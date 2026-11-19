@@ -1,0 +1,1 @@
+{"name":"Buscador Inteligente de Hinos","short_name":"Hinos","description":"Busca de hinos pelo tema, contexto e letra","lang":"pt-BR","start_url":"/assets/index.html","scope":"/assets/","display":"standalone","background_color":"#fbfcfa","theme_color":"#15483e","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
