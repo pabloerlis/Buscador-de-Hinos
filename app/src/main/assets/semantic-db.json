@@ -1,0 +1,1129 @@
+{
+  "schema_version": 1,
+  "revision": "2026-11-offline-1",
+  "kind": "Taxonomia semântica de temas cristãos para recuperação lexical associativa; NÃO contém letras nem revisões oficiais",
+  "method": "Sinais textuais observáveis no hino; expressões de intenção do usuário; relações temáticas ponderadas",
+  "items": [
+    {
+      "id": "fe",
+      "label": "Fé",
+      "evidence": [
+        "fé",
+        "creio",
+        "crer",
+        "cremos",
+        "pela fé",
+        "firme na fé",
+        "fé em deus",
+        "fé no senhor"
+      ],
+      "intent": [
+        "dúvida",
+        "incredulidade",
+        "acreditar em deus",
+        "fortalecer a fé",
+        "manter a fé"
+      ],
+      "related": {
+        "confianca": 0.7,
+        "esperanca": 0.55,
+        "perseveranca": 0.45
+      }
+    },
+    {
+      "id": "confianca",
+      "label": "Confiança",
+      "evidence": [
+        "confio",
+        "confiar",
+        "confiança",
+        "confiarei",
+        "confia",
+        "fiel é",
+        "refúgio",
+        "meu refúgio",
+        "seguro estou",
+        "amparo",
+        "meu socorro"
+      ],
+      "intent": [
+        "insegurança",
+        "incerteza",
+        "medo do futuro",
+        "preciso confiar",
+        "quando não sei o que fazer",
+        "confiar nas dificuldades",
+        "inseguro",
+        "insegura",
+        "ansiedade sobre o futuro"
+      ],
+      "related": {
+        "paz": 0.72,
+        "protecao": 0.6,
+        "fe": 0.7,
+        "esperanca": 0.55,
+        "direcao": 0.42
+      }
+    },
+    {
+      "id": "paz",
+      "label": "Paz",
+      "evidence": [
+        "paz",
+        "descanso",
+        "descansarei",
+        "tranquilidade",
+        "serenidade",
+        "quietude",
+        "sossegado",
+        "calma",
+        "repouso"
+      ],
+      "intent": [
+        "ansiedade",
+        "ansioso",
+        "ansiosa",
+        "inquietação",
+        "insônia",
+        "estou nervoso",
+        "preocupação",
+        "preocupado",
+        "acalmar a mente",
+        "descanso emocional",
+        "estou angustiado",
+        "sinto ansiedade",
+        "ansiedade constante",
+        "alívio para preocupação",
+        "preciso de calma"
+      ],
+      "related": {
+        "confianca": 0.72,
+        "consolo": 0.65,
+        "protecao": 0.37,
+        "esperanca": 0.32
+      }
+    },
+    {
+      "id": "consolo",
+      "label": "Consolo",
+      "evidence": [
+        "consolo",
+        "consolador",
+        "consolar",
+        "lágrimas",
+        "enxugará as lágrimas",
+        "acolheu",
+        "conforto",
+        "aflição",
+        "tribulação"
+      ],
+      "intent": [
+        "luto",
+        "perda de alguém",
+        "perdi uma pessoa",
+        "morte de familiar",
+        "triste",
+        "desânimo",
+        "sofrimento",
+        "dor emocional",
+        "sozinha",
+        "sozinho",
+        "angústia",
+        "angustiado",
+        "angustiada",
+        "tristeza",
+        "estou sofrendo",
+        "preciso de consolo"
+      ],
+      "related": {
+        "paz": 0.65,
+        "esperanca": 0.65,
+        "confianca": 0.45,
+        "tribulacao": 0.65
+      }
+    },
+    {
+      "id": "esperanca",
+      "label": "Esperança",
+      "evidence": [
+        "esperança",
+        "esperar no senhor",
+        "aguardar",
+        "promessa",
+        "promessas",
+        "esperarei",
+        "porvir",
+        "esperarei em deus"
+      ],
+      "intent": [
+        "desesperança",
+        "desanimado",
+        "desânimo",
+        "futuro incerto",
+        "renovar as forças",
+        "esperar por dias melhores"
+      ],
+      "related": {
+        "perseveranca": 0.58,
+        "consolo": 0.6,
+        "confianca": 0.53,
+        "vida_eterna": 0.48
+      }
+    },
+    {
+      "id": "tribulacao",
+      "label": "Tribulações",
+      "evidence": [
+        "tribulação",
+        "tribulações",
+        "provação",
+        "provações",
+        "aflição",
+        "aflições",
+        "luta",
+        "lutas",
+        "sofrimento",
+        "deserto",
+        "tempestade"
+      ],
+      "intent": [
+        "momentos difíceis",
+        "dificuldades",
+        "adversidades",
+        "crise",
+        "problemas",
+        "desafios",
+        "tempos difíceis",
+        "perseguição"
+      ],
+      "related": {
+        "consolo": 0.72,
+        "perseveranca": 0.62,
+        "confianca": 0.62,
+        "protecao": 0.4
+      }
+    },
+    {
+      "id": "perseveranca",
+      "label": "Perseverança",
+      "evidence": [
+        "perseverar",
+        "perseverança",
+        "persistir",
+        "permanecer fiel",
+        "até o fim",
+        "firme",
+        "constante",
+        "combater o bom combate"
+      ],
+      "intent": [
+        "continuar lutando",
+        "não desistir",
+        "persistência",
+        "desânimo",
+        "resistir às dificuldades",
+        "firmeza na caminhada"
+      ],
+      "related": {
+        "fe": 0.6,
+        "esperanca": 0.6,
+        "tribulacao": 0.5,
+        "vigilancia": 0.34
+      }
+    },
+    {
+      "id": "protecao",
+      "label": "Proteção",
+      "evidence": [
+        "proteção",
+        "proteger",
+        "guarda-me",
+        "guardará",
+        "escudo",
+        "fortaleza",
+        "livramento",
+        "meu abrigo",
+        "rocha firme",
+        "debaixo das asas",
+        "segurança"
+      ],
+      "intent": [
+        "perigo",
+        "insegurança",
+        "ameaça",
+        "me sinto desprotegido",
+        "pedir proteção",
+        "preciso de livramento"
+      ],
+      "related": {
+        "confianca": 0.65,
+        "paz": 0.43,
+        "direcao": 0.4
+      }
+    },
+    {
+      "id": "alegria",
+      "label": "Alegria",
+      "evidence": [
+        "alegria",
+        "alegre",
+        "regozijo",
+        "regozijai",
+        "júbilo",
+        "exultação",
+        "exultar",
+        "felicidade",
+        "cantar de alegria",
+        "alegres",
+        "felizes"
+      ],
+      "intent": [
+        "celebração",
+        "festa",
+        "culto alegre",
+        "hinos animados",
+        "contentamento",
+        "feliz",
+        "vitória recebida",
+        "mais alegres",
+        "músicas alegres",
+        "hinos mais animados",
+        "alegres"
+      ],
+      "related": {
+        "gratidao": 0.52,
+        "adoracao": 0.54,
+        "vitoria": 0.46
+      }
+    },
+    {
+      "id": "louvor",
+      "label": "Louvor",
+      "evidence": [
+        "louvor",
+        "louvarei",
+        "louvar",
+        "louvado",
+        "exaltar",
+        "exaltação",
+        "glorificarei",
+        "glorificar",
+        "cantar ao senhor",
+        "aleluia"
+      ],
+      "intent": [
+        "cânticos de louvor",
+        "adoração musical",
+        "louvores para o culto",
+        "exaltação a deus"
+      ],
+      "related": {
+        "adoracao": 0.75,
+        "gratidao": 0.4,
+        "alegria": 0.38
+      }
+    },
+    {
+      "id": "adoracao",
+      "label": "Adoração",
+      "evidence": [
+        "adoração",
+        "adorar",
+        "adoramos",
+        "adorarei",
+        "prostrar",
+        "diante do trono",
+        "glória ao senhor",
+        "santo santo santo",
+        "santidade do senhor"
+      ],
+      "intent": [
+        "culto de adoração",
+        "reverência a deus",
+        "adorar ao senhor",
+        "majestade de deus",
+        "adoração profunda"
+      ],
+      "related": {
+        "louvor": 0.77,
+        "santificacao": 0.38,
+        "gratidao": 0.3
+      }
+    },
+    {
+      "id": "gratidao",
+      "label": "Gratidão",
+      "evidence": [
+        "gratidão",
+        "agradeço",
+        "agradecer",
+        "agradecemos",
+        "agradecido",
+        "graças te dou",
+        "ação de graças",
+        "obrigado senhor",
+        "bendirei",
+        "grato",
+        "grata",
+        "dar graças"
+      ],
+      "intent": [
+        "agradecimento",
+        "bênçãos recebidas",
+        "reconhecer bondade",
+        "culto de gratidão",
+        "aniversário de gratidão"
+      ],
+      "related": {
+        "louvor": 0.6,
+        "alegria": 0.48,
+        "adoracao": 0.35
+      }
+    },
+    {
+      "id": "salvacao",
+      "label": "Salvação",
+      "evidence": [
+        "salvação",
+        "salvar",
+        "salvo",
+        "salvou",
+        "redentor",
+        "redimiu",
+        "redenção",
+        "resgatou",
+        "resgate",
+        "libertou",
+        "justificado"
+      ],
+      "intent": [
+        "aceitar jesus",
+        "plano da salvação",
+        "ser salvo",
+        "conversão",
+        "redenção em cristo"
+      ],
+      "related": {
+        "graca": 0.65,
+        "cruz": 0.66,
+        "perdao": 0.5,
+        "vida_eterna": 0.55
+      }
+    },
+    {
+      "id": "graca",
+      "label": "Graça de Deus",
+      "evidence": [
+        "graça",
+        "favor imerecido",
+        "pela graça",
+        "graça divina",
+        "maravilhosa graça",
+        "bondade de deus"
+      ],
+      "intent": [
+        "misericórdia divina",
+        "salvação pela graça",
+        "favor de deus",
+        "graça do senhor"
+      ],
+      "related": {
+        "salvacao": 0.65,
+        "perdao": 0.45,
+        "amor": 0.36
+      }
+    },
+    {
+      "id": "arrependimento",
+      "label": "Arrependimento",
+      "evidence": [
+        "arrependimento",
+        "arrepender",
+        "arrependido",
+        "pecador",
+        "confesso",
+        "confessar",
+        "meu pecado",
+        "coração quebrantado"
+      ],
+      "intent": [
+        "reconhecer erros",
+        "voltar para deus",
+        "quebrantamento",
+        "confissão de pecados",
+        "deixar o pecado"
+      ],
+      "related": {
+        "perdao": 0.65,
+        "humildade": 0.6,
+        "salvacao": 0.4,
+        "santificacao": 0.42
+      }
+    },
+    {
+      "id": "perdao",
+      "label": "Perdão",
+      "evidence": [
+        "perdão",
+        "perdoar",
+        "perdoaste",
+        "perdoado",
+        "remiu",
+        "lavou meus pecados",
+        "culpa apagada",
+        "absolvido"
+      ],
+      "intent": [
+        "culpa",
+        "restauração",
+        "pedir perdão",
+        "pecados perdoados",
+        "reconciliação"
+      ],
+      "related": {
+        "arrependimento": 0.65,
+        "salvacao": 0.5,
+        "graca": 0.45
+      }
+    },
+    {
+      "id": "cruz",
+      "label": "Cruz e sacrifício",
+      "evidence": [
+        "cruz",
+        "calvário",
+        "crucificado",
+        "madeiro",
+        "coroa de espinhos",
+        "seu sangue",
+        "precioso sangue",
+        "sacrifício",
+        "cordeiro de deus"
+      ],
+      "intent": [
+        "paixão de cristo",
+        "sofrimento de jesus",
+        "sacrifício de jesus",
+        "morte de cristo"
+      ],
+      "related": {
+        "salvacao": 0.75,
+        "perdao": 0.55,
+        "amor": 0.4,
+        "ressurreicao": 0.3
+      }
+    },
+    {
+      "id": "ressurreicao",
+      "label": "Ressurreição",
+      "evidence": [
+        "ressuscitou",
+        "ressurreto",
+        "ressurreição",
+        "ressurgiu",
+        "venceu a morte",
+        "túmulo vazio",
+        "cristo vive",
+        "jesus vive"
+      ],
+      "intent": [
+        "páscoa",
+        "jesus ressuscitou",
+        "ressurreição de cristo",
+        "vitória sobre a morte"
+      ],
+      "related": {
+        "vitoria": 0.56,
+        "salvacao": 0.45,
+        "vida_eterna": 0.45
+      }
+    },
+    {
+      "id": "vida_eterna",
+      "label": "Vida eterna",
+      "evidence": [
+        "vida eterna",
+        "eternidade",
+        "céu",
+        "glória eterna",
+        "lar celestial",
+        "morada eterna",
+        "para sempre com o senhor",
+        "mansões celestiais"
+      ],
+      "intent": [
+        "vida após a morte",
+        "destino eterno",
+        "esperança celestial",
+        "céu com jesus",
+        "eternidade com deus"
+      ],
+      "related": {
+        "esperanca": 0.52,
+        "salvacao": 0.58,
+        "volta_jesus": 0.47
+      }
+    },
+    {
+      "id": "volta_jesus",
+      "label": "Volta de Jesus",
+      "evidence": [
+        "maranata",
+        "jesus voltará",
+        "cristo voltará",
+        "volta de jesus",
+        "segunda vinda",
+        "vem senhor jesus",
+        "em breve virá",
+        "encontro com jesus",
+        "arrebatamento"
+      ],
+      "intent": [
+        "retorno de cristo",
+        "segunda vinda",
+        "volta de cristo",
+        "preparação para a vinda",
+        "jesus está voltando"
+      ],
+      "related": {
+        "vigilancia": 0.86,
+        "vida_eterna": 0.5,
+        "esperanca": 0.38
+      }
+    },
+    {
+      "id": "vigilancia",
+      "label": "Vigilância",
+      "evidence": [
+        "vigiai",
+        "vigiar",
+        "vigilância",
+        "velar",
+        "preparai-vos",
+        "estai preparados",
+        "atento",
+        "despertar espiritual",
+        "lâmpadas acesas",
+        "esperar o noivo",
+        "vigilantes",
+        "vigiamos",
+        "preparados"
+      ],
+      "intent": [
+        "preparação da igreja",
+        "estar preparado",
+        "vigiar e orar",
+        "noiva preparada",
+        "viver em vigilância",
+        "estar vigilante"
+      ],
+      "related": {
+        "volta_jesus": 0.82,
+        "oracao": 0.35,
+        "perseveranca": 0.4
+      }
+    },
+    {
+      "id": "espirito_santo",
+      "label": "Espírito Santo",
+      "evidence": [
+        "espírito santo",
+        "espírito de deus",
+        "consolador",
+        "paráclito",
+        "pentecostes",
+        "ungido pelo espírito",
+        "enche-me espírito",
+        "espírito da verdade"
+      ],
+      "intent": [
+        "unção",
+        "batismo com o espírito santo",
+        "dons espirituais",
+        "operação do espírito",
+        "ser cheio do espírito"
+      ],
+      "related": {
+        "oracao": 0.42,
+        "consolo": 0.36,
+        "santificacao": 0.38
+      }
+    },
+    {
+      "id": "oracao",
+      "label": "Oração",
+      "evidence": [
+        "oração",
+        "orar",
+        "orarei",
+        "oremos",
+        "clamarei",
+        "clamor",
+        "clamar",
+        "joelhos",
+        "interceder",
+        "súplica",
+        "suplicar"
+      ],
+      "intent": [
+        "vida de oração",
+        "intercessão",
+        "oração por alguém",
+        "pedir ajuda a deus",
+        "buscar ao senhor"
+      ],
+      "related": {
+        "fe": 0.4,
+        "direcao": 0.38,
+        "espirito_santo": 0.35
+      }
+    },
+    {
+      "id": "comunhao",
+      "label": "Comunhão",
+      "evidence": [
+        "comunhão",
+        "unidade",
+        "unidos em cristo",
+        "corpo de cristo",
+        "irmãos em cristo",
+        "fraternidade",
+        "um só corpo",
+        "congregação"
+      ],
+      "intent": [
+        "união da igreja",
+        "fraternidade",
+        "comunhão dos irmãos",
+        "amizade cristã",
+        "unidade do povo de deus"
+      ],
+      "related": {
+        "igreja": 0.75,
+        "amor": 0.55,
+        "servico": 0.3
+      }
+    },
+    {
+      "id": "igreja",
+      "label": "Igreja",
+      "evidence": [
+        "igreja",
+        "congregação",
+        "assembleia dos santos",
+        "noiva do cordeiro",
+        "povo de deus",
+        "corpo de cristo"
+      ],
+      "intent": [
+        "edificação da igreja",
+        "casa de deus",
+        "vida congregacional",
+        "unidade da igreja"
+      ],
+      "related": {
+        "comunhao": 0.66,
+        "volta_jesus": 0.26,
+        "servico": 0.38
+      }
+    },
+    {
+      "id": "ceia",
+      "label": "Santa Ceia",
+      "evidence": [
+        "santa ceia",
+        "ceia do senhor",
+        "partir do pão",
+        "tomai e comei",
+        "em memória de mim",
+        "pão e cálice",
+        "cálice da aliança"
+      ],
+      "intent": [
+        "culto de ceia",
+        "comunhão na mesa",
+        "memorial de cristo",
+        "ceia de jesus"
+      ],
+      "related": {
+        "cruz": 0.65,
+        "comunhao": 0.48,
+        "salvacao": 0.35
+      }
+    },
+    {
+      "id": "batismo",
+      "label": "Batismo",
+      "evidence": [
+        "batismo",
+        "batizar",
+        "batizado",
+        "águas do batismo",
+        "sepultados com cristo",
+        "nova criatura",
+        "nascer de novo"
+      ],
+      "intent": [
+        "culto de batismo",
+        "profissão de fé",
+        "vida nova em cristo",
+        "batizar nas águas"
+      ],
+      "related": {
+        "salvacao": 0.54,
+        "renovacao": 0.48,
+        "igreja": 0.28
+      }
+    },
+    {
+      "id": "evangelizacao",
+      "label": "Evangelização",
+      "evidence": [
+        "evangelho",
+        "anunciar a palavra",
+        "pregai o evangelho",
+        "boas novas",
+        "testemunhar",
+        "salvar almas",
+        "alcançar os perdidos"
+      ],
+      "intent": [
+        "evangelismo",
+        "culto evangelístico",
+        "convidar pessoas para jesus",
+        "pregação do evangelho"
+      ],
+      "related": {
+        "missao": 0.74,
+        "salvacao": 0.63,
+        "servico": 0.4
+      }
+    },
+    {
+      "id": "missao",
+      "label": "Missão",
+      "evidence": [
+        "missão",
+        "missões",
+        "ide por todo o mundo",
+        "enviar",
+        "enviado",
+        "seara",
+        "obreiros",
+        "pregar aos povos"
+      ],
+      "intent": [
+        "missionários",
+        "obra missionária",
+        "alcançar nações",
+        "campo missionário"
+      ],
+      "related": {
+        "evangelizacao": 0.75,
+        "servico": 0.62,
+        "obediencia": 0.28
+      }
+    },
+    {
+      "id": "amor",
+      "label": "Amor",
+      "evidence": [
+        "amor",
+        "amarei",
+        "amados",
+        "amou",
+        "misericórdia",
+        "compaixão",
+        "bondade",
+        "caridade"
+      ],
+      "intent": [
+        "amor de deus",
+        "amor fraternal",
+        "amar o próximo",
+        "afeto cristão"
+      ],
+      "related": {
+        "comunhao": 0.45,
+        "graca": 0.35,
+        "servico": 0.42,
+        "perdao": 0.3
+      }
+    },
+    {
+      "id": "humildade",
+      "label": "Humildade",
+      "evidence": [
+        "humildade",
+        "humilde",
+        "humilhar",
+        "quebrantado",
+        "pequeno sou",
+        "manso",
+        "sem nenhuma força"
+      ],
+      "intent": [
+        "dependência de deus",
+        "renunciar ao orgulho",
+        "submissão",
+        "humilhar-se perante deus"
+      ],
+      "related": {
+        "arrependimento": 0.53,
+        "obediencia": 0.4,
+        "oracao": 0.36
+      }
+    },
+    {
+      "id": "obediencia",
+      "label": "Obediência",
+      "evidence": [
+        "obedecer",
+        "obediência",
+        "mandamentos",
+        "vontade de deus",
+        "te seguirei",
+        "seguir tua voz",
+        "guardar tua palavra"
+      ],
+      "intent": [
+        "seguir a direção de deus",
+        "submissão à vontade de deus",
+        "caminho correto"
+      ],
+      "related": {
+        "direcao": 0.55,
+        "servico": 0.43,
+        "santificacao": 0.52
+      }
+    },
+    {
+      "id": "santificacao",
+      "label": "Santificação",
+      "evidence": [
+        "santificação",
+        "santidade",
+        "vida santa",
+        "consagrar",
+        "consagração",
+        "purificar",
+        "pureza",
+        "separado para deus",
+        "santo viver"
+      ],
+      "intent": [
+        "vida consagrada",
+        "pureza espiritual",
+        "ser santo",
+        "transformação pessoal"
+      ],
+      "related": {
+        "obediencia": 0.58,
+        "renovacao": 0.45,
+        "arrependimento": 0.36
+      }
+    },
+    {
+      "id": "renovacao",
+      "label": "Renovação espiritual",
+      "evidence": [
+        "renovo",
+        "renovar",
+        "renovado",
+        "novo coração",
+        "transformação",
+        "nova vida",
+        "restaurar",
+        "restauração"
+      ],
+      "intent": [
+        "recomeço espiritual",
+        "voltar ao primeiro amor",
+        "renovar forças",
+        "transformação interior"
+      ],
+      "related": {
+        "espirito_santo": 0.4,
+        "esperanca": 0.48,
+        "santificacao": 0.5
+      }
+    },
+    {
+      "id": "direcao",
+      "label": "Direção divina",
+      "evidence": [
+        "guia-me",
+        "guiar",
+        "guia meus passos",
+        "direção",
+        "teu caminho",
+        "mostra-me o caminho",
+        "conduze-me",
+        "meu pastor",
+        "pastor me guia"
+      ],
+      "intent": [
+        "tomada de decisão",
+        "escolher um caminho",
+        "orientação divina",
+        "buscar direção",
+        "decisão difícil",
+        "não sei que decisão tomar",
+        "devo escolher",
+        "preciso de orientação"
+      ],
+      "related": {
+        "confianca": 0.53,
+        "oracao": 0.45,
+        "obediencia": 0.42
+      }
+    },
+    {
+      "id": "vitoria",
+      "label": "Vitória",
+      "evidence": [
+        "vitória",
+        "vencerei",
+        "vencido",
+        "triunfo",
+        "vencedor",
+        "superação",
+        "venceu",
+        "conquistou"
+      ],
+      "intent": [
+        "superar obstáculos",
+        "vencendo dificuldades",
+        "triunfo espiritual",
+        "vitória em cristo"
+      ],
+      "related": {
+        "alegria": 0.52,
+        "confianca": 0.4,
+        "ressurreicao": 0.35
+      }
+    },
+    {
+      "id": "familia",
+      "label": "Família",
+      "evidence": [
+        "família",
+        "lar",
+        "esposo",
+        "esposa",
+        "filhos",
+        "pais e filhos",
+        "casamento",
+        "matrimônio"
+      ],
+      "intent": [
+        "casamento",
+        "família cristã",
+        "culto familiar",
+        "oração pela família"
+      ],
+      "related": {
+        "amor": 0.55,
+        "comunhao": 0.35,
+        "oracao": 0.32
+      }
+    },
+    {
+      "id": "criancas",
+      "label": "Crianças",
+      "evidence": [
+        "crianças",
+        "pequeninos",
+        "meninos",
+        "meninas",
+        "infância",
+        "criança",
+        "pequeno cordeiro"
+      ],
+      "intent": [
+        "escola bíblica",
+        "culto infantil",
+        "classe de crianças",
+        "hinos para crianças"
+      ],
+      "related": {
+        "familia": 0.38,
+        "amor": 0.3
+      }
+    },
+    {
+      "id": "servico",
+      "label": "Serviço cristão",
+      "evidence": [
+        "servir",
+        "serviço",
+        "trabalho na obra",
+        "servo",
+        "servos",
+        "trabalhar na seara",
+        "servindo ao senhor"
+      ],
+      "intent": [
+        "dedicação à obra",
+        "servir na igreja",
+        "disposição para ajudar",
+        "trabalho voluntário"
+      ],
+      "related": {
+        "missao": 0.48,
+        "obediencia": 0.43,
+        "amor": 0.35
+      }
+    },
+    {
+      "id": "biblia",
+      "label": "Palavra de Deus",
+      "evidence": [
+        "palavra de deus",
+        "tua palavra",
+        "escrituras",
+        "palavra do senhor",
+        "bíblia",
+        "lei do senhor",
+        "evangelho eterno"
+      ],
+      "intent": [
+        "meditação bíblica",
+        "estudo bíblico",
+        "leitura da bíblia",
+        "ensino da palavra"
+      ],
+      "related": {
+        "obediencia": 0.5,
+        "direcao": 0.5,
+        "fe": 0.32
+      }
+    },
+    {
+      "id": "cura",
+      "label": "Cura",
+      "evidence": [
+        "curar",
+        "cura",
+        "restabelecer",
+        "enfermidade",
+        "doença",
+        "enfermos",
+        "sarar",
+        "feridas curadas"
+      ],
+      "intent": [
+        "doente",
+        "enfermidade",
+        "hospital",
+        "oração pela saúde",
+        "restabelecimento"
+      ],
+      "related": {
+        "consolo": 0.48,
+        "oracao": 0.55,
+        "esperanca": 0.4
+      }
+    }
+  ]
+}

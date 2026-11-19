@@ -3,6 +3,13 @@ package br.com.buscadordehinos.app;
 import android.app.Activity;
 import android.content.Intent;
 import android.content.res.Configuration;
+import android.database.Cursor;
+import android.provider.OpenableColumns;
+import android.os.ParcelFileDescriptor;
+import android.content.SharedPreferences;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.Locale;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -32,6 +39,23 @@ public final class MainActivity extends Activity {
     private static final String DATA_URL = "https://raw.githubusercontent.com/italozaina/projection-html5-icm/master/data/data.json";
     private static final int MAX_JSON_BYTES = 12_000_000;
     private static final int PICK_FILE = 1205;
+    private static final int PICK_GGUF = 1206;
+    private static final String PREFS = "hinos_local_llm";
+    private static final String MODEL_URI_KEY = "model_uri";
+    private final ExecutorService llmExecutor=Executors.newSingleThreadExecutor();
+    private volatile boolean modelLoaded=false;
+    private volatile boolean llmBusy=false;
+    private ParcelFileDescriptor modelDescriptor;
+    private static final boolean NATIVE_AVAILABLE;
+    static {
+        boolean available;
+        try { System.loadLibrary("hinosllm"); available=true; }
+        catch(Throwable error) { available=false; }
+        NATIVE_AVAILABLE=available;
+    }
+    private static native String nativeLoad(String path);
+    private static native String nativeGenerate(String prompt,int maxTokens);
+    private static native void nativeUnload();
     private WebView web;
     private ValueCallback<Uri[]> pendingFile;
 
@@ -81,6 +105,7 @@ public final class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new ImportBridge(), "NativeHinos");
+        web.addJavascriptInterface(new ModelBridge(), "NativeGGUF");
         web.loadUrl(HOST + "/assets/index.html");
     }
     private static WebResourceResponse forbidden(){
@@ -101,6 +126,34 @@ public final class MainActivity extends Activity {
             pendingFile.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode,data));
             pendingFile=null;
         }
+        if(requestCode==PICK_GGUF){
+            if(resultCode!=RESULT_OK || data==null || data.getData()==null){
+                ggufEvent("selection", false, "Seleção cancelada.");return;
+            }
+            Uri uri=data.getData();
+            try {
+                String name=modelName(uri);
+                if(!name.toLowerCase(Locale.ROOT).endsWith(".gguf"))throw new IOException("Selecione um arquivo com extensão .gguf.");
+                try(InputStream input=getContentResolver().openInputStream(uri)) {
+                    if(input==null||input.read()!='G'||input.read()!='G'||input.read()!='U'||input.read()!='F')
+                        throw new IOException("Arquivo inválido: cabeçalho GGUF não encontrado.");
+                }
+                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                // Somente a seleção é persistida. O modelo deve ser carregado explicitamente.
+                getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString(MODEL_URI_KEY,uri.toString()).apply();
+                if(modelLoaded){
+                    llmBusy=true;
+                    llmExecutor.execute(()->{
+                        try{
+                            if(NATIVE_AVAILABLE)nativeUnload();
+                            modelLoaded=false;
+                            if(modelDescriptor!=null){modelDescriptor.close();modelDescriptor=null;}
+                        }catch(Exception ignored){}
+                        finally{llmBusy=false;ggufEvent("selection",true,name);}
+                    });
+                }else ggufEvent("selection",true,name);
+            }catch(Exception ex){ggufEvent("selection",false,errorMessage(ex));}
+        }
     }
     @Override public void onBackPressed(){
         web.evaluateJavascript("(function(){var layer=document.querySelector('.modal-layer:not(.hidden)');if(layer){var close=layer.querySelector('[data-close]');if(close)close.click();return true;}return false;})()", value -> {
@@ -109,9 +162,97 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onDestroy(){
         if(pendingFile!=null)pendingFile.onReceiveValue(null);
-        if(web!=null){web.removeJavascriptInterface("NativeHinos");web.destroy();web=null;}
+        if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeGGUF");web.destroy();web=null;}
+        llmExecutor.execute(()->{if(NATIVE_AVAILABLE)nativeUnload();if(modelDescriptor!=null){try{modelDescriptor.close();}catch(IOException ignored){}}});
+        llmExecutor.shutdown();
         super.onDestroy();
     }
+    private String modelName(Uri uri) {
+        try(Cursor cursor=getContentResolver().query(uri,null,null,null,null)) {
+            if(cursor!=null&&cursor.moveToFirst()){
+                int col=cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if(col>=0&&!cursor.isNull(col))return cursor.getString(col);
+            }
+        }catch(Exception ignored){}
+        return uri.getLastPathSegment()==null?"modelo.gguf":uri.getLastPathSegment();
+    }
+    private long modelSize(Uri uri){
+        try(Cursor cursor=getContentResolver().query(uri,null,null,null,null)){
+            if(cursor!=null&&cursor.moveToFirst()){
+                int col=cursor.getColumnIndex(OpenableColumns.SIZE);
+                if(col>=0&&!cursor.isNull(col))return cursor.getLong(col);
+            }
+        }catch(Exception ignored){}
+        return -1;
+    }
+    private static String errorMessage(Throwable ex){return ex.getMessage()==null?ex.getClass().getSimpleName():ex.getMessage();}
+    private void ggufEvent(String event,boolean ok,String value){
+        String js="window.__ggufNativeEvent && window.__ggufNativeEvent("+JSONObject.quote(event)+","+ok+","+JSONObject.quote(value)+");";
+        runOnUiThread(()->{if(web!=null)web.evaluateJavascript(js,null);});
+    }
+    public class ModelBridge {
+        @JavascriptInterface public String status(){
+            try{
+                String uriString=getSharedPreferences(PREFS,MODE_PRIVATE).getString(MODEL_URI_KEY,null);
+                JSONObject result=new JSONObject();
+                result.put("available",NATIVE_AVAILABLE);
+                result.put("selected",uriString!=null);
+                result.put("loaded",modelLoaded);
+                result.put("busy",llmBusy);
+                result.put("name",uriString!=null?modelName(Uri.parse(uriString)):"");
+                return result.toString();
+            }catch(Exception error){return "{}";}
+        }
+        @JavascriptInterface public void selectModel(){
+            runOnUiThread(()->{
+                if(llmBusy){ggufEvent("selection",false,"Aguarde o processamento em andamento.");return;}
+                Intent intent=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("*/*");
+                intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+                try {startActivityForResult(intent,PICK_GGUF);}
+                catch(Exception ex){ggufEvent("selection",false,errorMessage(ex));}
+            });
+        }
+        @JavascriptInterface public void loadModel(){
+            if(!NATIVE_AVAILABLE){ggufEvent("load",false,"Motor nativo indisponível nesta arquitetura.");return;}
+            if(llmBusy){ggufEvent("load",false,"O modelo já está ocupado.");return;}
+            llmBusy=true;
+            llmExecutor.execute(()->{
+                try{
+                    String uriString=getSharedPreferences(PREFS,MODE_PRIVATE).getString(MODEL_URI_KEY,null);
+                    if(uriString==null)throw new IOException("Selecione um modelo GGUF primeiro.");
+                    Uri uri=Uri.parse(uriString);
+                    long size=modelSize(uri);
+                    android.app.ActivityManager.MemoryInfo memory=new android.app.ActivityManager.MemoryInfo();
+                    android.app.ActivityManager manager=(android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE);
+                    manager.getMemoryInfo(memory);
+                    if(size>0 && size>memory.totalMem*0.80)
+                        throw new IOException("O GGUF é grande demais para a memória total do aparelho; escolha um modelo menor.");
+                    if(modelLoaded){nativeUnload();modelLoaded=false;}
+                    if(modelDescriptor!=null){modelDescriptor.close();modelDescriptor=null;}
+                    modelDescriptor=getContentResolver().openFileDescriptor(uri,"r");
+                    if(modelDescriptor==null)throw new IOException("Não foi possível abrir o GGUF.");
+                    String message=nativeLoad("/proc/self/fd/"+modelDescriptor.getFd());
+                    modelLoaded=true;
+                    ggufEvent("load",true,message);
+                }catch(Throwable ex){modelLoaded=false;ggufEvent("load",false,errorMessage(ex));}
+                finally{llmBusy=false;}
+            });
+        }
+        @JavascriptInterface public void generate(String prompt){
+            if(llmBusy){ggufEvent("generate",false,"O modelo já está em uso.");return;}
+            if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um modelo GGUF primeiro.");return;}
+            if(prompt==null||prompt.trim().isEmpty()||prompt.length()>2400){ggufEvent("generate",false,"Consulta inválida ou longa demais.");return;}
+            llmBusy=true;
+            llmExecutor.execute(()->{
+                try {ggufEvent("generate",true,nativeGenerate(prompt,112));}
+                catch(Throwable ex){ggufEvent("generate",false,errorMessage(ex));}
+                finally{llmBusy=false;}
+            });
+        }
+    }
+
     public class ImportBridge {
         @JavascriptInterface public void downloadCollection(){
             new Thread(()->{

@@ -12,11 +12,12 @@ async function refreshStatus() {
   $('collection-label').textContent=result.ready?result.collection:'Coletânea não importada';
   $('data-count').textContent=result.ready?`${result.hymn_count} hinos disponíveis`:'Aguardando base';
   $('import-panel').classList.toggle('hidden',result.ready);
-  $('refine-mode').textContent=result.ai_configured?'IA conectada · busca contextual':'Busca contextual local';
+  $('refine-mode').textContent=result.semantic_ready?'Busca semântica offline':'Busca contextual local';
   $('settings-collection').textContent=result.collection||'Não importada';
   $('settings-count').textContent=result.hymn_count;
   $('settings-ai').textContent=result.ai_configured?'Configurada':'Desativada';
-  $('settings-vectors').textContent=result.vector_count?`${result.vector_count} hinos`:'Não gerado';
+  $('settings-vectors').textContent=result.semantic_ready?`${result.semantic_topics} temas locais`:'Não carregada';
+  if(typeof GGUF !== 'undefined') GGUF.info();
   return result;
 }
 function busySearch(value) {
@@ -55,7 +56,7 @@ async function performSearch(query, {page=1, refine=false}={}) {
       const note=$('notice');
       const fragments=[];
       if(data.used_ai)fragments.push('Interpretação contextual processada com IA.');
-      else if(refine)fragments.push('Busca contextual local aplicado.');
+      else if(refine)fragments.push('Critérios contextuais aplicados localmente.');
       if(data.summary)fragments.push(data.summary);
       if(data.excluded?.length)fragments.push('Excluindo: '+data.excluded.join(', ')+'.');
       note.textContent=fragments.join(' ');note.classList.toggle('hidden',!fragments.length);
@@ -134,3 +135,59 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeLayer();});
 refreshStatus().catch(e=>toast('Não foi possível acessar a base local: '+e.message));
 // Android WebView: arquivos locais empacotados, sem service worker.
+
+// Integração com llama.cpp nativo (Android ARM64).
+const GGUF = (()=>{
+  const native = () => window.NativeGGUF || null;
+  let ready = false, busy = false;
+  function info() {
+    let status={};
+    try {if(native()?.status)status=JSON.parse(native().status());}catch(e){}
+    ready=Boolean(status.loaded);
+    const name=status.name || 'Nenhum arquivo selecionado';
+    const available=Boolean(status.available);
+    $('gguf-select').disabled=!available||busy;
+    $('gguf-load').disabled=!available||!status.selected||busy;
+    $('gguf-improve').disabled=!ready||busy;
+    $('settings-ai').textContent=ready?'Ativo':status.selected?'Selecionado':'Desativado';
+    $('gguf-status').textContent=!available?'Motor nativo indisponível neste dispositivo.':ready?'Modelo ativo: '+name:status.selected?'Selecionado: '+name+' (não carregado)':'Nenhum modelo selecionado. A busca local continua ativa.';
+    $('gguf-banner').classList.toggle('hidden',!ready||!state.ready);
+    return status;
+  }
+  function setBusy(value,message){busy=value;info();if(message)$('gguf-status').textContent=message;}
+  window.__ggufNativeEvent=(event,ok,value)=>{
+    setBusy(false);
+    if(event==='selection') {if(ok)toast('GGUF selecionado: '+value);else if(value!=='Seleção cancelada.')toast(value);}
+    else if(event==='load') {toast(ok?'Modelo local carregado.':('Não foi possível carregar: '+value));}
+    else if(event==='generate') {
+      if(!ok){toast('Falha do modelo: '+value);return;}
+      // Saída do modelo é apenas uma sugestão de termos; resultados sempre vêm do JSON local.
+      const expansion=String(value).replace(/<[^>]*>/g,' ').replace(/[\r\n]+/g,' ').replace(/[^\p{L}\p{N} .,;:!()\-]/gu,' ').trim().slice(0,260);
+      if(!expansion){toast('Modelo não sugeriu termos úteis.');return;}
+      const original=state.effectiveQuery||state.originalQuery;
+      if(original){
+        appendConversation('assistant','IA local sugeriu: '+expansion+' — conferindo nas letras da coletânea.');
+        performSearch((original+' '+expansion).slice(0,500)).then(success=>{
+          if(success){$('notice').textContent='Pesquisa expandida com o modelo local GGUF. Resultados conferidos na coletânea.';$('notice').classList.remove('hidden');}
+        });
+      }
+    }
+    info();
+  };
+  $('gguf-select').addEventListener('click',()=>{if(native()?.selectModel){setBusy(true,'Selecione um arquivo GGUF no armazenamento do aparelho…');native().selectModel();}});
+  $('gguf-load').addEventListener('click',()=>{if(native()?.loadModel){setBusy(true,'Carregando GGUF na memória. Esta etapa pode ser demorada…');native().loadModel();}});
+  $('gguf-improve').addEventListener('click',()=>{
+    if(!ready||busy)return;
+    const original=state.effectiveQuery||state.originalQuery;
+    if(!original)return;
+    const prompt='Você ajuda a encontrar hinos de uma coletânea cristã. Interprete a consulta e retorne APENAS uma frase curta em português contendo temas espirituais equivalentes e sinônimos úteis, sem citar números de hinos e sem inventar letras. Consulta: '+original+'\nTemas relacionados:';
+    setBusy(true,'Modelo GGUF interpretando a busca localmente…');
+    $('gguf-banner-text').textContent='IA local processando consulta…';
+    native().generate(prompt);
+  });
+  info();
+  // Invocado após a importação; garante que a ação de GGUF apareça nos resultados.
+  const observer=new MutationObserver(()=>info());
+  observer.observe($('import-panel'),{attributes:true,attributeFilter:['class']});
+  return {info};
+})();

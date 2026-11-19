@@ -9,6 +9,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <script src="semantic-engine.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -77,14 +78,15 @@
           <div class="results-layout">
             <div class="results-main">
               <div id="notice" class="notice hidden" role="status"></div>
-              <div id="results-list" class="results-list" aria-live="polite"></div>
+              <div id="gguf-banner" class="gguf-banner hidden" role="status"><span id="gguf-banner-text">Modelo GGUF pronto para refinar sua consulta.</span><button id="gguf-improve" class="secondary-btn" type="button">Reinterpretar com GGUF</button></div>
+        <div id="results-list" class="results-list" aria-live="polite"></div>
               <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
             </div>
             <aside class="refine-panel">
               <div class="refine-header"><span class="refine-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6 3 3M6 18l3-3m6-6 3-3"/></svg></span><div><h3>Refinar com contexto</h3><p id="refine-mode">Busca contextual</p></div></div>
               <div id="conversation" class="conversation" aria-live="polite"><div class="assistant-message">Precisa de algo mais específico? Descreva a mensagem ou ocasião desejada.</div></div>
               <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
-              <p class="privacy-note">Busca contextual local no aparelho. Não há transmissão de pesquisas nem IA generativa nesta versão Android.</p>
+              <p class="privacy-note">Busca local por temas; se você carregar um GGUF, a interpretação também ocorrerá no aparelho, sem envio de consultas.</p>
             </aside>
           </div>
         </div>
@@ -106,7 +108,14 @@
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca textual e contextual em letras de uma coletânea. Esta versão Android usa busca contextual local, sem serviços de IA externos.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>IA generativa</span><strong id="settings-ai">—</strong><span>Índice vetorial</span><strong id="settings-vectors">—</strong></div><p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p><div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar do GitHub</button><label class="secondary-btn file-upload">Importar outro JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div></div>
+      <div class="settings-content"><p>Busca textual e contextual em letras de uma coletânea. Esta versão Android usa uma taxonomia semântica local e aceita um modelo GGUF opcional, executado no próprio aparelho, sem enviar consultas à internet.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong></div><section class="gguf-box" aria-label="Modelo de IA local">
+        <h3>IA local (GGUF)</h3>
+        <p>Escolha um arquivo <code>.gguf</code> do telefone e carregue-o para reinterpretar pesquisas. O modelo não é enviado a servidores. Preferencialmente use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
+        <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
+        <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
+        <p class="setting-warning">O arquivo precisa estar no armazenamento local do Android e permanecer acessível. Modelos grandes podem exceder a RAM e fechar o aplicativo. Funciona apenas em dispositivos Android ARM64. Caso não configure o modelo, a busca semântica por regras continua funcionando offline.</p>
+      </section>
+      <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p><div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar do GitHub</button><label class="secondary-btn file-upload">Importar outro JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div></div>
     </section>
   </div>
   <div id="toast" role="status" class="toast hidden"></div>

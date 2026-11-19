@@ -38,6 +38,17 @@ const OfflineAPI = (() => {
   let hymns=[];
   let metadata={collection:'',edition:'',hymn_count:0};
   let initialized;
+  let semantic=null;
+  async function loadSemantic(){
+    if(typeof SemanticEngine==='undefined')return;
+    try {
+      const response=await fetch('semantic-db.json');
+      if(!response.ok)throw Error('Base semântica indisponível');
+      semantic=SemanticEngine.create(await response.json());
+    }catch(error){
+      console.warn('Base semântica opcional indisponível:',error.message);
+    }
+  }
 
   function plainText(content) {
     let html = String(content??'').replace(/\\n/g,'\n');
@@ -79,7 +90,7 @@ const OfflineAPI = (() => {
     }finally{db.close();}
   }
   async function init(){
-    if (!initialized)initialized=(async()=>{const cache=await readCache();if(cache&&Array.isArray(cache.hymns)){hymns=cache.hymns;metadata=cache.metadata;} })().catch(e=>{initialized=null;throw e;});
+    if (!initialized)initialized=(async()=>{await loadSemantic();const cache=await readCache();if(cache&&Array.isArray(cache.hymns)){hymns=cache.hymns;metadata=cache.metadata;if(semantic&&cache.semantic_revision!==semantic.revision){for(let i=0;i<hymns.length;i++){const song=hymns[i];song.semantic_profile=semantic.indexHymn(song.title,song.lyrics);song.topics=song.semantic_profile.slice(0,12).map(t=>t.label);if(i&&i%100===0)await yieldThread();}await writeCache({hymns,metadata,semantic_revision:semantic.revision});}} })().catch(e=>{initialized=null;throw e;});
     return initialized;
   }
   async function importJson(data){
@@ -96,19 +107,21 @@ const OfflineAPI = (() => {
       if(!parsed.title||!lyrics)continue;
       let number=(song.number??song.numero); number=number!==undefined&&number!==null&&/^\d+$/.test(String(number))?String(number).padStart(3,'0'):parsed.number;
       const searchable=normalize(parsed.title+' '+lyrics), titleNorm=normalize(parsed.title);
-      next.push({id:next.length+1,number,title:parsed.title,lyrics,collection,edition,searchable,titleNorm,topics:themes(parsed.title+' '+lyrics)});
+      const semantic_profile=semantic?semantic.indexHymn(parsed.title,lyrics):[];
+      const topics=semantic?semantic_profile.slice(0,12).map(t=>t.label):themes(parsed.title+' '+lyrics);
+      next.push({id:next.length+1,number,title:parsed.title,lyrics,collection,edition,searchable,titleNorm,topics,semantic_profile});
       if(i&&i%100===0)await yieldThread();
     }
     if(!next.length)throw Error('Nenhum hino válido neste JSON.');
     const newMeta={collection,edition,hymn_count:next.length};
-    await writeCache({hymns:next,metadata:newMeta});
+    await writeCache({hymns:next,metadata:newMeta,semantic_revision:semantic?.revision||null});
     hymns=next;metadata=newMeta;
     return {ok:true,collection,edition,count:hymns.length};
   }
-  function makeSnippet(song,qTokens,selectedTopics){
+  function makeSnippet(song,qTokens,selectedTopics,semanticCues=[]){
     const lines=song.lyrics.split(/\n/).map(x=>x.replace(/\s+/g,' ').trim()).filter(Boolean);
     if(!lines.length)return '';
-    const clues=qTokens.concat(selectedTopics.flatMap(t=>THEME_WORDS[t]||[]).filter(w=>w.length>=4));
+    const clues=qTokens.concat(semanticCues.map(normalize),selectedTopics.flatMap(t=>THEME_WORDS[t]||[]).filter(w=>w.length>=4));
     const weight=line=>{const norm=normalize(line);return clues.reduce((sum,w)=>sum+(norm.includes(w)?(qTokens.includes(w)?3:1):0),0);};
     const best=lines.reduce((prev,next)=>weight(next)>weight(prev)?next:prev,lines[0]);
     return best.length>210?best.slice(0,210)+'…':best;
@@ -132,11 +145,12 @@ const OfflineAPI = (() => {
     const excluded=payload?.refine? [...new Set([...(fresh?[]:inherited),...ctx.excluded])].slice(0,4):ctx.excluded;
     if(!query)return {results:[],page,total:0,has_more:false,effective_query:query,excluded,used_ai:false,summary:'Nenhum critério positivo informado.'};
     const norm=normalize(query), numberMatch=norm.match(/^(?:hino\s*|louvor\s*)?(\d{1,4})$/);
-    const selectedTopics=themes(query),qTokens=tokens(query);
+    const intent=semantic?semantic.interpret(query):null;
+    const selectedTopics=intent?intent.direct.map(t=>t.label):themes(query),qTokens=tokens(query);
     const excludedNorm=excluded.map(normalize);
     const ranked=[];
     for(const song of hymns){
-      let score=0;const evidence=[];
+      let score=0;const evidence=[];let semanticResult=null;
       if(numberMatch){
         if(!song.number||Number(song.number)!==Number(numberMatch[1]))continue;
         score=100;evidence.push('número exato');
@@ -149,20 +163,27 @@ const OfflineAPI = (() => {
           if(hasWord(song.searchable,token))score+=2.3;
           else if(token.length>=5&&song.searchable.includes(token.slice(0,5)))score+=0.6;
         }
-        const matching=selectedTopics.filter(t=>song.topics.includes(t));
-        score+=matching.length*6.5;
-        if(matching.length)evidence.push('tema: '+matching.slice(0,2).join(', ').toLowerCase());
-        for(const t of selectedTopics){
-          const synonyms=(THEME_WORDS[t]||[]).filter(w=>!qTokens.includes(w)&&w.length>=4);
-          const count=synonyms.reduce((n,w)=>n+(hasWord(song.searchable,w)?1:0),0);
-          score+=Math.min(3.5,count*.65);
+        if (semantic && intent){
+          semanticResult=semantic.evaluate(song.semantic_profile||[],intent);
+          score+=semanticResult.score;
+          if(semanticResult.proof.length)evidence.push(...semanticResult.proof.slice(0,2));
+        }else{
+          const matching=selectedTopics.filter(t=>song.topics.includes(t));
+          score+=matching.length*6.5;
+          if(matching.length)evidence.push('tema: '+matching.slice(0,2).join(', ').toLowerCase());
+          for(const t of selectedTopics){
+            const synonyms=(THEME_WORDS[t]||[]).filter(w=>!qTokens.includes(w)&&w.length>=4);
+            const count=synonyms.reduce((n,w)=>n+(hasWord(song.searchable,w)?1:0),0);
+            score+=Math.min(3.5,count*.65);
+          }
         }
       }
       if(excludedNorm.some(t=>t&&(hasWord(song.searchable,t)||song.topics.some(topic=>normalize(topic)===t))))continue;
-      if(score<7)continue;
+      if(semantic&&semantic.excluded(song.semantic_profile||[],excluded))continue;
+      if(score<(semanticResult?.score>0?4.7:7))continue;
       const matchedTokens=qTokens.filter(x=>song.searchable.includes(x));
-      const reason=evidence.length?'Correspondência identificada na letra ou no título ('+evidence.slice(0,2).join('; ')+').':matchedTokens.length?'A letra contém termos relacionados: '+matchedTokens.slice(0,3).join(', ')+'.':'Possível relação temática; confira a letra antes de utilizar.';
-      ranked.push({id:song.id,number:song.number,title:song.title,collection:song.collection,edition:song.edition,topics:song.topics.slice(0,7),snippet:makeSnippet(song,qTokens,selectedTopics),reason,relevance_score:Math.round(score*100)/100,relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
+      const reason=semanticResult?.proof.length?semanticResult.proof.slice(0,2).join('. ')+'.':numberMatch?'Número exato do hino.':evidence.length?'Correspondência identificada na letra ou no título ('+evidence.slice(0,2).join('; ')+').':matchedTokens.length?'A letra contém termos relacionados: '+matchedTokens.slice(0,3).join(', ')+'.':'Possível relação temática; confira a letra antes de utilizar.';
+      ranked.push({id:song.id,number:song.number,title:song.title,collection:song.collection,edition:song.edition,topics:song.topics.slice(0,7),snippet:makeSnippet(song,qTokens,selectedTopics,semanticResult?.cues||[]),reason,relevance_score:Math.round(score*100)/100,relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     ranked.sort((a,b)=>b.relevance_score-a.relevance_score||(a.number||'9999').localeCompare(b.number||'9999')||a.id-b.id);
     const from=(page-1)*5;
@@ -190,7 +211,7 @@ const OfflineAPI = (() => {
   }
   async function request(url,payload){
     await init();
-    if(url==='/api/status')return {ready:hymns.length>0,hymn_count:hymns.length,vector_count:0,collection:metadata.collection,edition:metadata.edition,ai_configured:false,source_url:SOURCE,chat_mode:'Busca contextual local'};
+    if(url==='/api/status')return {ready:hymns.length>0,hymn_count:hymns.length,vector_count:0,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,collection:metadata.collection,edition:metadata.edition,ai_configured:false,source_url:SOURCE,chat_mode:semantic?'Semântica local por taxonomia':'Busca contextual local'};
     if(url==='/api/import')return importJson(payload.data);
     if(url==='/api/import-remote')return downloadRemote();
     if(url==='/api/search')return search(payload);
