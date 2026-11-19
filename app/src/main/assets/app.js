@@ -110,16 +110,17 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 const GGUF=(()=>{
   const native=()=>window.NativeGGUF||null;
   const selectedState={ready:false,busy:false,task:null,lastResult:'',startTime:0,lastQuery:'',autoGeneration:false,lastError:''};
-  const phases={none:'Sem modelo',selected:'Arquivo selecionado',loading:'Carregando modelo',ready:'Modelo pronto',generating:'IA analisando',error:'Falha ao carregar',unavailable:'Motor indisponível'};
+  const phases={none:'Sem modelo',selected:'Arquivo selecionado',copying:'Copiando GGUF',loading:'Carregando modelo',ready:'Modelo pronto',generating:'IA analisando',error:'Falha ao carregar',unavailable:'Motor indisponível'};
   function nativeStatus(){try{return JSON.parse(native()?.status?.()||'{}');}catch(e){return {};}}
   function setActivity(active,text){$('ai-activity').classList.toggle('hidden',!active);$('ai-progress').textContent=text||'';}
   function showTask(title,detail){$('ai-task').textContent=title;$('ai-detail').textContent=detail;}
   function updateIndicator(status){
     const phase=status.phase||(status.loaded?'ready':status.selected?'selected':'none');
-    const active=phase==='loading'||phase==='generating';
+    const active=phase==='copying'||phase==='loading'||phase==='generating';
     $('ai-indicator').className='ai-indicator '+(phase==='ready'?'ai-on':active?'ai-busy':'ai-off');
     $('ai-indicator').textContent='IA: '+(phases[phase]||phase);
     $('ai-state-badge').textContent=phases[phase]||phase;
+    if(phase==='copying'){setActivity(true,`Copiando GGUF para o armazenamento privado ${Number.isFinite(status.progress)?status.progress+'%':''}…`);showTask('Cópia autorizada pelo Android','O arquivo será copiado uma única vez e reutilizado em carregamentos futuros, desde que não seja substituído.');}
     if(phase==='loading') {setActivity(true,`Carregando pesos do modelo ${Number.isFinite(status.progress)?status.progress+'%':''}…`);showTask('Carregamento GGUF','O arquivo está sendo mapeado e os pesos estão sendo preparados.');}
     if(phase==='generating'){setActivity(true,'Modelo processando o contexto localmente…');showTask('IA interpretando consulta','Aguarde a geração de texto local. Nenhuma informação é enviada à internet.');}
     if(phase==='ready'&&!selectedState.task){setActivity(false);showTask('IA pronta para trabalhar','A IA pode interpretar contexto, comparar os cinco primeiros resultados e analisar a letra de um hino.');}
@@ -137,9 +138,9 @@ const GGUF=(()=>{
     $('settings-ai').textContent=phases[phase]||phase;
     const modelName=status.name||'Nenhum arquivo selecionado';
     $('gguf-status').textContent=available?(status.selected?'Arquivo: '+modelName:'Nenhum arquivo selecionado.'):'Motor GGUF indisponível neste aparelho.';
-    $('gguf-phase').textContent='Estado: '+(phases[phase]||phase)+(phase==='loading'&&status.progress?' · '+status.progress+'%':'');
+    $('gguf-phase').textContent='Estado: '+(phases[phase]||phase)+((phase==='loading'||phase==='copying')&&Number.isFinite(status.progress)?' · '+status.progress+'%':'');
     const fmt=x=>Number.isFinite(x)&&x>0?Math.round(x)+' MB':'—';
-    $('gguf-model-meta').textContent=`Tamanho GGUF: ${fmt(status.modelMB)} · RAM disponível: ${fmt(status.availableMB)} · RAM total: ${fmt(status.totalMB)} · Memória nativa usada: ${fmt(status.nativeMB)}. Valores aproximados, sujeitos às restrições do Android.`;
+    $('gguf-model-meta').textContent=`Tamanho GGUF: ${fmt(status.modelMB)} · Armazenamento livre: ${fmt(status.storageMB)} · Cache local: ${fmt(status.cachedMB)} · RAM disponível: ${fmt(status.availableMB)} · RAM total: ${fmt(status.totalMB)} · Memória nativa usada: ${fmt(status.nativeMB)}. Valores aproximados, sujeitos às restrições do Android.`;
     if(status.lastError){$('gguf-last').textContent='Erro mais recente: '+status.lastError;}
     else if(status.lastDurationMs>0){$('gguf-last').textContent=`Última execução: ${Math.round(status.lastDurationMs/1000)} s`;}
     $('gguf-banner').classList.toggle('hidden',!selectedState.ready||!state.ready);
@@ -215,7 +216,7 @@ const GGUF=(()=>{
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   const savedAuto=localStorage.getItem('hinos-gguf-auto');if(savedAuto!==null)$('gguf-auto').checked=savedAuto==='1';
   $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-gguf-auto',$('gguf-auto').checked?'1':'0'));
-  setInterval(()=>{const status=info();if((status.phase==='loading'||status.phase==='generating')&&selectedState.startTime){$('ai-timer').textContent=Math.round((Date.now()-selectedState.startTime)/1000)+' s';}},1250);
+  setInterval(()=>{const status=info();if((status.phase==='copying'||status.phase==='loading'||status.phase==='generating')&&selectedState.startTime){$('ai-timer').textContent=Math.round((Date.now()-selectedState.startTime)/1000)+' s';}},1250);
   info();return {info,maybeAuto};
 })();
 refreshStatus().catch(e=>toast('Não foi possível acessar a base local: '+e.message));

@@ -5,10 +5,10 @@ import android.content.Intent;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.provider.OpenableColumns;
-import android.os.ParcelFileDescriptor;
-import android.content.SharedPreferences;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.security.MessageDigest;
+import android.os.StatFs;
 import java.util.Locale;
 import android.graphics.Color;
 import android.net.Uri;
@@ -50,7 +50,7 @@ public final class MainActivity extends Activity {
     private volatile long lastDurationMs=0;
     private volatile long generationStarted=0;
     private volatile String selectedName="";
-    private ParcelFileDescriptor modelDescriptor;
+    private volatile int copyProgress=0;
     private static final boolean NATIVE_AVAILABLE;
     static {
         boolean available;
@@ -157,7 +157,6 @@ public final class MainActivity extends Activity {
                         try{
                             if(NATIVE_AVAILABLE)nativeUnload();
                             modelLoaded=false;
-                            if(modelDescriptor!=null){modelDescriptor.close();modelDescriptor=null;}
                         }catch(Exception ignored){}
                         finally{llmBusy=false;ggufEvent("selection",true,name);}
                     });
@@ -173,7 +172,7 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy(){
         if(pendingFile!=null)pendingFile.onReceiveValue(null);
         if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeGGUF");web.destroy();web=null;}
-        llmExecutor.execute(()->{if(NATIVE_AVAILABLE)nativeUnload();if(modelDescriptor!=null){try{modelDescriptor.close();}catch(IOException ignored){}}});
+        llmExecutor.execute(()->{if(NATIVE_AVAILABLE)nativeUnload();});
         llmExecutor.shutdown();
         super.onDestroy();
     }
@@ -195,6 +194,77 @@ public final class MainActivity extends Activity {
         }catch(Exception ignored){}
         return -1;
     }
+    // ACTION_OPEN_DOCUMENT autoriza o URI; o acesso via /proc/self/fd pode ser negado ao motor nativo.
+    // Copiar por streaming evita manter o modelo inteiro em RAM e fornece um caminho real para mmap.
+    private File modelCacheDir() throws IOException {
+        File dir = new File(getFilesDir(), "gguf-cache");
+        if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Não foi possível criar a pasta privada do modelo.");
+        return dir;
+    }
+    private long cachedModelBytes() {
+        File dir = new File(getFilesDir(), "gguf-cache");
+        long total=0;
+        File[] files=dir.listFiles();
+        if(files!=null)for(File item:files)if(item.isFile())total+=item.length();
+        return total;
+    }
+    private static boolean validMagic(File path) {
+        if (!path.isFile() || path.length()<32) return false;
+        try(InputStream input = new FileInputStream(path)) {
+            return input.read()=='G' && input.read()=='G' && input.read()=='U' && input.read()=='F';
+        }catch(IOException ignored){return false;}
+    }
+    private static String cacheKey(Uri uri, long size) throws Exception {
+        MessageDigest digest=MessageDigest.getInstance("SHA-256");
+        byte[] value=digest.digest((uri.toString()+"|"+size).getBytes(StandardCharsets.UTF_8));
+        StringBuilder hex=new StringBuilder();
+        for(int i=0;i<12;i++)hex.append(String.format(Locale.ROOT,"%02x",value[i]&255));
+        return hex.toString();
+    }
+    private File prepareModelFile(Uri uri,long expectedSize) throws Exception {
+        File dir=modelCacheDir();
+        File target=new File(dir,"gguf-"+cacheKey(uri,expectedSize)+".gguf");
+        if(validMagic(target) && (expectedSize<0 || expectedSize==target.length())) {
+            copyProgress=100;
+            return target;
+        }
+        if(target.exists()&&!target.delete())throw new IOException("Não foi possível substituir a cópia anterior do modelo.");
+        File[] stored=dir.listFiles();
+        if(stored!=null)for(File file:stored)if(!file.equals(target)&&file.isFile())file.delete();
+        long available=new StatFs(dir.getAbsolutePath()).getAvailableBytes();
+        if(expectedSize>0 && available < expectedSize + 64L*1024*1024) {
+            long requiredMB=(expectedSize+64L*1024*1024+1048575)/1048576;
+            throw new IOException("Armazenamento insuficiente para copiar o GGUF: necessário aproximadamente " + requiredMB + " MB, livre " + (available/1048576) + " MB. Não é um erro de RAM.");
+        }
+        File partial=new File(dir,target.getName()+".partial");
+        copyProgress=0;
+        modelPhase="copying";
+        ggufEvent("phase",true,"Copiando GGUF com autorização do Android…");
+        long transferred=0;
+        try {
+            try(InputStream input=getContentResolver().openInputStream(uri);
+                FileOutputStream output=new FileOutputStream(partial)) {
+                if(input==null)throw new IOException("O Android não liberou a leitura do modelo. Selecione o arquivo novamente.");
+                byte[] buffer=new byte[1024*1024];
+                int n;
+                while((n=input.read(buffer))!=-1) {
+                    output.write(buffer,0,n);
+                    transferred+=n;
+                    if(expectedSize>0)copyProgress=(int)Math.min(99, transferred*100/expectedSize);
+                }
+                output.getFD().sync();
+            }
+            if(expectedSize>0 && transferred!=expectedSize)throw new IOException("Cópia incompleta: esperado "+expectedSize+" bytes, obtidos "+transferred+".");
+            if(!validMagic(partial))throw new IOException("O arquivo copiado não contém um cabeçalho GGUF válido.");
+            if(!partial.renameTo(target))throw new IOException("Não foi possível finalizar a cópia do GGUF.");
+            copyProgress=100;
+            return target;
+        }catch(SecurityException ex){
+            throw new IOException("A autorização de leitura do arquivo expirou. Selecione o GGUF novamente no Android.",ex);
+        }finally{
+            if(partial.exists())partial.delete();
+        }
+    }
     private static String errorMessage(Throwable ex){return ex.getMessage()==null?ex.getClass().getSimpleName():ex.getMessage();}
     private void ggufEvent(String event,boolean ok,String value){
         String js="window.__ggufNativeEvent && window.__ggufNativeEvent("+JSONObject.quote(event)+","+ok+","+JSONObject.quote(value)+");";
@@ -211,7 +281,9 @@ public final class MainActivity extends Activity {
                 result.put("busy",llmBusy);
                 result.put("name",uriString!=null?(selectedName.isEmpty()?modelName(Uri.parse(uriString)):selectedName):"");
                 result.put("phase",!NATIVE_AVAILABLE?"unavailable":modelPhase);
-                result.put("progress",llmBusy&&"loading".equals(modelPhase)?nativeLoadProgress():0);
+                result.put("progress",llmBusy&&"loading".equals(modelPhase)?nativeLoadProgress():("copying".equals(modelPhase)?copyProgress:0));
+                result.put("cachedMB", Math.round(cachedModelBytes()/1048576.0));
+                result.put("storageMB", Math.round(new StatFs(getFilesDir().getAbsolutePath()).getAvailableBytes()/1048576.0));
                 result.put("lastError",modelError);
                 result.put("lastDurationMs",lastDurationMs);
                 if(uriString!=null){
@@ -241,9 +313,9 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void loadModel(){
             if(!NATIVE_AVAILABLE){modelPhase="unavailable";ggufEvent("load",false,"Motor nativo indisponível neste dispositivo ARM64.");return;}
             if(llmBusy){ggufEvent("load",false,"A IA já está ocupada.");return;}
-            llmBusy=true;modelPhase="loading";modelError="";lastDurationMs=0;
+            llmBusy=true;modelPhase="copying";copyProgress=0;modelError="";lastDurationMs=0;
             final long start=android.os.SystemClock.elapsedRealtime();
-            ggufEvent("phase",true,"Carregando GGUF…");
+            ggufEvent("phase",true,"Preparando acesso ao GGUF…");
             llmExecutor.execute(()->{
                 try{
                     String uriString=getSharedPreferences(PREFS,MODE_PRIVATE).getString(MODEL_URI_KEY,null);
@@ -257,21 +329,15 @@ public final class MainActivity extends Activity {
                     if(size>0&&size>memory.totalMem*1.2)
                         throw new IOException("Arquivo muito maior que a RAM física. Tente uma quantização menor.");
                     if(modelLoaded){nativeUnload();modelLoaded=false;}
-                    if(modelDescriptor!=null){modelDescriptor.close();modelDescriptor=null;}
-                    modelDescriptor=getContentResolver().openFileDescriptor(uri,"r");
-                    if(modelDescriptor==null)throw new IOException("O Android não disponibilizou o arquivo selecionado.");
-                    // Verifica acesso aleatório. Alguns provedores virtuais disponibilizam somente um pipe.
-                    try {android.system.Os.lseek(modelDescriptor.getFileDescriptor(),0,android.system.OsConstants.SEEK_CUR);}
-                    catch(android.system.ErrnoException ex){
-                        throw new IOException("Esse provedor não permite leitura aleatória do GGUF. Salve o arquivo em Downloads do telefone e selecione-o novamente.");
-                    }
-                    String message=nativeLoad("/proc/self/fd/"+modelDescriptor.getFd());
+                    File modelFile=prepareModelFile(uri,size);
+                    modelPhase="loading";
+                    ggufEvent("phase",true,"Modelo copiado. Carregando pesos…");
+                    String message=nativeLoad(modelFile.getAbsolutePath());
                     modelLoaded=true;modelPhase="ready";modelError="";
                     lastDurationMs=android.os.SystemClock.elapsedRealtime()-start;
                     ggufEvent("load",true,message);
                 }catch(Throwable ex){
                     modelLoaded=false;modelPhase="error";modelError=errorMessage(ex);
-                    if(modelDescriptor!=null){try{modelDescriptor.close();}catch(IOException ignored){}modelDescriptor=null;}
                     ggufEvent("load",false,modelError);
                 }finally{llmBusy=false;}
             });

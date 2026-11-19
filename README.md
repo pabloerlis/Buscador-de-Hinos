@@ -1,6 +1,14 @@
-# Buscador de Hinos — Android 1.3
+# Buscador de Hinos — Android 1.3.1
 
 Aplicativo Android ARM64 com busca offline, ranking estimado e motor GGUF opcional (`llama.cpp`).
+
+## Corrigido na 1.3.1
+
+- Seleção pelo seletor oficial do Android (`ACTION_OPEN_DOCUMENT`) e permissão persistente de leitura quando disponível.
+- Corrigido o erro `/proc/self/fd/N (Permission denied)`: o GGUF é copiado por streaming, sem ocupar RAM equivalente ao tamanho do arquivo, para o diretório privado do app antes de carregar com `llama.cpp`.
+- Progresso de cópia separado do progresso de carregamento, com exibição do armazenamento livre e do cache.
+- A cópia é reutilizada em carregamentos seguintes. Exige espaço livre para uma cópia adicional do GGUF.
+- Ainda é necessária validação real com Qwen3.5 2B/Gemma 4 E2B no smartphone.
 
 ## O que mudou
 
