@@ -18,6 +18,7 @@ const db=JSON.parse(fs.readFileSync(dbPath,'utf8'));
 const ctx={window,document,indexedDB:fakeIndexedDB,setTimeout,clearTimeout,console,fetch:async(url)=>{if(String(url).endsWith('semantic-db.json'))return {ok:true,json:async()=>db};throw Error('No network in tests');}};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/semantic-engine.js'),'utf8')+'\nthis.engine=SemanticEngine;',ctx);
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/bible-context.js'),'utf8')+'\nthis.bible=BibleContext;',ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/offline-api.js'),'utf8')+'\nthis.api=OfflineAPI;',ctx);
 const api=ctx.api;
 const samples=[
@@ -40,12 +41,14 @@ const samples=[
  assert.equal((await api.request('/api/status')).semantic_ready,true);
  assert.equal((await api.request('/api/status')).semantic_topics,41);
  let r=await api.request('/api/search',{query:'Hino 1'});
- assert.equal(r.total,1);assert.equal(r.results[0].number,'001');
+ assert.equal(r.total,1);assert.equal(r.results[0].number,'001');assert.equal(r.results[0].relevance_percent,100);assert.equal(r.results[0].match_type,'numero');
  r=await api.request('/api/search',{query:'Maranata'});assert.ok(r.results.some(x=>x.number==='003'));
  r=await api.request('/api/search',{query:'confiar'});assert.ok(r.results.some(x=>x.number==='001'));
- r=await api.request('/api/search',{query:'gratidão'});assert.equal(r.results.length,5);assert.equal(r.has_more,true);
+ r=await api.request('/api/search',{query:'gratidão'});assert.equal(r.results.length,5);assert.equal(r.has_more,true);assert.ok(r.results.every(x=>x.relevance_percent>=20&&x.relevance_percent<=98));
  const next=await api.request('/api/search',{query:'gratidão',page:2});assert.equal(next.page,2);assert.ok(next.results.length>0);assert.ok(!r.results.some(a=>next.results.some(b=>a.id===b.id)));
  const d=await api.request('/api/hymns/3');assert.equal(d.number,'003');assert.match(d.lyrics,/Maranata/);assert.ok(d.topics.includes('Volta de Jesus'));
+ const ps=await api.request('/api/search',{query:'Salmo 23'});assert.equal(ps.bible_reference,'Salmo 23');assert.match(ps.summary,/pastor|cuidado/i);
+ const withHints=await api.request('/api/search',{query:'esperança',semantic_hints:['consolo','refúgio']});assert.equal(withHints.used_ai,true);
  const anxiety=await api.request('/api/search',{query:'ansiedade'});
  assert.ok(anxiety.results.some(x=>x.number==='001'),'Ansiedade deve alcançar confiança/refúgio via relação temática');
  assert.match(anxiety.results.find(x=>x.number==='001').reason,/contextual|refúgio|amparo/i);
@@ -58,5 +61,5 @@ const samples=[
  const prior=await api.request('/api/status');
  await assert.rejects(api.request('/api/import',{data:{invalid:true}}),/Nenhuma coleção/);
  assert.equal((await api.request('/api/status')).hymn_count,prior.hymn_count);
- console.log('Testes offline e semânticos: 32 verificações aprovadas.');
+ console.log('Testes offline, semânticos, versículos e percentuais: 39 verificações aprovadas.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

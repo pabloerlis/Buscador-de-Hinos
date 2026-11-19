@@ -135,6 +135,11 @@ const OfflineAPI = (() => {
     if(!fresh&&old&&(text.length<140||/\b(apenas|somente|mais|menos|agora|desses|destes|tambem|priorize|foco|enfatiz)/i.test(normalize(text))))text=old+'. '+text;
     return {query:text.trim().slice(0,600),excluded:excluded.slice(0,4)};
   }
+  // Conversão VISUAL heurística não calibrada: NÃO é probabilidade nem confiança estatística.
+  function percentage(score, exactNumber=false){
+    if(exactNumber)return 100;
+    return Math.max(20, Math.min(98, Math.round(30 + 68*(1-Math.exp(-score/22)))));
+  }
   function search(payload){
     let query=String(payload?.query||'').trim();if(!query||query.length>500)throw Error('Digite uma consulta de até 500 caracteres.');
     const page=Math.max(1,Math.min(100,Number(payload.page)||1));
@@ -145,8 +150,12 @@ const OfflineAPI = (() => {
     const excluded=payload?.refine? [...new Set([...(fresh?[]:inherited),...ctx.excluded])].slice(0,4):ctx.excluded;
     if(!query)return {results:[],page,total:0,has_more:false,effective_query:query,excluded,used_ai:false,summary:'Nenhum critério positivo informado.'};
     const norm=normalize(query), numberMatch=norm.match(/^(?:hino\s*|louvor\s*)?(\d{1,4})$/);
-    const intent=semantic?semantic.interpret(query):null;
-    const selectedTopics=intent?intent.direct.map(t=>t.label):themes(query),qTokens=tokens(query);
+    const bible=typeof BibleContext!=='undefined'?BibleContext.lookup(query):null;
+    const isBiblicalRef=typeof BibleContext!=='undefined' && BibleContext.looksLikeReference(query);
+    const hints=Array.isArray(payload?.semantic_hints)?payload.semantic_hints.filter(x=>typeof x==='string'&&x.length<90).slice(0,6):[];
+    const analysisQuery=numberMatch?query:[query,bible?.theme||'',...hints].filter(Boolean).join(' ');
+    const intent=semantic?semantic.interpret(analysisQuery):null;
+    const selectedTopics=intent?intent.direct.map(t=>t.label):themes(analysisQuery),qTokens=tokens(analysisQuery);
     const excludedNorm=excluded.map(normalize);
     const ranked=[];
     for(const song of hymns){
@@ -183,11 +192,11 @@ const OfflineAPI = (() => {
       if(score<(semanticResult?.score>0?4.7:7))continue;
       const matchedTokens=qTokens.filter(x=>song.searchable.includes(x));
       const reason=semanticResult?.proof.length?semanticResult.proof.slice(0,2).join('. ')+'.':numberMatch?'Número exato do hino.':evidence.length?'Correspondência identificada na letra ou no título ('+evidence.slice(0,2).join('; ')+').':matchedTokens.length?'A letra contém termos relacionados: '+matchedTokens.slice(0,3).join(', ')+'.':'Possível relação temática; confira a letra antes de utilizar.';
-      ranked.push({id:song.id,number:song.number,title:song.title,collection:song.collection,edition:song.edition,topics:song.topics.slice(0,7),snippet:makeSnippet(song,qTokens,selectedTopics,semanticResult?.cues||[]),reason,relevance_score:Math.round(score*100)/100,relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
+      ranked.push({id:song.id,number:song.number,title:song.title,collection:song.collection,edition:song.edition,topics:song.topics.slice(0,7),snippet:makeSnippet(song,qTokens,selectedTopics,semanticResult?.cues||[]),reason,relevance_score:Math.round(score*100)/100,relevance_percent:percentage(score,!!numberMatch),match_type:numberMatch?'numero':'contexto',relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     ranked.sort((a,b)=>b.relevance_score-a.relevance_score||(a.number||'9999').localeCompare(b.number||'9999')||a.id-b.id);
     const from=(page-1)*5;
-    return {page,total:ranked.length,has_more:from+5<ranked.length,results:ranked.slice(from,from+5),topics:selectedTopics,effective_query:query,excluded,used_ai:false,summary:''};
+    return {page,total:ranked.length,has_more:from+5<ranked.length,results:ranked.slice(from,from+5),topics:selectedTopics,effective_query:query,excluded,used_ai:hints.length>0,summary:bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',bible_reference:bible?.reference||null};
   }
   function hymnDetail(id){
     const song=hymns.find(s=>s.id===id);if(!song)throw Error('Hino não encontrado.');
@@ -219,5 +228,5 @@ const OfflineAPI = (() => {
     if(match)return hymnDetail(Number(match[1]));
     throw Error('Operação não reconhecida.');
   }
-  return {request,normalize,themes,parseTitle,chooseCollection,contextQuery};
+  return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage};
 })();

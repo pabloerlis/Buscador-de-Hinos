@@ -45,6 +45,11 @@ public final class MainActivity extends Activity {
     private final ExecutorService llmExecutor=Executors.newSingleThreadExecutor();
     private volatile boolean modelLoaded=false;
     private volatile boolean llmBusy=false;
+    private volatile String modelPhase="none";
+    private volatile String modelError="";
+    private volatile long lastDurationMs=0;
+    private volatile long generationStarted=0;
+    private volatile String selectedName="";
     private ParcelFileDescriptor modelDescriptor;
     private static final boolean NATIVE_AVAILABLE;
     static {
@@ -54,6 +59,7 @@ public final class MainActivity extends Activity {
         NATIVE_AVAILABLE=available;
     }
     private static native String nativeLoad(String path);
+    private static native int nativeLoadProgress();
     private static native String nativeGenerate(String prompt,int maxTokens);
     private static native void nativeUnload();
     private WebView web;
@@ -138,9 +144,13 @@ public final class MainActivity extends Activity {
                     if(input==null||input.read()!='G'||input.read()!='G'||input.read()!='U'||input.read()!='F')
                         throw new IOException("Arquivo inválido: cabeçalho GGUF não encontrado.");
                 }
-                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                try {getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);}
+                catch(SecurityException ignored) { /* Algumas fontes não oferecem permissão persistente. */ }
                 // Somente a seleção é persistida. O modelo deve ser carregado explicitamente.
                 getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString(MODEL_URI_KEY,uri.toString()).apply();
+                selectedName=name;
+                modelError="";
+                modelPhase="selected";
                 if(modelLoaded){
                     llmBusy=true;
                     llmExecutor.execute(()->{
@@ -152,7 +162,7 @@ public final class MainActivity extends Activity {
                         finally{llmBusy=false;ggufEvent("selection",true,name);}
                     });
                 }else ggufEvent("selection",true,name);
-            }catch(Exception ex){ggufEvent("selection",false,errorMessage(ex));}
+            }catch(Exception ex){modelPhase="error";modelError=errorMessage(ex);ggufEvent("selection",false,errorMessage(ex));}
         }
     }
     @Override public void onBackPressed(){
@@ -199,7 +209,21 @@ public final class MainActivity extends Activity {
                 result.put("selected",uriString!=null);
                 result.put("loaded",modelLoaded);
                 result.put("busy",llmBusy);
-                result.put("name",uriString!=null?modelName(Uri.parse(uriString)):"");
+                result.put("name",uriString!=null?(selectedName.isEmpty()?modelName(Uri.parse(uriString)):selectedName):"");
+                result.put("phase",!NATIVE_AVAILABLE?"unavailable":modelPhase);
+                result.put("progress",llmBusy&&"loading".equals(modelPhase)?nativeLoadProgress():0);
+                result.put("lastError",modelError);
+                result.put("lastDurationMs",lastDurationMs);
+                if(uriString!=null){
+                    long fileSize=modelSize(Uri.parse(uriString));
+                    if(fileSize>0)result.put("modelMB",Math.round(fileSize/1048576.0));
+                }
+                android.app.ActivityManager.MemoryInfo mi=new android.app.ActivityManager.MemoryInfo();
+                ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(mi);
+                result.put("availableMB",Math.round(mi.availMem/1048576.0));
+                result.put("totalMB",Math.round(mi.totalMem/1048576.0));
+                result.put("lowMemory",mi.lowMemory);
+                result.put("nativeMB",Math.round(android.os.Debug.getNativeHeapAllocatedSize()/1048576.0));
                 return result.toString();
             }catch(Exception error){return "{}";}
         }
@@ -215,39 +239,56 @@ public final class MainActivity extends Activity {
             });
         }
         @JavascriptInterface public void loadModel(){
-            if(!NATIVE_AVAILABLE){ggufEvent("load",false,"Motor nativo indisponível nesta arquitetura.");return;}
-            if(llmBusy){ggufEvent("load",false,"O modelo já está ocupado.");return;}
-            llmBusy=true;
+            if(!NATIVE_AVAILABLE){modelPhase="unavailable";ggufEvent("load",false,"Motor nativo indisponível neste dispositivo ARM64.");return;}
+            if(llmBusy){ggufEvent("load",false,"A IA já está ocupada.");return;}
+            llmBusy=true;modelPhase="loading";modelError="";lastDurationMs=0;
+            final long start=android.os.SystemClock.elapsedRealtime();
+            ggufEvent("phase",true,"Carregando GGUF…");
             llmExecutor.execute(()->{
                 try{
                     String uriString=getSharedPreferences(PREFS,MODE_PRIVATE).getString(MODEL_URI_KEY,null);
-                    if(uriString==null)throw new IOException("Selecione um modelo GGUF primeiro.");
+                    if(uriString==null)throw new IOException("Selecione um GGUF primeiro.");
                     Uri uri=Uri.parse(uriString);
                     long size=modelSize(uri);
                     android.app.ActivityManager.MemoryInfo memory=new android.app.ActivityManager.MemoryInfo();
-                    android.app.ActivityManager manager=(android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE);
-                    manager.getMemoryInfo(memory);
-                    if(size>0 && size>memory.totalMem*0.80)
-                        throw new IOException("O GGUF é grande demais para a memória total do aparelho; escolha um modelo menor.");
+                    ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(memory);
+                    // A RAM livre não é toda utilizável pelo processo Android, mesmo que pareça suficiente.
+                    // Não rejeitar modelos com base apenas no tamanho do GGUF: mmap é paginado pelo sistema.
+                    if(size>0&&size>memory.totalMem*1.2)
+                        throw new IOException("Arquivo muito maior que a RAM física. Tente uma quantização menor.");
                     if(modelLoaded){nativeUnload();modelLoaded=false;}
                     if(modelDescriptor!=null){modelDescriptor.close();modelDescriptor=null;}
                     modelDescriptor=getContentResolver().openFileDescriptor(uri,"r");
-                    if(modelDescriptor==null)throw new IOException("Não foi possível abrir o GGUF.");
+                    if(modelDescriptor==null)throw new IOException("O Android não disponibilizou o arquivo selecionado.");
+                    // Verifica acesso aleatório. Alguns provedores virtuais disponibilizam somente um pipe.
+                    try {android.system.Os.lseek(modelDescriptor.getFileDescriptor(),0,android.system.OsConstants.SEEK_CUR);}
+                    catch(android.system.ErrnoException ex){
+                        throw new IOException("Esse provedor não permite leitura aleatória do GGUF. Salve o arquivo em Downloads do telefone e selecione-o novamente.");
+                    }
                     String message=nativeLoad("/proc/self/fd/"+modelDescriptor.getFd());
-                    modelLoaded=true;
+                    modelLoaded=true;modelPhase="ready";modelError="";
+                    lastDurationMs=android.os.SystemClock.elapsedRealtime()-start;
                     ggufEvent("load",true,message);
-                }catch(Throwable ex){modelLoaded=false;ggufEvent("load",false,errorMessage(ex));}
-                finally{llmBusy=false;}
+                }catch(Throwable ex){
+                    modelLoaded=false;modelPhase="error";modelError=errorMessage(ex);
+                    if(modelDescriptor!=null){try{modelDescriptor.close();}catch(IOException ignored){}modelDescriptor=null;}
+                    ggufEvent("load",false,modelError);
+                }finally{llmBusy=false;}
             });
         }
         @JavascriptInterface public void generate(String prompt){
             if(llmBusy){ggufEvent("generate",false,"O modelo já está em uso.");return;}
-            if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um modelo GGUF primeiro.");return;}
+            if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um GGUF primeiro.");return;}
             if(prompt==null||prompt.trim().isEmpty()||prompt.length()>2400){ggufEvent("generate",false,"Consulta inválida ou longa demais.");return;}
-            llmBusy=true;
+            llmBusy=true;modelPhase="generating";modelError="";
+            final long start=android.os.SystemClock.elapsedRealtime();
+            ggufEvent("phase",true,"Interpretando contexto…");
             llmExecutor.execute(()->{
-                try {ggufEvent("generate",true,nativeGenerate(prompt,112));}
-                catch(Throwable ex){ggufEvent("generate",false,errorMessage(ex));}
+                try {
+                    String output=nativeGenerate(prompt,152);
+                    lastDurationMs=android.os.SystemClock.elapsedRealtime()-start;
+                    modelPhase="ready";ggufEvent("generate",true,output);
+                }catch(Throwable ex){modelPhase="error";modelError=errorMessage(ex);ggufEvent("generate",false,modelError);}
                 finally{llmBusy=false;}
             });
         }
