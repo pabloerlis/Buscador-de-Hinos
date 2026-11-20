@@ -460,15 +460,17 @@ public final class MainActivity extends Activity {
     public class ImportBridge {
         /** Metadados da própria instalação, sem depender de serviços ou do catálogo. */
         @JavascriptInterface public String buildInfo(){
-            return new JSONObject()
-                .put("appName", "Buscador de Hinos")
-                .put("developer", "Pablo Erlis")
-                .put("versionName", BuildConfig.VERSION_NAME)
-                .put("versionCode", BuildConfig.VERSION_CODE)
-                .put("buildType", BuildConfig.BUILD_TYPE)
-                .put("sourceRevision", BuildConfig.SOURCE_REVISION)
-                .put("buildDateUtc", BuildConfig.BUILD_DATE_UTC)
-                .toString();
+            try{
+                return new JSONObject()
+                    .put("appName", "Buscador de Hinos")
+                    .put("developer", "Pablo Erlis")
+                    .put("versionName", BuildConfig.VERSION_NAME)
+                    .put("versionCode", BuildConfig.VERSION_CODE)
+                    .put("buildType", BuildConfig.BUILD_TYPE)
+                    .put("sourceRevision", BuildConfig.SOURCE_REVISION)
+                    .put("buildDateUtc", BuildConfig.BUILD_DATE_UTC)
+                    .toString();
+            }catch(Exception error){return "{}";}
         }
         @JavascriptInterface public void downloadCollection(){
             new Thread(()->{
