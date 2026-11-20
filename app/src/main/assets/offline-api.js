@@ -620,6 +620,8 @@ const OfflineAPI = (() => {
           ...(graphResult?.cues||[]),...(storyResult?.cues||[]),...(semanticResult?.cues||[])],
         reason:opts.showReasons?reason+(lowered.length?' Menor prioridade por '+lowered.join(', ')+'.':''):'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
+        _eventPoints:appliedEventPoints,
+        _baseScore:score-appliedEventPoints*(lowered.length?1-Math.min(.45,lowered.length*.25):1),
         _narrativeTier:storyResult?.tier||0,
         // Evita que o tier preliminar de eventos suplante a evidência narrativa
         // já validada; eventos influem no score, mas não criam prioridade rígida.
@@ -647,6 +649,26 @@ const OfflineAPI = (() => {
       const ordered=FusionRRF.rank(ranked,{vectorMode:opts.vectorMode,narrativePrimary});
       ranked.splice(0,ranked.length,...ordered);
     }
+    // Guardrail conservador para evidência experimental:
+    // um episódio bíblico já tinha um top10 calculado com sinais testados.
+    // As novas ações podem reordenar ESSE conjunto e elevar hinos fora
+    // dele, mas não podem expulsar um hino que antes estava no top10 sem
+    // uma validação humana ampla do classificador de eventos.
+    // Não há listas fixas, números de hinos ou exceções por narrativa.
+    if(opts.eventEvidence&&graphCtx?.narrative&&eventFrames&&ranked.some(h=>h._eventPoints>=4)){
+      const old=ranked.map(h=>({...h,
+        _fusionSignals:{...h._fusionSignals,
+          biblical:Math.max(0,h._fusionSignals.biblical-h._eventPoints)}}));
+      old.sort((a,b)=>Number(b.match_type==='titulo_exato')-Number(a.match_type==='titulo_exato')||
+        (narrativePrimary?b._narrativeTier-a._narrativeTier:0)||
+        b._baseScore-a._baseScore||Number(a.number||10000)-Number(b.number||10000)||a.id-b.id);
+      const base=fusionEnabled?FusionRRF.rank(old,{vectorMode:opts.vectorMode,narrativePrimary}):old;
+      const protectedIds=new Set(base.filter(h=>!RepertoireStore.isNotLearned(hymns[h.id-1]))
+        .slice(0,10).map(h=>h.id));
+      const held=ranked.filter(h=>protectedIds.has(h.id));
+      const other=ranked.filter(h=>!protectedIds.has(h.id));
+      ranked.splice(0,ranked.length,...held,...other);
+    }
     // O hino não aprendido continua no ranking e mantém sua afinidade.
     // Apenas a paginação principal fica reservada aos hinos disponíveis.
     const available=ranked.filter(h=>!RepertoireStore.isNotLearned(hymns[h.id-1]));
@@ -655,7 +677,7 @@ const OfflineAPI = (() => {
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
-    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_eventSnippet,_fusionSignals,_fusionPenalty,_vectorRange,...hit})=>{
+    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_eventSnippet,_eventPoints,_baseScore,_fusionSignals,_fusionPenalty,_vectorRange,...hit})=>{
       const hymn=hymns[hit.id-1];
       const vectorText=vectorEnabled&&hit.vector_similarity>=76&&!sharedPassage&&!numberMatch&&
         !quoted.length&&!required.length&&typeof VectorIndex.passageForSong==='function'?
