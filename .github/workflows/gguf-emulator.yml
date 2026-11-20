@@ -41,15 +41,34 @@ jobs:
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           "$ANDROID_HOME/emulator/emulator" -accel-check
-      - name: Build and start Android x86_64
+      - name: Build the x86_64 app and instrumentation APK
+        run: gradle --no-daemon --max-workers=2 -PsmokeAbi=x86_64 assembleDebug assembleDebugAndroidTest
+      - name: Start Android emulator and check boot
         run: |
           set -euo pipefail
+          df -h "$RUNNER_TEMP"
+          "$ANDROID_HOME/platform-tools/adb" start-server
           printf 'no\n' | avdmanager create avd --force --name hino-gguf --package 'system-images;android-35;google_apis;x86_64'
-          gradle --no-daemon -PsmokeAbi=x86_64 assembleDebug assembleDebugAndroidTest
-          "$ANDROID_HOME/emulator/emulator" -avd hino-gguf -no-window -no-boot-anim -no-audio -gpu swiftshader_indirect -memory 4096 -cores 4 -partition-size 8192 > "$RUNNER_TEMP/hino-emulator.log" 2>&1 &
-          timeout 180s adb wait-for-device
-          timeout 180s bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done'
-          adb shell getprop ro.product.cpu.abilist
+          emulator="$ANDROID_HOME/emulator/emulator"
+          nohup "$emulator" -avd hino-gguf -no-window -no-boot-anim -no-audio -no-snapshot -camera-back none -camera-front none -feature -Vulkan -gpu software -memory 4096 -cores 2 -partition-size 6144 > "$RUNNER_TEMP/hino-emulator.log" 2>&1 </dev/null &
+          pid=$!
+          for ((attempt=0; attempt<60; attempt++)); do
+            if ! kill -0 "$pid" 2>/dev/null; then
+              tail -100 "$RUNNER_TEMP/hino-emulator.log"
+              exit 1
+            fi
+            state=$(timeout 4s adb shell getprop sys.boot_completed 2>/dev/null | tr -d '\r' || true)
+            if [ "$state" = '1' ]; then
+              adb shell getprop ro.product.cpu.abilist
+              exit 0
+            fi
+            sleep 3
+          done
+          adb devices -l
+          tail -100 "$RUNNER_TEMP/hino-emulator.log"
+          exit 1
+      - name: Install the test APKs
+        run: |
           adb install -t app/build/outputs/apk/debug/app-debug.apk
           adb install -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
       - name: Download and verify the reference GGUF
@@ -77,4 +96,4 @@ jobs:
         if: failure()
         run: |
           test ! -f "$RUNNER_TEMP/hino-emulator.log" || tail -80 "$RUNNER_TEMP/hino-emulator.log"
-          adb logcat -d -t 400 -s HinoGgufSmoke AndroidRuntime DEBUG || true
+          timeout 8s adb logcat -d -t 400 -s HinoGgufSmoke AndroidRuntime DEBUG || true
