@@ -59,11 +59,13 @@ require(re.search(r"\bversionCode\s+\d+\b", gradle), "versionCode inválido")
 require(re.search(r"\bversionName\s+'[\d.]+(?:-[a-z0-9.]+)?'", gradle), "versionName inválido")
 
 workflow = (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8")
-for gate in ("sources", "static", "regressions", "relevance", "embeddings", "build_apk", "audit_apk"):
+for gate in ("sources", "static", "regressions", "relevance", "embeddings", "build_apk", "device_smoke", "audit_apk"):
     require(re.search(r"^  " + gate + r":", workflow, re.M), "Agente ou etapa obrigatória ausente: " + gate)
 require("needs: [sources, static, regressions, relevance, embeddings]" in workflow,
         "Compilação não depende de todos os agentes de pré-build")
-require("needs: build_apk" in workflow, "APK sem auditoria pós-build")
+require("needs: [build_apk, device_smoke]" in workflow,
+        "APK deve depender dos testes instrumentados Android antes da auditoria")
+require("E5DeviceSmokeTest" in workflow, "Verificação real do encoder E5 no Android ausente")
 require("node tests/qa-metrics.js" in workflow, "Avaliação quantitativa não está no CI")
 require("scripts/qa_e5.py" in workflow, "Agente de embeddings E5 ausente")
 require("continue-on-error: true" not in workflow, "Um dos agentes ignora falhas")
