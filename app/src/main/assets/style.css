@@ -140,3 +140,11 @@ html:not(.with-gguf) [data-gguf-ui],html:not(.with-vector) [data-vector-ui]{disp
 .compare-offline{margin:14px 0 10px}
 .conversation:empty{display:none}
 .assistant-message{white-space:pre-line}
+
+/* Metadados do APK: quebra segura para commits e datas em telas estreitas. */
+.about-app{margin-top:0;margin-bottom:20px}
+.about-app .about-content{padding:10px 4px 6px}
+.about-app h3{font-size:15px;font-weight:700;color:#274734;margin:0 0 12px}
+.about-app .status-grid{grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:11px 12px}
+.about-app .status-grid strong{overflow-wrap:anywhere;word-break:break-word}
+.about-app .subtle-note{margin-top:12px}
