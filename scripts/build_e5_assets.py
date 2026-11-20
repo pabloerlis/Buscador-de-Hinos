@@ -221,7 +221,32 @@ def main():
     print('Generated index',out.stat().st_size,'bytes, passages',len(passages),
           'model',target.stat().st_size,'bytes',flush=True)
     # Arquivo compacto de diagnóstico e teste das formas de tokenização.
-    test=['query: Filho Pródigo','query: Quero voltar para Deus','query: Salmo 23','passage: Voltei pra ti meu Pai']
+    test=[
+        'query: Filho Pródigo',
+        'query: Quero voltar para Deus',
+        'query: Salmo 23',
+        'query: Marcos 5:25-34',
+        'query: Mulher do fluxo de sangue',
+        'query: Jesus acalma a tempestade',
+        'query: Lázaro foi ressuscitado',
+        'query: João 11:1-44',
+        'query: o filho pediu perdão ao pai',
+        'query: ninguém me vê, Senhor?',
+        'query: Sou feliz por Cristo!',
+        'query: CRISTO CAMINHAVA LENTAMENTE',
+        'query: a fé e o amor ao próximo',
+        'query: não era tarde demais',
+        'query: 1 João 4:7',
+        'query: Cântico de ação de graças',
+        'query: 100 ovelhas e só 99 retornaram',
+        'query: Deus está comigo — confio!',
+        'query: a tua fé te salvou',
+        'query: Há um rio de paz e amor',
+        'passage: Voltei pra ti meu Pai',
+        'passage: tocou as vestes e foi curada',
+        'passage: Mestre, o mar se revolta',
+        'passage: Não temas, pois Eu sou contigo',
+    ]
     expected={'tokenizer_type':'Unigram','test_cases':[{'text':s,'ids':tok.encode(s).ids} for s in test]}
     (ROOT/'tests/e5-tokenizer-cases.json').write_text(json.dumps(expected,ensure_ascii=False,indent=2),encoding='utf8')
     (ASSETS/'e5-source.txt').write_text('Modelo: https://huggingface.co/Xenova/multilingual-e5-small\nBase: https://huggingface.co/intfloat/multilingual-e5-small\nLicença: MIT; ver arquivos do projeto original\n\nEste APK redistribui apenas vetores codificados das três coleções 2018; as letras são importadas pelo usuário no dispositivo.\n',encoding='utf8')
