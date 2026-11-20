@@ -12,6 +12,7 @@
   <script src="semantic-engine.js" defer></script>
   <script src="story-engine.js" defer></script>
   <script src="bible-context.js" defer></script>
+  <script src="recommendation-engine.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -113,7 +114,15 @@
     <div class="modal-scrim" data-close="modal"></div>
     <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-top"><div><span class="modal-overline" id="modal-number">HINO</span><h2 id="modal-title">Detalhes do hino</h2></div><button class="icon-button" data-close="modal" aria-label="Fechar detalhes">×</button></div>
-      <div class="modal-body"><div class="modal-section"><h3>Letra da coletânea</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
+      <div class="modal-body">
+        <div class="related-heading"><button class="secondary-btn hidden" id="related-back" type="button">← Voltar ao hino anterior</button><span id="related-trail" class="related-trail"></span></div>
+        <section class="modal-section related-section" id="related-section" aria-label="Recomendações de hinos semelhantes">
+          <div class="related-top"><div><span class="section-kicker">DESCUBRA MAIS HINOS</span><h3>Hinos semelhantes a este</h3></div><span class="local-badge">100% offline</span></div>
+          <p id="related-description" class="subtle-note">Letras comparadas por temas, narrativas e palavras relevantes.</p>
+          <div id="related-list" class="related-list" aria-live="polite"></div>
+          <p class="related-method">As porcentagens são índices de afinidade estimada, não probabilidades nem avaliação teológica oficial.</p>
+        </section>
+        <div class="modal-section"><h3>Letra da coletânea</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
       <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local. O GGUF é usado apenas para sugerir palavras da busca, não para analisar letras.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
       <div class="modal-bottom"><span id="modal-edition"></span><button class="secondary-btn" data-close="modal">Fechar</button></div>
     </section>
@@ -137,6 +146,14 @@
         <label for="page-size">Resultados por página</label><select id="page-size"><option value="5">5 hinos</option><option value="10">10 hinos</option></select>
         <label class="setting-check"><input id="explain-toggle" type="checkbox" checked>Mostrar justificativa em cada resultado</label>
         <label class="setting-check"><input id="concepts-toggle" type="checkbox" checked>Mostrar como a consulta foi interpretada</label>
+        <div class="setting-divider"></div><h3>Recomendações em cadeia</h3>
+        <label for="rec-weight">Peso da semelhança entre letras <strong id="rec-weight-value">65%</strong></label>
+        <input id="rec-weight" type="range" min="0" max="100" step="5" value="65">
+        <p class="subtle-note">O restante dá peso à pesquisa inicial. Ex.: 65% hino selecionado + 35% consulta original.</p>
+        <label for="rec-count">Hinos relacionados por seleção</label><select id="rec-count"><option value="5">5 hinos</option><option value="10">10 hinos</option></select>
+        <label class="setting-check"><input id="rec-context" type="checkbox" checked>Manter a pesquisa inicial nas recomendações</label>
+        <label class="setting-check"><input id="rec-visited" type="checkbox" checked>Evitar hinos já abertos na sequência</label>
+        <label class="setting-check"><input id="rec-breakdown" type="checkbox" checked>Mostrar porcentagens separadas de letra e contexto</label>
         <p class="subtle-note">Afinidade é uma pontuação heurística. Associações são sugeridas a partir de evidências da letra, não são avaliação teológica oficial.</p>
         <div class="settings-actions"><button id="settings-search-save" class="primary-btn" type="button">Aplicar preferências</button><button id="settings-search-reset" class="secondary-btn" type="button">Restaurar padrões</button></div>
       </section>

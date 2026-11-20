@@ -40,7 +40,9 @@ const OfflineAPI = (() => {
   let initialized;
   let semantic=null;
   let narratives=null;
-  const DEFAULT_SEARCH={mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{}};
+  let recommender=null;
+  let queryRankingCache=new Map();
+  const DEFAULT_SEARCH={mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   function searchOptions(raw){
     const p=raw&&typeof raw==='object'?raw:{};
     const clamp=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;
@@ -55,7 +57,9 @@ const OfflineAPI = (() => {
       strength:clamp(p.strength,0,100,75),narratives:p.narratives!==false,
       related:p.related!==false,minAffinity:clamp(p.minAffinity,0,90,0),
       pageSize:[5,10].includes(Number(p.pageSize))?Number(p.pageSize):5,
-      showReasons:p.showReasons!==false,showConcepts:p.showConcepts!==false,customAliases:aliases};
+      showReasons:p.showReasons!==false,showConcepts:p.showConcepts!==false,customAliases:aliases,
+      recWeight:clamp(p.recWeight,0,100,65),recCount:[5,10].includes(Number(p.recCount))?Number(p.recCount):5,
+      recContext:p.recContext!==false,recAvoidVisited:p.recAvoidVisited!==false,recBreakdown:p.recBreakdown!==false};
   }
   // Índices residentes em memória: calculados uma vez na importação/abertura.
   // A IA jamais percorre hinos nem altera a coletânea: apenas produz termos de consulta.
@@ -80,6 +84,8 @@ const OfflineAPI = (() => {
         storyIndex.get(item.id).add(song.id);
       }
     }
+    recommender=typeof RecommendationEngine!=='undefined'?RecommendationEngine.create(hymns):null;
+    queryRankingCache.clear();
   }
   function candidateSongs(numberMatch,queryTokens,intent,storyIntent){
     if(numberMatch){const match=numberIndex.get(Number(numberMatch[1]));return match?[match]:[];}
@@ -296,8 +302,31 @@ const OfflineAPI = (() => {
     return {page,page_size:opts.pageSize,total:ranked.length,has_more:from+opts.pageSize<ranked.length,
       results:ranked.slice(from,from+opts.pageSize),topics:selectedTopics,story_matches:reading,
       interpretation,effective_query:query,excluded,used_ai:hints.length>0,applied_hints:hints,
+      _fullRanked:payload?._forRecommendations===true?ranked:undefined,
       summary:bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef&&!storyIntent?.matches.length?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',
       bible_reference:bible?.reference||null};
+  }
+  function queryRanking(query,opts){
+    if(!query||!query.trim()||/^(?:hino\s*)?\d{1,4}$/i.test(query.trim()))return new Map();
+    const key=JSON.stringify([query,opts.mode,opts.strength,opts.narratives,opts.related,opts.customAliases]);
+    if(queryRankingCache.has(key))return queryRankingCache.get(key);
+    const ranked=search({query,page:1,settings:{...opts,minAffinity:0},_forRecommendations:true});
+    const scores=new Map(ranked._fullRanked.map(x=>[x.id,x.relevance_percent]));
+    if(queryRankingCache.size>=12)queryRankingCache.delete(queryRankingCache.keys().next().value);
+    queryRankingCache.set(key,scores);return scores;
+  }
+  function recommendRelated(payload){
+    if(!recommender)throw Error('Índice de recomendações indisponível. Importe a coletânea.');
+    const opts=searchOptions(payload?.settings),original=String(payload?.original_query||'').trim().slice(0,500);
+    const active=String(payload?.active_query||'').trim().slice(0,500),root=opts.recContext?original:'';
+    const rootScores=root?queryRanking(root,opts):new Map();
+    const activeScores=root&&active&&active!==root?queryRanking(active,opts):rootScores;
+    const visited=Array.isArray(payload?.visited)?payload.visited.filter(x=>Number.isInteger(Number(x))).slice(-60):[];
+    const results=recommender.recommend({id:Number(payload?.hymn_id),originalRanks:rootScores,
+      activeRanks:activeScores,originalQuery:root,visited,
+      settings:{weight:opts.recWeight,count:opts.recCount,keepContext:opts.recContext,skipVisited:opts.recAvoidVisited}});
+    if(!opts.recBreakdown)for(const h of results.results){delete h.query_percent;delete h.similarity_percent;}
+    return results;
   }
   function hymnDetail(id){
     const song=hymns.find(s=>s.id===id);if(!song)throw Error('Hino não encontrado.');
@@ -328,6 +357,7 @@ const OfflineAPI = (() => {
     if(url==='/api/import')return importJson(payload.data);
     if(url==='/api/import-remote')return downloadRemote();
     if(url==='/api/search')return search(payload);
+    if(url==='/api/recommend')return recommendRelated(payload);
     const match=url.match(/^\/api\/hymns\/(\d+)$/);
     if(match)return hymnDetail(Number(match[1]));
     throw Error('Operação não reconhecida.');

@@ -1,8 +1,8 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],currentHymn:null,
-  searchSettings:{mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{}}};
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,
+  searchSettings:{mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true}};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 let toastTimer=null;
@@ -39,11 +39,11 @@ function resultCard(hymn){
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
 }
 function showResults(){$('welcome-panel').classList.add('hidden');$('results-panel').classList.remove('hidden');$('results-panel').scrollIntoView({behavior:'smooth',block:'start'});}
-async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true}={}){
+async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,retainRoot=false}={}){
   if(state.busy)return false;
   if(!state.ready){toast('Importe a coletânea para começar.');$('import-panel').scrollIntoView({behavior:'smooth',block:'center'});return false;}
   if(!String(query).trim())return false;
-  if(page===1){state.originalQuery=query;showResults();$('results-list').innerHTML=Array.from({length:3},()=>'<div class="loading-skeleton"></div>').join('');$('load-more').classList.add('hidden');}
+  if(page===1){if(!refine&&!retainRoot)state.searchRootQuery=query;state.originalQuery=query;state.hymnTrail=[];showResults();$('results-list').innerHTML=Array.from({length:3},()=>'<div class="loading-skeleton"></div>').join('');$('load-more').classList.add('hidden');}
   busySearch(true);let succeeded=false;
   try {
     let data;
@@ -79,9 +79,42 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   return succeeded;
 }
 function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;}
-async function openHymn(id){
+function relatedCard(hymn){
+  const percent=Math.min(100,Math.max(0,Number(hymn.compatibility_percent)||0));
+  const components=Number.isFinite(hymn.similarity_percent)?`<span>${Math.round(hymn.similarity_percent)}% com a letra</span>${Number.isFinite(hymn.query_percent)?`<span>${Math.round(hymn.query_percent)}% com a busca</span>`:''}`:'';
+  return `<button class="related-card" type="button" data-related-id="${Number(hymn.id)}" aria-label="Abrir hino ${escapeHTML(hymn.number||'')} ${escapeHTML(hymn.title)}; ${percent}% de afinidade combinada">
+    <span class="related-card-top"><span>HINO ${escapeHTML(hymn.number||'—')}</span><strong>${percent}% <small>compatível</small></strong></span>
+    <span class="related-card-title">${escapeHTML(hymn.title)}</span>
+    <span class="score-track related-track"><span style="width:${percent}%"></span></span>
+    ${components?`<span class="related-components">${components}</span>`:''}
+    <span class="related-evidence">${escapeHTML(hymn.reason||'Associação temática encontrada nas letras.')}</span>
+    <span class="related-open">Ver hino e novas sugestões ›</span>
+  </button>`;
+}
+async function renderRecommendations(hymn){
+  const seq=state.modalSequence;
+  $('related-back').classList.toggle('hidden',state.hymnTrail.length<2);
+  $('related-trail').textContent=state.hymnTrail.length>1?`${state.hymnTrail.length}º hino da sequência`: 'Início da descoberta';
+  $('related-list').innerHTML='<p class="subtle-note">Comparando hinos da coletânea…</p>';
   try{
-    const hymn=await jsonRequest(`/api/hymns/${Number(id)}`);state.currentHymn=hymn;
+    const response=await jsonRequest('/api/recommend',{hymn_id:hymn.id,original_query:state.searchRootQuery,
+      active_query:state.effectiveQuery,visited:state.hymnTrail,settings:state.searchSettings});
+    if(seq!==state.modalSequence)return;
+    $('related-description').textContent=response.original_query
+      ?`Afinidade combinada: ${response.weight_percent}% com o hino aberto e ${100-response.weight_percent}% com a busca inicial “${response.original_query}”.`
+      :'Afinidade calculada somente com a letra, os temas e as narrativas do hino aberto.';
+    $('related-list').innerHTML=response.results.length?response.results.map(relatedCard).join(''):
+      '<p class="subtle-note">Não encontrei outros hinos suficientemente relacionados. Experimente reduzir o filtro de já visitados nas Configurações.</p>';
+  }catch(error){if(seq===state.modalSequence)$('related-list').textContent='Não foi possível calcular as recomendações: '+error.message;}
+}
+async function openHymn(id,{fromRelated=false,back=false}={}){
+  const sequence=++state.modalSequence;
+  try{
+    const hymn=await jsonRequest(`/api/hymns/${Number(id)}`);if(sequence!==state.modalSequence)return;
+    if(back){const index=state.hymnTrail.lastIndexOf(hymn.id);if(index>=0)state.hymnTrail=state.hymnTrail.slice(0,index+1);}
+    else if(fromRelated){state.hymnTrail.push(hymn.id);if(state.hymnTrail.length>50)state.hymnTrail.shift();}
+    else state.hymnTrail=[hymn.id];
+    state.currentHymn=hymn;
     $('modal-number').textContent=hymn.number?`HINO ${hymn.number}`:'HINO';$('modal-title').textContent=hymn.title;
     $('modal-lyrics').textContent=hymn.lyrics;$('modal-topics').replaceChildren();
     if(hymn.topics?.length)hymn.topics.forEach(t=>{const s=document.createElement('span');s.className='small-tag';s.textContent=t;$('modal-topics').appendChild(s);});
@@ -89,9 +122,17 @@ async function openHymn(id){
     $('modal-references').textContent=hymn.references?.length?hymn.references.join(' · '):'Nenhuma referência explícita identificada.';
     $('modal-edition').textContent=`${hymn.collection} · Edição ${hymn.edition}`;
     $('modal-ai-output').classList.add('hidden');$('modal-ai-output').textContent='';
-    openLayer('modal');GGUF.info();
+    if(state.activeModal!=='modal')openLayer('modal');
+    else q('.modal-body')?.scrollTo({top:0,behavior:'instant'});
+    GGUF.info();await renderRecommendations(hymn);
   }catch(e){toast(e.message);}
 }
+$('related-list').addEventListener('click',event=>{
+  const b=event.target.closest('[data-related-id]');if(b)openHymn(Number(b.dataset.relatedId),{fromRelated:true});
+});
+$('related-back').addEventListener('click',()=>{
+  if(state.hymnTrail.length>1){const prior=state.hymnTrail[state.hymnTrail.length-2];openHymn(prior,{back:true});}
+});
 function openLayer(name){const el=$(name+'-layer');el.classList.remove('hidden');el.setAttribute('aria-hidden','false');state.activeModal=name;document.body.style.overflow='hidden';q('.icon-button[data-close]',el)?.focus();}
 function closeLayer(){if(!state.activeModal)return;const el=$(state.activeModal+'-layer');el.classList.add('hidden');el.setAttribute('aria-hidden','true');state.activeModal=null;document.body.style.overflow='';}
 async function importRemote(){
@@ -107,7 +148,7 @@ $('search-form').addEventListener('submit',ev=>{ev.preventDefault();if(typeof GG
 $('refine-form').addEventListener('submit',async ev=>{ev.preventDefault();if(typeof GGUF!=='undefined')GGUF.cancelIfBusy();const message=$('refine-input').value.trim();if(!message||state.busy)return;appendConversation('user',message);$('refine-input').value='';const success=await performSearch(message,{refine:true});appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados. Acrescente outra restrição se necessário.`:'Não consegui refinar a pesquisa.');});
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{state.effectiveQuery='';state.originalQuery='';state.exclude=[];state.semanticHints=[];state.lastResults=[];$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').innerHTML='<div class="assistant-message">Precisa de algo mais específico? Descreva a mensagem ou ocasião desejada.</div>';});
+$('new-search').addEventListener('click',()=>{state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.semanticHints=[];state.lastResults=[];$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').innerHTML='<div class="assistant-message">Precisa de algo mais específico? Descreva a mensagem ou ocasião desejada.</div>';});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;performSearch(b.dataset.suggestion);}));
 $('open-settings').addEventListener('click',()=>openLayer('settings'));$('ai-indicator').addEventListener('click',()=>openLayer('settings'));
 $('import-remote').addEventListener('click',importRemote);$('settings-import').addEventListener('click',importRemote);
@@ -119,8 +160,9 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 // Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
 const SearchPreferences=(()=>{
   const ids={mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
-    narratives:'story-toggle',related:'related-toggle',showReasons:'explain-toggle',showConcepts:'concepts-toggle'};
-  const defaults={mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{}};
+    narratives:'story-toggle',related:'related-toggle',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
+    recWeight:'rec-weight',recCount:'rec-count',recContext:'rec-context',recAvoidVisited:'rec-visited',recBreakdown:'rec-breakdown'};
+  const defaults={mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   let stories=[];
   function renderAliases(){
     const container=$('alias-list');container.replaceChildren();let count=0;
@@ -143,7 +185,7 @@ const SearchPreferences=(()=>{
       const input=$(id);if(input.type==='checkbox')input.checked=cfg[key]!==false;
       else input.value=String(cfg[key]);
     }
-    $('semantic-power-value').textContent=cfg.strength+'%';$('min-affinity-value').textContent=cfg.minAffinity+'%';
+    $('rec-weight-value').textContent=cfg.recWeight+'%';$('semantic-power-value').textContent=cfg.strength+'%';$('min-affinity-value').textContent=cfg.minAffinity+'%';
     renderAliases();
   }
   function readInputs(){
@@ -159,8 +201,9 @@ const SearchPreferences=(()=>{
     fill();
   }
   function refreshSearch(){
-    if(state.ready&&state.effectiveQuery)performSearch(state.effectiveQuery,{autoAI:false});
+    if(state.ready&&state.effectiveQuery)performSearch(state.effectiveQuery,{autoAI:false,retainRoot:true});
   }
+  $('rec-weight').oninput=()=>{$('rec-weight-value').textContent=$('rec-weight').value+'%';};
   $('semantic-power').oninput=()=>{$('semantic-power-value').textContent=$('semantic-power').value+'%';};
   $('min-affinity').oninput=()=>{$('min-affinity-value').textContent=$('min-affinity').value+'%';};
   $('settings-search-save').onclick=()=>{save();closeLayer();refreshSearch();toast('Preferências de busca aplicadas.');};
@@ -317,7 +360,7 @@ const GGUF=(()=>{
       if(aiCache.size>25)aiCache.delete(aiCache.keys().next().value);
       if(!hints.length){resetTask('IA não sugeriu termos válidos. A busca offline continua disponível.');return;}
       appendConversation('assistant','A IA sugeriu estes termos: '+hints.join(', ')+'. Reclassificando pela base offline.');
-      performSearch(state.effectiveQuery,{semanticHints:hints,autoAI:false}).then(ok=>resetTask(ok?'Resultados refinados com '+hints.length+' tema(s) sugerido(s) pela IA.':'Não foi possível aplicar os termos; busca local preservada.',!ok));
+      performSearch(state.effectiveQuery,{semanticHints:hints,autoAI:false,retainRoot:true}).then(ok=>resetTask(ok?'Resultados refinados com '+hints.length+' tema(s) sugerido(s) pela IA.':'Não foi possível aplicar os termos; busca local preservada.',!ok));
     }
   };
   $('gguf-select').addEventListener('click',()=>{if(native()?.selectModel)native().selectModel();});

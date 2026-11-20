@@ -1,4 +1,4 @@
-# Buscador de Hinos — Android 1.5
+# Buscador de Hinos — Android 1.6
 
 Aplicativo Android ARM64 com busca offline, ranking estimado e motor GGUF opcional (`llama.cpp`).
 
@@ -78,3 +78,29 @@ Com os requisitos instalados: `gradle assembleDebug`.
 `node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js`
 
 O teste v1.5 usa letras sintéticas, não a coletânea integral de 2018. A precisão no catálogo real precisa ser avaliada após a importação.
+
+
+## Versão 1.6 — Recomendações em cadeia
+
+Ao abrir um hino, a seção **Hinos semelhantes a este** mostra outras letras com afinidade comprovável em temas, narrativas bíblicas e termos relevantes. Tocar um hino recomendado abre seus detalhes e recalcula as sugestões; o botão **Voltar ao hino anterior** recupera a sequência. Sugestões repetidas da trilha ficam ocultas por padrão.
+
+### Duas referências no ranking
+
+- **Semelhança com a letra selecionada:** índice de sobreposição ponderada de conceitos, narrativas e palavras relevantes (TF-IDF local).
+- **Afinidade com a busca inicial:** obtida do próprio mecanismo de busca offline; refinamentos posteriores também influenciam o contexto, preservando a intenção inicial.
+- **Compatibilidade geral:** composição ponderada das duas medidas; padrão 65% letra atual e 35% busca inicial, configurável em Configurações.
+- Sem busca inicial, a compatibilidade usa somente o hino selecionado. Buscas só por número também não são tratadas como contexto semântico.
+
+### Configurações adicionais
+
+- Peso das letras atuais de 0% a 100% (a busca ocupa o restante).
+- 5 ou 10 recomendações por abertura.
+- Considerar ou ignorar a consulta inicial.
+- Ocultar ou incluir hinos já visitados.
+- Exibir ou ocultar as duas porcentagens separadas.
+
+As pontuações são **heurísticas, não probabilidades de compatibilidade comprovada**. Não treinamos modelo, não há chamadas GGUF e não precisamos de internet depois da importação. São exibidas somente recomendações que possuem evidência temática, narrativa ou lexical; o sistema pode retornar menos de cinco.
+
+### Testes v1.6
+
+`node tests/test-v16.js` valida compatibilidade, cruzamento de hinos, conservação do contexto, porcentagens, deduplicação e preferências. Teste de navegação em navegador mobile também executado com letras sintéticas. A base completa real não foi validada.
