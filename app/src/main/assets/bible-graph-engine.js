@@ -94,7 +94,7 @@ const BibleGraphEngine=(()=>{
         const uniqueOther=hits.some(item=>!item.anchor&&item.uniqueEpisode);
         const pairBonus=anchors>=1&&uniqueOther?20:0;
         const score=anchors>=1&&hits.length>=2?
-          Math.min(46,weight*1.7+(anchors>=2?6:0)+pairBonus+Math.min(6,hits.length)) :
+          Math.min(74,weight*1.7+(anchors>=2?6:0)+pairBonus+Math.min(6,hits.length)) :
           Math.min(3,weight*.25);
         if(score>best.score)best={score,hits,anchors};
       }
@@ -201,7 +201,7 @@ const BibleGraphEngine=(()=>{
       if(context.narrative&&totalDocs>0){
         const episode=episodeEvidence(song,context);
         const topicPoints=Math.min(8,direct.length*2.5+indirect.length*.5);
-        const score=Math.min(50,topicPoints+episode.score);
+        const score=Math.min(82,topicPoints+episode.score);
         const reasons=[];
         if(episode.count>=2&&episode.anchors>=1){
           reasons.push('Detalhes de '+context.reference+' na letra: '+episode.cues.join(', '));
