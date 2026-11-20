@@ -112,7 +112,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeLoad(JNIEnv* env,jclass,jstri
         params.n_gpu_layers=0;
         params.use_mmap=true;     // Evita uma cópia inteira do modelo na RAM.
         params.use_mlock=false;   // Permite que o Android descarte páginas inativas.
-        params.use_direct_io=false;
+        params.load_mtp=false;
         params.use_extra_bufts=false; // Evita buffers de repacking adicionais no primeiro teste.
         params.progress_callback=modelProgress;
         g_model=llama_model_load_from_file(path.c_str(),params);
