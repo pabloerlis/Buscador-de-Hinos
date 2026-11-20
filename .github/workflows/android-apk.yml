@@ -107,9 +107,42 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
+
+  embeddings:
+    name: "Agente 5 | E5, vetores por estrofe e proveniencia"
+    needs: static
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar dependencias do encoder E5
+        run: |
+          python3 -m pip install --disable-pip-version-check -q \
+            "numpy>=1.26,<3" "onnxruntime==1.20.1" "tokenizers==0.20.3" \
+            "huggingface_hub>=0.27,<1" requests
+      - name: Preparar modelo int8 pinado e gerar vetores por trecho
+        run: python3 scripts/build_e5_assets.py
+      - name: Auditar estrutura, origem, SHA e cobertura de estrofes
+        run: python3 scripts/qa_e5.py
+      - name: Preservar apenas os artefatos que entram no APK E5
+        uses: actions/upload-artifact@v4
+        with:
+          name: e5-stanza-assets-qa
+          path: |
+            app/src/main/assets/e5-model.onnx
+            app/src/main/assets/e5-vocab.bin
+            app/src/main/assets/e5-index.json
+            app/src/main/assets/e5-source.txt
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
   build_apk:
     name: "Compilar apenas se os 4 agentes aprovarem"
-    needs: [sources, static, regressions, relevance]
+    needs: [sources, static, regressions, relevance, embeddings]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -132,10 +165,14 @@ jobs:
         with:
           name: bible-indexes-qa
           path: app/src/main/assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: e5-stanza-assets-qa
+          path: app/src/main/assets
       - name: Compilar APK debug
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: gradle --no-daemon --stacktrace assembleDebug
+        run: gradle --no-daemon --stacktrace assembleDebug -PenableLocalEmbeddings=true
       - name: Guardar candidato para auditoria (ainda nao aprovado)
         uses: actions/upload-artifact@v4
         with:
@@ -165,6 +202,7 @@ jobs:
       - name: Assinatura, versao, SHA, proveniencia, integridade
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECT_E5_EMBEDDINGS: 'true'
         run: python3 scripts/qa_apk.py apk-candidate/app-debug.apk
       - name: Identificar a versao do artefato
         id: meta
