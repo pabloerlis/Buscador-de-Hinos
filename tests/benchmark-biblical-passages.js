@@ -63,5 +63,11 @@ const cases=[
   for(const row of outcome){
     assert.ok(row.expected.some(x=>x.position&&x.position<=20),
       'Nenhum hino diretamente relacionado recuperado no top 20: '+row.query);
+    if(row.query==='Mulher do fluxo de sangue'||row.query==='Marcos 5:25-34'){
+      assert.ok(row.expected.filter(x=>x.position&&x.position<=10).length>=2,
+        'Passagem não recuperou pelo menos dois hinos de referência no top 10: '+row.query);
+      assert.ok(row.falsePositive.every(x=>!x.position||x.position>10),
+        'Correspondência apenas temática entrou entre as dez primeiras: '+row.query);
+    }
   }
 })().catch(e=>{console.error(e);process.exitCode=1;});
