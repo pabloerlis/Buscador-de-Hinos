@@ -1,3 +1,19 @@
+# Buscador de Hinos Android v2.6.4 — ações e sequência narrativa
+
+Esta versão acrescenta um **motor determinístico de acontecimentos bíblicos** ao ranking existente. O aplicativo compara a sequência de ações e o contexto dos personagens/cenários na **Bíblia Livre offline** com trechos de cada hino importado. Não precisa de serviço remoto, modelo generativo nem distribui letras.
+
+**Como funciona:** um dicionário compartilhado de famílias de ações da língua portuguesa (verbos conjugados e algumas expressões) cria janelas locais de até cinco linhas. A correspondência só recebe bônus narrativo significativo quando há **pelo menos duas ações distintas, ordem compatível e pista de personagem/cenário no mesmo trecho**. Uma sequência semelhante em primeira pessoa sem pista de cenário recebe bônus menor, como *analogia*, não é considerada relato direto. Temas isolados e ações negadas não constituem evidência narrativa.
+
+**Pesquisa:** o motor trabalha junto com assuntos bíblicos, interpretações de histórias, busca lexical, RRF e E5 por estrofe. Um novo controle em Configurações permite desativar «Identificar ações e personagens na sequência da história» para comparar os resultados. Números, títulos exatos, filtros e repertório não aprendido mantêm prioridade.
+
+**Limites:** este é um **extrator lexical de eventos**, não um analisador de dependências/sujeito-objeto treinado. Pode perder paráfrases, metáforas, pronomes e verbos irregulares; uma justificativa é pista textual, não garantia teológica. Melhorias futuras devem incluir papéis semânticos e avaliação humana diversa sem criar exceções por hino.
+
+**QA:** testes de ações e atores em diferentes cenários sintéticos, negação, ordem temporal, falsos positivos e desempenho com 1.557 hinos; benchmark real pareado com motor ligado/desligado (narrativas, referências, E5), comparação de métricas e ensaio do motor no emulador Android junto com inferência ONNX, antes da assinatura final.
+
+**Build:** v2.6.4, versionCode 23, APK independente. A variante E5 permanece offline, com o mesmo modelo pinado da v2.6.3.
+
+---
+
 # Buscador de Hinos Android v2.6.3 — fusão de rankings por RRF
 
 Esta versão implementa **Reciprocal Rank Fusion (RRF, k=60)** para combinar rankings independentes: busca literal, temas, evidência bíblica, narrativas e similaridade vetorial E5. A classificação anterior somava pontuações de escalas diferentes; o RRF combina **posições** nas listas. Metodologia: https://learn.microsoft.com/pt-br/azure/search/hybrid-search-ranking .
