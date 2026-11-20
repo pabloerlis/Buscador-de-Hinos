@@ -36,7 +36,7 @@ import org.json.JSONObject;
 
 public final class MainActivity extends Activity {
     private static final String HOST = "https://appassets.androidplatform.net";
-    private static final String DATA_URL = "https://raw.githubusercontent.com/italozaina/projection-html5-icm/master/data/data.json";
+    private static final String DATA_URL = "https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json";
     private static final int MAX_JSON_BYTES = 12_000_000;
     private static final int PICK_FILE = 1205;
     private static final int PICK_GGUF = 1206;
