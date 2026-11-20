@@ -18,8 +18,8 @@ android {
             if (enableLocalEmbeddings) abiFilters 'x86_64'
         }
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
-        versionCode 22
-        versionName '2.6.3'
+        versionCode 23
+        versionName '2.6.4'
         buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
         buildConfigField 'boolean', 'ENABLE_LOCAL_EMBEDDINGS', enableLocalEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
