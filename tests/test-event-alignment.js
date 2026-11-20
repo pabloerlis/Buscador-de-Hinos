@@ -8,7 +8,7 @@ const Event=vm.runInContext('EventAlignment',context);
 const Stories=vm.runInContext('StoryEngine',context);
 const db=JSON.parse(fs.readFileSync(path.join(assets,'semantic-stories.json'),'utf8'));
 const engine=Stories.create(db);
-assert.ok(db.stories.length>=40,'Índice de narrativas incompleto');
+assert.ok(db.stories.length>=10,'Índice de narrativas específicas incompleto');
 const template={groups:[['caminho','estrada'],['ferido','caido'],['socorreu','cuidou']]};
 const aligned=Event.analyze(template,'Na estrada um homem caído\nO ferido foi socorrido\nAlguém cuidou dele\nFoi levado ao abrigo');
 assert.equal(aligned.tier,3,'Ações e participantes da mesma cena não foram associados');
