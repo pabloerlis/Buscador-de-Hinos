@@ -59,7 +59,7 @@ public class E5DeviceSmokeTest {
                 "Number.isInteger(a.versionCode);}catch(e){return false}})()");
             assertEquals("Installed app metadata does not match About view","true",metadata);
             assertEquals("RRF default or controls were not loaded in WebView","true",
-                evaluate(web,"Boolean(typeof FusionRRF!=='undefined' && " +
+                evaluate(web,"Boolean(typeof FusionRRF!=='undefined' && typeof EventAlignment!=='undefined' && " +
                     "OfflineAPI.searchOptions().fusionMode==='rrf' && " +
                     "document.getElementById('fusion-mode'))"));
             assertEquals("GGUF must not be enabled in E5-only variant","true",
