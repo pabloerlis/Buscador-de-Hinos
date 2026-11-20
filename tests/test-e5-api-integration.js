@@ -39,7 +39,7 @@ const ctx=vm.createContext({console,crypto:crypto.webcrypto,TextEncoder,atob:s=>
   setTimeout,clearTimeout,queueMicrotask,window:{indexedDB,NativeVector:{status:()=>true}},indexedDB,document:doc,
   localStorage:{getItem:k=>prefs.get(k)||null,setItem:(k,v)=>prefs.set(k,String(v))},
   fetch:async name=>({ok:Object.hasOwn(data,name),json:async()=>data[name]})});
-for(const name of ['scripture-index.js','semantic-engine.js','story-engine.js','bridge-engine.js',
+for(const name of ['scripture-index.js','semantic-engine.js','event-alignment.js','story-engine.js','bridge-engine.js',
   'bible-context.js','bible-graph-engine.js','recommendation-engine.js','vector-index.js','rrf-fusion.js',
   'repertoire-store.js','offline-api.js'])
   vm.runInContext(read(name),ctx,{filename:name});

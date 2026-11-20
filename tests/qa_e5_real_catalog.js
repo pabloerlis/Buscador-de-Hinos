@@ -32,7 +32,7 @@ const context=vm.createContext({console,window:{indexedDB,NativeVector:{status:(
   document:{createElement(){return {content:{textContent:''},set innerHTML(v){
     this.content.textContent=String(v).replace(/<br\s*\/?\s*>/gi,'\n').replace(/<[^>]*>/g,'');
   }};}}});
-for(const name of ['scripture-index.js','semantic-engine.js','story-engine.js','bridge-engine.js',
+for(const name of ['scripture-index.js','semantic-engine.js','event-alignment.js','story-engine.js','bridge-engine.js',
   'bible-context.js','bible-graph-engine.js','recommendation-engine.js','vector-index.js',
   'repertoire-store.js','offline-api.js'])
   vm.runInContext(read(name),context,{filename:name});
