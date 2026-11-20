@@ -30,7 +30,7 @@ jobs:
       - name: Build biblical-topic and cross-reference graph
         run: python3 scripts/build_bible_graph.py
       - name: Run local-search tests
-        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js && node tests/test-v21.js && node tests/test-narrative-events.js
+        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js && node tests/test-v21.js && node tests/test-narrative-events.js && node tests/test-about.js
       - name: Evaluate offline semantic ranking
         run: node tests/test-stanza-ranking.js
       - name: Evaluate narrative ranking on full catalog (test only)
@@ -40,6 +40,8 @@ jobs:
             --output /tmp/hinos-avaliacao.json
           node tests/benchmark-narratives.js /tmp/hinos-avaliacao.json
       - name: Build APK
+        env:
+          BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: gradle --no-daemon --stacktrace assembleDebug
       - name: Verify model-free APK contents
         run: |
