@@ -119,6 +119,9 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -156,6 +159,14 @@ jobs:
         run: python3 scripts/qa_e5_android_tokenizer.py
       - name: Auditar estrutura, origem, SHA e cobertura de estrofes
         run: python3 scripts/qa_e5.py
+      - name: Validar importação real e compatibilidade de hashes do E5
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --max-time 90 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output /tmp/e5-catalogo-verificado.json
+          node tests/qa_e5_real_catalog.js /tmp/e5-catalogo-verificado.json
       - name: Medir recuperação E5 com consultas de diferentes narrativas
         run: python3 scripts/benchmark_e5.py
       - name: Registrar métricas de recuperação sem letras
