@@ -63,6 +63,6 @@ const groups=[{name:'Coletânea 2018',songs:lyrics.map((content,i)=>({title:`00$
   assert.match(app,/RepertoireUI\.renderRelated\(response\)/);
   assert.match(css,/\.unlearned-drawer/);
   const gradle=fs.readFileSync(path.join(root,'../../../build.gradle'),'utf8');
-  assert.match(gradle,/versionName '2\.1\.0'/);
+  assert.ok(Number(gradle.match(/versionCode\s+(\d+)/)?.[1])>=13);
   console.log('v2.1: marcação persistente, deduplicação, reimportação, ranking, recomendações, recuperação, UI e versão aprovados.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

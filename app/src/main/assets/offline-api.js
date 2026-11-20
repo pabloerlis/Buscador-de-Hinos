@@ -438,6 +438,11 @@ const OfflineAPI = (() => {
       not_learned_results:notLearned.slice(hiddenFrom,hiddenFrom+hiddenSize),
       not_learned_has_more:hiddenFrom+hiddenSize<notLearned.length,
       topics:selectedTopics,story_matches:reading,
+      ai_context:{
+        reference:graphCtx?.reference||scripture?.reference||null,
+        passage:(graphCtx?.sourceText||scripture?.text||'').slice(0,220),
+        topics:[...new Set([...(graphCtx?.concepts||[]).map(topic=>topic.label),...selectedTopics])].slice(0,4)
+      },
       interpretation,effective_query:query,excluded,used_ai:hints.length>0,applied_hints:hints,
       _fullRanked:payload?._forRecommendations===true?ranked:undefined,
       summary:graphCtx?'Busca por contexto bíblico offline: '+graphCtx.reference+'. Resultados baseados nas evidências das letras.':scripture?'Texto da Bíblia Livre consultado offline: '+scripture.reference+'.':bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef&&!storyIntent?.matches.length?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',

@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+const vm=require('node:vm');
 const root=path.join(__dirname,'..');
 const read=p=>fs.readFileSync(path.join(root,p),'utf8');
 const html=read('app/src/main/assets/index.html');
@@ -11,8 +12,8 @@ const cpp=read('app/src/main/cpp/hinos_jni.cpp');
 const cmake=read('app/src/main/cpp/CMakeLists.txt');
 const build=read('app/build.gradle');
 const workflow=read('.github/workflows/android-apk.yml');
-for(const id of ['gguf-cancel','ai-cancel','gguf-select','gguf-load','gguf-improve','gguf-compare','gguf-status','gguf-banner','gguf-auto','ai-workspace','ai-indicator','modal-ai-ask','settings-ai','gguf-phase','gguf-model-meta'])assert.match(html,new RegExp('id="'+id+'"'),id);
-for(const fn of ['selectModel','loadModel','generate','cancel','status'])assert.ok(java.includes('public '+(fn==='status'?'String':'void')+' '+fn+'('),'Java bridge: '+fn);
+for(const id of ['gguf-cancel','ai-cancel','gguf-select','gguf-load','gguf-improve','gguf-compare','gguf-compare-model','gguf-test','gguf-test-result','gguf-comparison','gguf-status','gguf-banner','gguf-auto','ai-workspace','ai-indicator','modal-ai-ask','settings-ai','gguf-phase','gguf-model-meta'])assert.match(html,new RegExp('id="'+id+'"'),id);
+for(const fn of ['selectModel','loadModel','generate','cancel','status'])assert.match(java,new RegExp('public (?:synchronized )?'+(fn==='status'?'String':'void')+' '+fn+'\\('),'Java bridge: '+fn);
 assert.match(js,/window\.NativeGGUF/);
 assert.match(js,/\.generate\(prompt/);
 assert.match(js,/\.status\?\.\(\)/);
@@ -47,15 +48,100 @@ assert.match(cpp,/llama_decode/);
 assert.match(cpp,/llama_sampler_sample/);
 assert.match(cmake,/ggml-org\/llama.cpp/);
 assert.match(cmake,/GIT_TAG b8201/);
-assert.match(build,/versionName '2\.1\.0'/);
+assert.match(build,/versionName '2\.2\.0'/);
 assert.match(build,/abiFilters 'arm64-v8a'/);
 assert.match(workflow,/ndk;27\.2\.12479018/);
 assert.match(js,/MAX_AI_MS=16000/);
 assert.match(js,/OfflineAPI\.validateHints/);
 assert.match(cpp,/nativeCancel/);
 assert.match(cpp,/cp\.abort_callback=shouldCancel/);
-assert.match(java,/nativeGenerate\(prompt,36\)/);
+assert.match(java,/nativeGenerate\(prompt\.getBytes\(StandardCharsets\.UTF_8\),grammar\.getBytes\(StandardCharsets\.UTF_8\)/);
+assert.match(cpp,/llama_sampler_init_grammar/);
+assert.match(cpp,/cp\.abort_callback_data=&deadline/);
 assert.match(html,/id="gguf-auto"/);
 assert.doesNotMatch(html,/id="gguf-auto" checked/);
 assert.match(html,/Percentuais|percentuais/);
-console.log('Integração GGUF, observabilidade e diagnóstico: 41 verificações estruturais aprovadas.');
+
+const aiSource=read('app/src/main/assets/local-hymn-ai.js');
+const ai=vm.runInNewContext(aiSource+'\nLocalHymnAI');
+const hymns=Array.from({length:6},(_,index)=>({id:index+1,number:String(index+1),title:'Hino de teste '+(index+1),snippet:'Deus acolhe quem volta de coração.'}));
+const context={reference:'Lucas 15:20',passage:'Vinha ele ainda longe, quando seu pai o viu.',topics:['Arrependimento']};
+const request=ai.prepareComparison('Voltar para Deus',['tristeza'],hymns,context);
+assert.equal(request.candidates.size,5);
+assert.match(request.prompt,/Lucas 15:20.*seu pai o viu.*Hino de teste 5/);
+assert.doesNotMatch(request.prompt,/Hino de teste 6/);
+assert.match(request.prompt,/tristeza/);
+assert.match(request.grammar,/hymn-id ::= "1" \| "2" \| "3" \| "4" \| "5"/);
+assert.equal(ai.prepareComparison('Voltar para Deus',[],[{id:1,snippet:''},hymns[1]],null),null);
+const valid='[{"id":2,"motivo":"O trecho expressa acolhimento no retorno."}]';
+assert.equal(ai.readComparison(valid,request.candidates)[0].excerpt,hymns[1].snippet);
+assert.equal(ai.readComparison('[]',request.candidates).length,0);
+for(const invalid of ['[{"id":6,"motivo":"Fora da lista."}]','[{"id":2,"motivo":" "}]','[{"id":"2","motivo":"Tipo errado."}]','[{"id":2,"motivo":"a"},{"id":2,"motivo":"b"}]','[{"id":2,"motivo":"a"},{"id":3,"motivo":"b"},{"id":4,"motivo":"c"}]','[{"id":2,"motivo":"a\\nb"}]','sem JSON']){
+  assert.throws(()=>ai.readComparison(invalid,request.candidates));
+}
+
+const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
+const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
+function setup({ready=true}={}){
+  const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[];
+  const $=id=>{
+    if(!elements.has(id)){
+      const classes=new Set(['hidden']);
+      elements.set(id,{classes,textContent:'',classList:{add:c=>classes.add(c),remove:c=>classes.delete(c),toggle(){}},
+        addEventListener(name,handler){if(name==='click')this.click=handler;},replaceChildren(){},insertAdjacentHTML(){}});
+    }
+    return elements.get(id);
+  };
+  const window={NativeGGUF:{status:()=>JSON.stringify({available:true,loaded:true,phase:'ready'}),
+    generate:(...args)=>calls.push(args),cancel:id=>cancelled.push(id)}};
+  const vector=Array(384).fill(0.1);
+  const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:hymns,searchSettings:{},aiContext:context,vectorQuery:vector};
+  vm.runInNewContext(aiSource+searchSource+ggufSource,{window,$,state,localStorage:{getItem:()=>null},setInterval(){},toast(){},appendConversation(){},
+    OfflineAPI:{normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
+    jsonRequest:async(url,payload)=>{requests.push(payload);return {results:hymns,effective_query:payload.query,excluded:payload.exclude,ai_context:context,total:hymns.length,page:1};},
+    busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>embeddings.push(args)}});
+  return {calls,cancelled,$,state,requests,embeddings,vector,complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
+}
+
+async function checkBridge(){
+  const diagnostic=setup({ready:false});
+  diagnostic.$('gguf-test').click();
+  const [prompt,id,grammar]=diagnostic.calls[0];
+  assert.equal(prompt,ai.diagnostic.prompt);
+  assert.equal(grammar,ai.diagnostic.grammar);
+  diagnostic.complete(id,'OK',true,{setupMs:10,prefillMs:5,firstTokenMs:15,tokens:1});
+  assert.match(diagnostic.$('gguf-test-result').textContent,/Teste passou.*Primeiro token: 15 ms/);
+
+  const comparison=setup();
+  comparison.$('gguf-compare-model').click();
+  const comparisonId=comparison.calls[0][1];
+  comparison.complete('0',valid);
+  assert.ok(comparison.$('gguf-comparison').classes.has('hidden'));
+  comparison.complete(comparisonId,valid);
+  assert.match(comparison.$('gguf-comparison').textContent,/Hino de teste 2.*\nMotivo da IA: O trecho expressa acolhimento no retorno\.\nTrecho da coletânea:/);
+  assert.equal(comparison.requests.length,0);
+
+  const stale=setup();
+  stale.$('gguf-compare-model').click();
+  stale.state.searchEpoch++;
+  stale.complete(stale.calls[0][1],valid);
+  assert.ok(stale.$('gguf-comparison').classes.has('hidden'));
+
+  const cancelled=setup();
+  cancelled.$('gguf-compare-model').click();
+  cancelled.$('gguf-cancel').click();
+  assert.deepEqual(cancelled.cancelled,[cancelled.calls[0][1]]);
+  cancelled.complete(cancelled.calls[0][1],valid);
+  assert.ok(cancelled.$('gguf-comparison').classes.has('hidden'));
+
+  const enrichment=setup();
+  enrichment.$('gguf-improve').click();
+  enrichment.complete(enrichment.calls[0][1],'Arrependimento');
+  await Promise.resolve();
+  assert.equal(enrichment.requests[0].exclude[0],'tristeza');
+  assert.equal(enrichment.requests[0].vector_query,enrichment.vector);
+  assert.equal(enrichment.embeddings.length,0);
+  console.log('GGUF: diagnóstico, comparação fundamentada, validação, cancelamento e preservação da busca aprovados.');
+}
+
+checkBridge().catch(error=>{console.error(error);process.exitCode=1;});

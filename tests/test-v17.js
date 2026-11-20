@@ -54,7 +54,9 @@ const sample=[
  assert.ok(r.interpretation.some(x=>x.includes('Bíblia Livre offline')));
  r=await api.request('/api/search',{query:'Salmo 23'});
  assert.equal(r.bible_reference,'Salmo 23');assert.ok(r.results.some(x=>x.number==='005'));
+ assert.equal(r.ai_context.reference,'Salmo 23');assert.match(r.ai_context.passage,/pastor/i);
  const noBible=await api.request('/api/search',{query:'Salmo 23',settings:{scripture:false}});
+ assert.equal(noBible.ai_context.passage,'');
  assert.equal(noBible.bible_verses,0);
  const noBridge=await api.request('/api/search',{query:'Não consigo dormir',settings:{bridge:false}});
  assert.ok(!noBridge.interpretation.some(x=>x.startsWith('Associação lexical')));

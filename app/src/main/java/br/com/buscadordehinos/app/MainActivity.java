@@ -52,6 +52,7 @@ public final class MainActivity extends Activity {
     private volatile String modelError="";
     private volatile long lastDurationMs=0;
     private volatile long generationStarted=0;
+    private volatile String activeGenerationId="";
     private volatile String selectedName="";
     private volatile int copyProgress=0;
     private static final boolean NATIVE_AVAILABLE;
@@ -63,7 +64,9 @@ public final class MainActivity extends Activity {
     }
     private static native String nativeLoad(String path);
     private static native int nativeLoadProgress();
-    private static native String nativeGenerate(String prompt,int maxTokens);
+    private static native byte[] nativeGenerate(byte[] prompt,byte[] grammar,int maxTokens,int timeoutMs,long[] metrics);
+    private static native int nativeGenerationStage();
+    private static native void nativeResetCancellation();
     private static native void nativeCancel();
     private static native void nativeUnload();
     private WebView web;
@@ -209,6 +212,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onDestroy(){
         if(pendingFile!=null)pendingFile.onReceiveValue(null);
+        if(NATIVE_AVAILABLE&&!activeGenerationId.isEmpty())nativeCancel();
         if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeGGUF");web.destroy();web=null;}
         llmExecutor.execute(()->{if(NATIVE_AVAILABLE)nativeUnload();});
         llmExecutor.shutdown();
@@ -307,7 +311,11 @@ public final class MainActivity extends Activity {
     }
     private static String errorMessage(Throwable ex){return ex.getMessage()==null?ex.getClass().getSimpleName():ex.getMessage();}
     private void ggufEvent(String event,boolean ok,String value){
-        String js="window.__ggufNativeEvent && window.__ggufNativeEvent("+JSONObject.quote(event)+","+ok+","+JSONObject.quote(value)+");";
+        ggufEvent(event,ok,value,"",null);
+    }
+    private void ggufEvent(String event,boolean ok,String value,String requestId,JSONObject metrics){
+        String js="window.__ggufNativeEvent && window.__ggufNativeEvent("+JSONObject.quote(event)+","+ok+","+
+            JSONObject.quote(value)+","+JSONObject.quote(requestId)+","+metrics+");";
         runOnUiThread(()->{if(web!=null)web.evaluateJavascript(js,null);});
     }
     public class ModelBridge {
@@ -326,6 +334,10 @@ public final class MainActivity extends Activity {
                 result.put("storageMB", Math.round(new StatFs(getFilesDir().getAbsolutePath()).getAvailableBytes()/1048576.0));
                 result.put("lastError",modelError);
                 result.put("lastDurationMs",lastDurationMs);
+                if(NATIVE_AVAILABLE&&"generating".equals(modelPhase)){
+                    result.put("generationStage",nativeGenerationStage());
+                    result.put("elapsedMs",android.os.SystemClock.elapsedRealtime()-generationStarted);
+                }
                 if(uriString!=null){
                     long fileSize=modelSize(Uri.parse(uriString));
                     if(fileSize>0)result.put("modelMB",Math.round(fileSize/1048576.0));
@@ -350,7 +362,7 @@ public final class MainActivity extends Activity {
                 catch(Exception ex){ggufEvent("selection",false,errorMessage(ex));}
             });
         }
-        @JavascriptInterface public void loadModel(){
+        @JavascriptInterface public synchronized void loadModel(){
             if(!NATIVE_AVAILABLE){modelPhase="unavailable";ggufEvent("load",false,"Motor nativo indisponível neste dispositivo ARM64.");return;}
             if(llmBusy){ggufEvent("load",false,"A IA já está ocupada.");return;}
             llmBusy=true;modelPhase="copying";copyProgress=0;modelError="";lastDurationMs=0;
@@ -382,32 +394,47 @@ public final class MainActivity extends Activity {
                 }finally{llmBusy=false;}
             });
         }
-        @JavascriptInterface public void cancel(){
-            if(NATIVE_AVAILABLE && llmBusy && "generating".equals(modelPhase)){
+        @JavascriptInterface public synchronized void cancel(String requestId){
+            if(NATIVE_AVAILABLE && requestId!=null && !requestId.isEmpty() && requestId.equals(activeGenerationId)){
                 nativeCancel();
-                ggufEvent("phase",true,"Solicitada interrupção da IA; preservando busca local.");
             }
         }
-        @JavascriptInterface public void generate(String prompt){
-            if(llmBusy){ggufEvent("generate",false,"O modelo já está em uso.");return;}
-            if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um GGUF primeiro.");return;}
-            if(prompt==null||prompt.trim().isEmpty()||prompt.length()>2400){ggufEvent("generate",false,"Consulta inválida ou longa demais.");return;}
-            llmBusy=true;modelPhase="generating";modelError="";
-            final long start=android.os.SystemClock.elapsedRealtime();
-            ggufEvent("phase",true,"Interpretando contexto…");
+        @JavascriptInterface public synchronized void generate(String prompt,String requestId,String grammar,int maxTokens,int timeoutMs){
+            if(requestId==null||!requestId.matches("[0-9]{1,12}"))return;
+            if(llmBusy){ggufEvent("generate",false,"O modelo já está em uso.",requestId,null);return;}
+            if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um GGUF primeiro.",requestId,null);return;}
+            if(prompt==null||prompt.trim().isEmpty()||prompt.length()>2400||grammar==null||grammar.length()>2400
+                    ||maxTokens<1||maxTokens>120||timeoutMs<1000||timeoutMs>60000){
+                ggufEvent("generate",false,"Parâmetros de geração inválidos.",requestId,null);
+                return;
+            }
+            nativeResetCancellation();
+            generationStarted=android.os.SystemClock.elapsedRealtime();
+            llmBusy=true;
+            activeGenerationId=requestId;
+            modelPhase="generating";
+            modelError="";
+            ggufEvent("phase",true,"Preparando a geração…");
             llmExecutor.execute(()->{
-                try {
-                    String output=nativeGenerate(prompt,36);
-                    lastDurationMs=android.os.SystemClock.elapsedRealtime()-start;
-                    modelPhase="ready";ggufEvent("generate",true,output);
+                String value;
+                JSONObject metrics=null;
+                boolean ok=false;
+                try{
+                    long[] timing=new long[4];
+                    byte[] output=nativeGenerate(prompt.getBytes(StandardCharsets.UTF_8),grammar.getBytes(StandardCharsets.UTF_8),maxTokens,timeoutMs,timing);
+                    value=new String(output,StandardCharsets.UTF_8);
+                    metrics=new JSONObject().put("setupMs",timing[0]).put("prefillMs",timing[1])
+                        .put("firstTokenMs",timing[2]).put("tokens",timing[3]);
+                    ok=true;
                 }catch(Throwable ex){
-                    String message=errorMessage(ex);
-                    boolean cancelled=message.contains("interrompida")||message.contains("cancelada");
-                    modelPhase=cancelled?"ready":"error";
-                    modelError=cancelled?"":message;
-                    ggufEvent("generate",false,cancelled?"Tempo limite atingido; mantendo os resultados locais.":message);
+                    value=errorMessage(ex);
+                    modelError=value.equals("Geração cancelada.")?"":value;
                 }
-                finally{llmBusy=false;}
+                lastDurationMs=android.os.SystemClock.elapsedRealtime()-generationStarted;
+                activeGenerationId="";
+                modelPhase="ready";
+                llmBusy=false;
+                ggufEvent("generate",ok,value,requestId,metrics);
             });
         }
     }

@@ -19,6 +19,7 @@
   <script src="vector-index.js" defer></script>
   <script src="repertoire-store.js" defer></script>
   <script src="offline-api.js" defer></script>
+  <script src="local-hymn-ai.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -113,8 +114,9 @@
                 <button id="ai-cancel" class="secondary-btn hidden" type="button">Interromper IA</button><div id="ai-activity" class="ai-activity hidden"><span class="ai-spinner"></span><span id="ai-progress">Preparando...</span></div>
                 <p id="ai-last" class="ai-last"></p>
               </div>
-              <div id="gguf-banner" class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto: escolha como utilizar a IA.</span>
-                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare" class="secondary-btn" type="button">Comparar 5 (offline)</button></div></div>
+              <div id="gguf-banner" class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
+                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar com IA</button><button id="gguf-compare" class="secondary-btn" type="button">Comparar 5 (offline)</button></div></div>
+              <div id="gguf-comparison" class="ai-interpretation hidden" role="status" aria-live="polite"></div>
         <div id="results-list" class="results-list" aria-live="polite"></div>
               <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
               <details id="not-learned-search" class="unlearned-drawer hidden">
@@ -155,7 +157,7 @@
           <p class="related-method">As porcentagens são índices de afinidade estimada, não probabilidades nem avaliação teológica oficial.</p>
         </section>
         <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
-      <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local. O GGUF é usado apenas para sugerir palavras da busca, não para analisar letras.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
+      <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
       <div class="modal-bottom"><span id="modal-edition"></span><button class="secondary-btn" data-close="modal">Fechar</button></div>
     </section>
   </div>
@@ -228,13 +230,14 @@
       </section>
       <details class="advanced-settings"><summary>IA local experimental (GGUF) — opcional</summary><section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (GGUF)</h3>
-        <p>Escolha um arquivo <code>.gguf</code> do telefone. O modelo servirá apenas para sugerir até 4 temas de busca; a classificação e o detalhamento são feitos pelo índice offline. O modelo não é enviado a servidores. Preferencialmente use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
+        <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. O modelo pode sugerir temas ou comparar trechos dos cinco primeiros resultados da busca. Use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
         <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
         <p id="gguf-phase" class="gguf-phase">Estado: verificando</p><p id="gguf-model-meta" class="subtle-note">Nenhum modelo foi carregado na memória.</p>
         <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Usar IA automaticamente para sugerir palavras-chave (desativado por padrão). A busca offline sempre aparece primeiro.</span></label>
-        <p class="subtle-note">Como funciona: 1) pesquisa instantânea no índice local; 2) opcionalmente, o GGUF sugere até quatro temas em uma resposta curta; 3) o índice local reclassifica os hinos. A IA pode ser interrompida e nunca precisa ler toda a coletânea.</p>
         <p id="gguf-last" class="gguf-phase" aria-live="polite">Última execução: nenhuma</p>
-        <div class="settings-actions"><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div><div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
+        <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
+        <div class="settings-actions"><button id="gguf-test" class="secondary-btn" type="button" disabled>Testar modelo</button><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div>
+        <p id="gguf-test-result" class="subtle-note" role="status" aria-live="polite">Carregue o GGUF para testar a geração no aparelho.</p>
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
       </section></details>
       <p class="subtle-note">Fontes das relações: Bible Topics Dataset (NEUU, CC BY 4.0) e Bible Cross-References Dataset (NEUU/OpenBible, CC BY 4.0), com curadoria de nomes narrativos em português. Fontes: <a href="https://github.com/neuu-org/bible-topics-dataset">Temas</a> e <a href="https://github.com/neuu-org/bible-crossrefs-dataset">Referências cruzadas</a>. Texto bíblico: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>

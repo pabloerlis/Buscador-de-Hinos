@@ -1,4 +1,14 @@
-# Buscador de Hinos Android v2.1
+# Buscador de Hinos Android v2.2
+
+1. Abra **Configurações → IA local experimental**, escolha um GGUF e toque em **Carregar modelo**.
+2. Toque em **Testar modelo**. O app executa uma geração curta e mostra o tempo de preparação, de processamento da entrada e até o primeiro token.
+3. Faça uma pesquisa com pelo menos dois hinos e toque em **Comparar com IA**. O modelo recebe até cinco trechos do índice local, junto dos temas e da passagem bíblica quando disponíveis. O app mostra até duas escolhas com a justificativa da IA e o trecho da coletânea.
+
+A busca e a comparação pelo índice continuam disponíveis durante a geração. A comparação via GGUF tem um prazo de até 60 segundos. Todas as consultas e inferências são executadas no aparelho após a importação. O motor incluído é `llama.cpp b8201` e não suporta arquivos GGUF com arquitetura `gemma4`.
+
+Para verificar cancelamento durante o uso, inicie uma comparação e toque em **Interromper IA**. Para verificar o descarte de respostas antigas, inicie uma comparação e faça uma nova busca antes da conclusão.
+
+## v2.1 — Repertório da igreja
 
 Novidade: repertório da igreja. Qualquer hino pode ser marcado como **não aprendido**, ficando fora das sugestões principais e preservado em gavetas recolhíveis nos resultados e nas recomendações. A marcação é independente da importação e permanece armazenada localmente entre atualizações normais. Não desinstalar/limpar dados sem backup.
 
