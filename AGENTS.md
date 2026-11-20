@@ -55,6 +55,6 @@ Nota: o emulador testa o APK x86_64; dispositivos reais arm64-v8a podem apresent
 - O motor `event-frame-engine.js` deve usar um dicionário de ações genérico para **todas** as histórias. Proibido pontuar hinos pelo número ou criar exceções para personagens, histórias ou referências individuais.
 - Não confundir mera semelhança temática com narrativa: exigir múltiplas ações, ordem de ocorrência e evidência de personagem/cenário **dentro de um trecho da letra**, com citações textuais autênticas da letra importada.
 - Separar analogia em primeira pessoa de descrição direta do episódio e não promover frases negadas como acontecimento ocorrido.
-- Preservar `eventEvidence:false` para auditoria pareada com o motor desligado; defaults ativados só em busca contextual e narrativa.
+- Preservar `eventEvidence:false` para auditoria pareada com o motor desligado; defaults ativados só em busca contextual e narrativa. Até obter avaliação humana maior, preservar o conjunto dos dez hinos conhecidos no topo de cada pesquisa narrativa, permitindo apenas reordenação interna e melhorias além dessa faixa.
 - O CI deve executar `tests/test-event-frames.js` e `tests/qa_event_ranking.js`, comparando Recall@10/20 e nDCG@5 em consultas reais, incluindo narrativas e referências. Os resultados devem ser registrados sem letras.
 - Dispositivo: inspecionar `EventFrameEngine` e controle `event-toggle` dentro da WebView Android offline e executar classificação de texto sintético antes da auditoria e publicação do APK.
