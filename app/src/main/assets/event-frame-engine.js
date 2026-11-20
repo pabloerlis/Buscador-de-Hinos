@@ -88,6 +88,13 @@ const EventFrameEngine=(()=>{
     name,fragments:fragments.map(normalize)
   }));
   const ACT_NAMES=new Set(ACTIONS.map(x=>x.name));
+  const ACTION_LOOKUP=new Map();
+  for(const action of ACTIONS)for(const prefix of action.fragments){
+    const key=prefix.slice(0,2);
+    if(!ACTION_LOOKUP.has(key))ACTION_LOOKUP.set(key,[]);
+    ACTION_LOOKUP.get(key).push({name:action.name,prefix});
+  }
+  const actionMatches=word=>(ACTION_LOOKUP.get(word.slice(0,2))||[]).filter(a=>word.startsWith(a.prefix));
   const ROLE_WORDS=new Set(('pai filho filha filhos filhas mulher mulheres homem homens menino menina jovem '
     +'irmao irma mae maes crianca criancas cego cegos doente enfermo viuva pastor pastores '
     +'ovelha ovelhas servo servos discipulo discipulos amigo amigos mestre rei reis sacerdote '
@@ -102,16 +109,12 @@ const EventFrameEngine=(()=>{
       const w=tokens[i];
       const negated=tokens.slice(Math.max(0,i-3),i).some(x=>NEGATE.has(x));
       if(negated)continue;
-      for(const action of ACTIONS){
-        if(action.fragments.some(prefix=>w.startsWith(prefix))){
-          actions.add(action.name);
-        }
-      }
+      for(const action of actionMatches(w))actions.add(action.name);
     }
     const nouns=new Set();
     for(const token of tokens){
       if(STOP.has(token))continue;
-      if(ACTIONS.some(a=>a.fragments.some(p=>token.startsWith(p))))continue;
+      if(actionMatches(token).length)continue;
       const root=token.replace(/(?:amentos|imentos|idades|adores|adoras|mente|zinho|zinha|coes|cao|amento|imento|ados|adas|idos|idas|ando|endo|indo|oes|ais|eis|eis|os|as|es|s|o|a)$/,'');
       if(root.length>=3)nouns.add(root);
     }
