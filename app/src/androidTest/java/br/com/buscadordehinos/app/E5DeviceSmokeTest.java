@@ -72,7 +72,7 @@ public class E5DeviceSmokeTest {
                     "const verses=['O viajante partiu e deixou a casa do pai.'," +
                     "'O filho voltou e foi recebido pelo pai que o perdoou.'];" +
                     "const db={narratives:[{id:'qa',label:'Uma viagem',reference:'QA'," +
-                    "aliases:['Viajante que voltou']}]};" +
+                    "aliases:['Filho voltou ao pai']}]};" +
                     "const bible={lookup:()=>({verses:verses.map(text=>({text}))})};" +
                     "const engine=EventFrameEngine.create(db,bible);" +
                     "const hymn={id:1,title:'Relato',lyrics:" +
