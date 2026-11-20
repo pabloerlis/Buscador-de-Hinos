@@ -20,6 +20,7 @@
   <script src="repertoire-store.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="local-hymn-ai.js" defer></script>
+  <script src="about.js" defer></script>
   <script src="app.js" defer></script>
 </head>
 <body>
@@ -166,8 +167,23 @@
   <div id="settings-layer" class="modal-layer hidden" aria-hidden="true">
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea.</p><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span data-gguf-ui>Modelo GGUF</span><strong id="settings-ai" data-gguf-ui>Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      <div class="modal-top"><div><span class="modal-overline">APLICATIVO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
+      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea.</p>
+      <details class="advanced-settings about-app" id="about-app" aria-label="Sobre o aplicativo">
+        <summary>Sobre</summary>
+        <div class="about-content">
+          <h3>Buscador de Hinos</h3>
+          <div class="status-grid">
+            <span>Desenvolvedor</span><strong id="about-developer">Pablo Erlis</strong>
+            <span>Versão</span><strong id="about-version">—</strong>
+            <span>Código da versão</span><strong id="about-code">—</strong>
+            <span>Tipo de build</span><strong id="about-type">—</strong>
+            <span>Commit da build</span><strong id="about-commit">—</strong>
+            <span>Compilado em</span><strong id="about-date">—</strong>
+          </div>
+          <p class="subtle-note">Informações obtidas diretamente do APK instalado; data exibida em UTC. Estes dados não dependem da conexão com a internet.</p>
+        </div>
+      </details><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span data-gguf-ui>Modelo GGUF</span><strong id="settings-ai" data-gguf-ui>Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
       <section class="semantic-settings" aria-label="Coleções e importação">
         <div class="setting-section-heading"><h3>Biblioteca unificada</h3><span class="local-badge">Offline</span></div>
         <p class="subtle-note">Escolha onde pesquisar. Hinos idênticos em várias coleções aparecem uma única vez, preservando suas referências de origem.</p>
