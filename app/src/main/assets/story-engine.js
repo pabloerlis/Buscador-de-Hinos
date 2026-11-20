@@ -10,13 +10,28 @@ const StoryEngine = (() => {
     const safe=escapeRe(normalize(term)).replace(/\s+/g,'\\s+');
     return new RegExp('(?:^|[^a-z0-9])'+safe+'(?=$|[^a-z0-9])');
   }
+  // Flexões portuguesas frequentes. Não altera aliases nem a pesquisa literal;
+  // só amplia sinais narrativos de uma palavra, para TODAS as histórias.
+  const ENDINGS=['aremos','eremos','iremos','ariam','eriam','iriam','ando','endo','indo',
+    'ados','adas','idos','idas','aram','eram','iram','arei','erei','irei',
+    'asse','esse','isse','ava','avam','ado','ada','ido','ida',
+    'ou','eu','iu','ei','am','em','ar','er','ir','os','as','es','o','a','e','i','s'];
+  const FLEX_SUFFIX='(?:'+ENDINGS.join('|')+')?';
+  function flexMatcher(term){
+    const word=normalize(term);
+    if(!/^[a-z]{5,}$/.test(word))return matcher(term);
+    const suffix=ENDINGS.find(x=>word.endsWith(x)&&word.length-x.length>=4);
+    if(!suffix)return matcher(term);
+    const stem=word.slice(0,-suffix.length);
+    return new RegExp('(?:^|[^a-z0-9])'+escapeRe(stem)+FLEX_SUFFIX+'(?=$|[^a-z0-9])');
+  }
   function create(db){
     if(!db||db.schema_version!==1||!Array.isArray(db.stories)||db.stories.length>80)throw Error('Índice de narrativas inválido');
     const stories=db.stories.map(s=>{
       if(!s.id||!s.label||!Array.isArray(s.aliases)||!Array.isArray(s.phrases)||!Array.isArray(s.groups)||s.groups.length<2)throw Error('Narrativa sem estrutura suficiente');
       return {...s,matchAliases:s.aliases.map(a=>({text:a,normalized:normalize(a),re:matcher(a)})),
         matchPhrases:s.phrases.map(x=>({text:x,re:matcher(x)})),
-        matchGroups:s.groups.map(group=>group.map(x=>({text:x,re:matcher(x)})))};
+        matchGroups:s.groups.map(group=>group.map(x=>({text:x,re:flexMatcher(x)})))};
     });
     if(new Set(stories.map(s=>s.id)).size!==stories.length)throw Error('Narrativas com IDs duplicados');
     // Trechos limitados a quatro versos, sem atravessar estrofes.
