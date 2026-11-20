@@ -30,7 +30,7 @@ const VectorIndex=(()=>{
         const response=await fetch('e5-index.json');
         if(!response.ok)throw Error('Índice vetorial não instalado');
         source=await response.json();
-        if(source.dimension!==384||!Array.isArray(source.records)||![2,3].includes(source.version))
+        if(source.dimension!==384||!Array.isArray(source.records)||(source.version!=null&&![2,3].includes(source.version)))
           throw Error('Índice E5 incompatível');
       }catch(ex){error=ex.message;return status();}
     }
