@@ -57,11 +57,12 @@ const BibleGraphEngine=(()=>{
     function setCorpus(hymns){
       docFreq=new Map();totalDocs=0;corpus.clear();
       for(const song of hymns||[]){
-        const windows=passageWindows(song.lyrics||'');
         const unique=new Set(roots((song.title||'')+' '+(song.lyrics||'')));
         totalDocs++;
         for(const root of unique)docFreq.set(root,(docFreq.get(root)||0)+1);
-        if(song.id!=null)corpus.set(song.id,{unique,windows});
+        // Não construir dezenas de milhares de janelas na importação:
+        // analisar estrofes sob demanda somente para documentos candidatos.
+        if(song.id!=null)corpus.set(song.id,{unique,lyrics:song.lyrics||'',windows:null});
       }
     }
     function episodeEvidence(song,context){
@@ -80,6 +81,8 @@ const BibleGraphEngine=(()=>{
         const uniqueEpisode=(episodeDf.get(root)||0)<=Math.max(3,Math.floor(narratives.length*.10));
         return {root,idf,anchor,uniqueEpisode,weight:idf*(anchor?2.2:.48)};
       });
+      if(!candidates.some(x=>x.anchor))return {score:0,cues:[],count:0,anchors:0};
+      if(!doc.windows)doc.windows=passageWindows(doc.lyrics||song.lyrics||'');
       let best={score:0,hits:[],anchors:0};
       for(const window of doc.windows){
         const hits=candidates.filter(item=>window.has(item.root));
