@@ -62,6 +62,24 @@ public class E5DeviceSmokeTest {
                 evaluate(web,"Boolean(typeof FusionRRF!=='undefined' && " +
                     "OfflineAPI.searchOptions().fusionMode==='rrf' && " +
                     "document.getElementById('fusion-mode'))"));
+            assertEquals("Event engine or its configuration did not load","true",
+                evaluate(web,"Boolean(typeof EventFrameEngine!=='undefined' && " +
+                    "OfflineAPI.searchOptions().eventEvidence===true && " +
+                    "document.getElementById('event-toggle'))"));
+            assertEquals("Android narrative actor/action engine not functional","true",
+                evaluate(web,
+                    "(()=>{try{" +
+                    "const verses=['O viajante partiu e deixou a casa do pai.'," +
+                    "'O filho voltou e foi recebido pelo pai que o perdoou.'];" +
+                    "const db={narratives:[{id:'qa',label:'Uma viagem',reference:'QA'," +
+                    "aliases:['Viajante que voltou']}]};" +
+                    "const bible={lookup:()=>({verses:verses.map(text=>({text}))})};" +
+                    "const engine=EventFrameEngine.create(db,bible);" +
+                    "const hymn={id:1,title:'Relato',lyrics:" +
+                    "'Deixei minha casa.\\nVoltei ao pai e fui recebido e perdoado.'};" +
+                    "engine.setCorpus([hymn]);" +
+                    "return engine.evaluate(hymn,{narrative:'Uma viagem'}).score>=8;" +
+                    "}catch(e){return false}})()"));
             assertEquals("GGUF must not be enabled in E5-only variant","true",
                 evaluate(web,"typeof window.NativeGGUF==='undefined'"));
             assertEquals("Native embedding request was not dispatched","true",
