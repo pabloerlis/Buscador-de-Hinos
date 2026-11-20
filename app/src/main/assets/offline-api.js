@@ -593,8 +593,11 @@ const OfflineAPI = (() => {
         match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
+    // Consulta composta: preservar o peso dos outros requisitos; o nível
+    // narrativo só desempata prioritariamente a busca pela história isolada.
+    const narrativePrimary=Boolean(storyIntent?.matches?.length)&&qTokens.length===0&&!required.length;
     ranked.sort((a,b)=>Number(b.match_type==='titulo_exato')-Number(a.match_type==='titulo_exato')||
-      b._narrativeTier-a._narrativeTier||
+      (narrativePrimary?b._narrativeTier-a._narrativeTier:0)||
       b.relevance_score-a.relevance_score||Number(a.number||10000)-Number(b.number||10000)||a.id-b.id);
     // O hino não aprendido continua no ranking e mantém sua afinidade.
     // Apenas a paginação principal fica reservada aos hinos disponíveis.
