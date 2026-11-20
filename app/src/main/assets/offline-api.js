@@ -523,7 +523,7 @@ const OfflineAPI = (() => {
       const namedCollection=numberMatch?.[1]?collectionId(numberMatch[1]):null;
       if(numberMatch&&!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2]) && (!namedCollection||ref.id===namedCollection) && opts.collections[ref.id]!==false))continue;
       let score=0;let lexicalSignal=0,semanticSignal=0,biblicalSignal=0,narrativeSignal=0,vectorSignal=0;
-      let eventResult=null;
+      let eventResult=null,appliedEventPoints=0;
       const evidence=[],spelling=[];let semanticResult=null,storyResult=null,graphResult=null;
       if(numberMatch){
         if(!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2])))continue;
@@ -579,10 +579,15 @@ const OfflineAPI = (() => {
         }
         if(graphCtx?.narrative&&opts.eventEvidence&&eventFrames){
           eventResult=eventFrames.evaluate(song,graphCtx);
-          if(eventResult.score>=5){
-            const eventPoints=eventResult.score*semanticWeight;
-            score+=eventPoints;
-            biblicalSignal+=eventPoints;
+          // Convergência de fontes: eventos só reforçam a busca quando o grafo
+          // encontra evidência do episódio ALÉM dos temas genéricos (máx. 8).
+          // Coincidências de verbos e substantivos comuns não sobrepõem o
+          // ranking de narrativas que já tinha evidência local confirmada.
+          const confirmation=Math.min(1,Math.max(0,((graphResult?.score||0)-8)/25));
+          appliedEventPoints=eventResult.score*semanticWeight*confirmation;
+          if(appliedEventPoints>=4){
+            score+=appliedEventPoints;
+            biblicalSignal+=appliedEventPoints;
             if(eventResult.reason)evidence.unshift(eventResult.reason);
           }
         }
@@ -618,13 +623,13 @@ const OfflineAPI = (() => {
         _narrativeTier:storyResult?.tier||0,
         // Evita que o tier preliminar de eventos suplante a evidência narrativa
         // já validada; eventos influem no score, mas não criam prioridade rígida.
-        _eventSnippet:eventResult?.tier>=1?eventResult.snippet:'',
+        _eventSnippet:appliedEventPoints>=4&&eventResult?.tier>=1?eventResult.snippet:'',
         _fusionSignals:{lexical:lexicalSignal,semantic:semanticSignal,biblical:biblicalSignal,
           narrative:narrativeSignal,vector:vectorSignal},
         _fusionPenalty:lowered.length?1-Math.min(.45,lowered.length*.25):1,
         _vectorRange:vectorRanges.get(song.id)||null,
         vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
-        match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':eventResult?.tier>=1?'acontecimento':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
+        match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':appliedEventPoints>=4&&eventResult?.tier>=1?'acontecimento':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     // Consulta composta: preservar o peso dos outros requisitos; o nível
