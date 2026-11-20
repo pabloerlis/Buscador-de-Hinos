@@ -30,6 +30,8 @@ Matthew:Matt Mark:Mark Luke:Luke John:John Acts:Acts Romans:Rom 1_Corinthians:1C
 1_John:1John 2_John:2John 3_John:3John Jude:Jude Revelation:Rev'''
 BOOK_ALIASES = {key.replace('_',' ').lower():v for item in ENGLISH.split() for key,v in [item.split(':')]}
 BOOK_ALIASES.update({'jn':'John','jhn':'John','psa':'Ps','psalm':'Ps','ps':'Ps','song of songs':'Song','song of solomon':'Song', 'canticles':'Song', 'revelations':'Rev','gen':'Gen','mrk':'Mark','luk':'Luke','mat':'Matt','1 cor':'1Cor','2 cor':'2Cor','1 sam':'1Sam','2 sam':'2Sam'})
+# Códigos OSIS em referências cruzadas (Exod, Num, 1Cor, Rev...)
+BOOK_ALIASES.update({value.lower(): value for value in list(BOOK_ALIASES.values())})
 # Vocabulário temático português curado. Padrões aplicados a rótulos EN, não à letra dos hinos.
 MAP = {
 'fe':r'\b(faith|believ|unbelief)\b', 'confianca':r'\b(trust|confidence|reliance)\b',
