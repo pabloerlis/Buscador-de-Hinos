@@ -8,6 +8,11 @@ const db=JSON.parse(read('semantic-stories.json'));
 const context=vm.createContext({db});
 vm.runInContext(read('story-engine.js'),context,{filename:'story-engine.js'});
 const engine=vm.runInContext('StoryEngine.create(db)',context);
+// Todo rótulo canônico deve resolver a própria narrativa, mesmo sem alias manual.
+for(const story of db.stories){
+  const resolved=engine.interpret(story.label);
+  assert.ok(resolved.matches.some(x=>x.id===story.id),'Rótulo não reconhecido: '+story.label);
+}
 
 const fixtures=[
   {number:'286',title:'Um dia eu quis te deixar',story:'filho_prodigo',
