@@ -42,6 +42,8 @@ public final class MainActivity extends Activity {
     private static final int PICK_GGUF = 1206;
     private static final String PREFS = "hinos_local_llm";
     private static final String MODEL_URI_KEY = "model_uri";
+    private static final String MODEL_DISPLAY_NAME_KEY = "model_display_name";
+    private static final String MODEL_BYTES_KEY = "model_bytes";
     private final ExecutorService llmExecutor=Executors.newSingleThreadExecutor();
     private final ExecutorService vectorExecutor=Executors.newSingleThreadExecutor();
     private volatile String vectorState="Aguardando primeira pesquisa";
@@ -53,7 +55,6 @@ public final class MainActivity extends Activity {
     private volatile long lastDurationMs=0;
     private volatile long generationStarted=0;
     private volatile String activeGenerationId="";
-    private volatile String selectedName="";
     private volatile int copyProgress=0;
     private static final boolean NATIVE_AVAILABLE;
     static {
@@ -188,9 +189,12 @@ public final class MainActivity extends Activity {
                 try {getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);}
                 catch(SecurityException ignored) { /* Algumas fontes não oferecem permissão persistente. */ }
                 // Somente a seleção é persistida. O modelo deve ser carregado explicitamente.
-                getSharedPreferences(PREFS,MODE_PRIVATE).edit().putString(MODEL_URI_KEY,uri.toString()).apply();
-                selectedName=name;
+                getSharedPreferences(PREFS,MODE_PRIVATE).edit()
+                    .putString(MODEL_URI_KEY,uri.toString())
+                    .putString(MODEL_DISPLAY_NAME_KEY,name)
+                    .putLong(MODEL_BYTES_KEY,modelSize(uri)).apply();
                 modelError="";
+                lastDurationMs=0;
                 modelPhase="selected";
                 if(modelLoaded){
                     llmBusy=true;
@@ -202,7 +206,7 @@ public final class MainActivity extends Activity {
                         finally{llmBusy=false;ggufEvent("selection",true,name);}
                     });
                 }else ggufEvent("selection",true,name);
-            }catch(Exception ex){modelPhase="error";modelError=errorMessage(ex);ggufEvent("selection",false,errorMessage(ex));}
+            }catch(Exception ex){modelError=errorMessage(ex);ggufEvent("selection",false,modelError);}
         }
     }
     @Override public void onBackPressed(){
@@ -321,27 +325,29 @@ public final class MainActivity extends Activity {
     public class ModelBridge {
         @JavascriptInterface public String status(){
             try{
-                String uriString=getSharedPreferences(PREFS,MODE_PRIVATE).getString(MODEL_URI_KEY,null);
+                android.content.SharedPreferences preferences=getSharedPreferences(PREFS,MODE_PRIVATE);
+                String uriString=preferences.getString(MODEL_URI_KEY,null);
+                boolean selected=uriString!=null;
+                String phase=modelPhase;
                 JSONObject result=new JSONObject();
                 result.put("available",NATIVE_AVAILABLE);
-                result.put("selected",uriString!=null);
+                result.put("selected",selected);
                 result.put("loaded",modelLoaded);
                 result.put("busy",llmBusy);
-                result.put("name",uriString!=null?(selectedName.isEmpty()?modelName(Uri.parse(uriString)):selectedName):"");
-                result.put("phase",!NATIVE_AVAILABLE?"unavailable":modelPhase);
-                result.put("progress",llmBusy&&"loading".equals(modelPhase)?nativeLoadProgress():("copying".equals(modelPhase)?copyProgress:0));
+                result.put("name",selected?preferences.getString(MODEL_DISPLAY_NAME_KEY,"GGUF selecionado"):"");
+                if(selected&&"none".equals(phase))phase="selected";
+                result.put("phase",NATIVE_AVAILABLE?phase:"unavailable");
+                result.put("progress",llmBusy&&"loading".equals(phase)?nativeLoadProgress():("copying".equals(phase)?copyProgress:0));
                 result.put("cachedMB", Math.round(cachedModelBytes()/1048576.0));
                 result.put("storageMB", Math.round(new StatFs(getFilesDir().getAbsolutePath()).getAvailableBytes()/1048576.0));
                 result.put("lastError",modelError);
                 result.put("lastDurationMs",lastDurationMs);
-                if(NATIVE_AVAILABLE&&"generating".equals(modelPhase)){
+                if(NATIVE_AVAILABLE&&"generating".equals(phase)){
                     result.put("generationStage",nativeGenerationStage());
                     result.put("elapsedMs",android.os.SystemClock.elapsedRealtime()-generationStarted);
                 }
-                if(uriString!=null){
-                    long fileSize=modelSize(Uri.parse(uriString));
-                    if(fileSize>0)result.put("modelMB",Math.round(fileSize/1048576.0));
-                }
+                long fileSize=preferences.getLong(MODEL_BYTES_KEY,-1);
+                if(selected&&fileSize>0)result.put("modelMB",Math.round(fileSize/1048576.0));
                 android.app.ActivityManager.MemoryInfo mi=new android.app.ActivityManager.MemoryInfo();
                 ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(mi);
                 result.put("availableMB",Math.round(mi.availMem/1048576.0));
@@ -369,11 +375,15 @@ public final class MainActivity extends Activity {
             final long start=android.os.SystemClock.elapsedRealtime();
             ggufEvent("phase",true,"Preparando acesso ao GGUF…");
             llmExecutor.execute(()->{
+                boolean ok=false;
+                String message;
                 try{
-                    String uriString=getSharedPreferences(PREFS,MODE_PRIVATE).getString(MODEL_URI_KEY,null);
+                    android.content.SharedPreferences preferences=getSharedPreferences(PREFS,MODE_PRIVATE);
+                    String uriString=preferences.getString(MODEL_URI_KEY,null);
                     if(uriString==null)throw new IOException("Selecione um GGUF primeiro.");
                     Uri uri=Uri.parse(uriString);
                     long size=modelSize(uri);
+                    if(size<0)size=preferences.getLong(MODEL_BYTES_KEY,-1);
                     android.app.ActivityManager.MemoryInfo memory=new android.app.ActivityManager.MemoryInfo();
                     ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(memory);
                     // A RAM livre não é toda utilizável pelo processo Android, mesmo que pareça suficiente.
@@ -384,14 +394,18 @@ public final class MainActivity extends Activity {
                     File modelFile=prepareModelFile(uri,size);
                     modelPhase="loading";
                     ggufEvent("phase",true,"Modelo copiado. Carregando pesos…");
-                    String message=nativeLoad(modelFile.getAbsolutePath());
+                    message=nativeLoad(modelFile.getAbsolutePath());
+                    android.content.SharedPreferences.Editor metadata=preferences.edit().putLong(MODEL_BYTES_KEY,size);
+                    if(!preferences.contains(MODEL_DISPLAY_NAME_KEY))metadata.putString(MODEL_DISPLAY_NAME_KEY,modelName(uri));
+                    metadata.apply();
                     modelLoaded=true;modelPhase="ready";modelError="";
                     lastDurationMs=android.os.SystemClock.elapsedRealtime()-start;
-                    ggufEvent("load",true,message);
+                    ok=true;
                 }catch(Throwable ex){
                     modelLoaded=false;modelPhase="error";modelError=errorMessage(ex);
-                    ggufEvent("load",false,modelError);
+                    message=modelError;
                 }finally{llmBusy=false;}
+                ggufEvent("load",ok,message);
             });
         }
         @JavascriptInterface public synchronized void cancel(String requestId){

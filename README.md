@@ -1,4 +1,10 @@
-# Buscador de Hinos Android v2.2
+# Buscador de Hinos Android v2.3
+
+- O GGUF pode pedir uma busca complementar por termos em português ao usar **Comparar com IA** ou **Buscar hinos com IA**. O app permite uma consulta por comparação, mantém os filtros ativos e mostra os termos usados. Mesmo sem resultado inicial, o modelo pode buscar candidatos no índice local.
+- As sugestões de temas usam uma lista estruturada com os nomes do catálogo. Pesquisas por número exato e pesquisas em modo literal ficam fora dessa expansão.
+- Alterar filtros preserva exclusões, temas aplicados e o vetor da consulta. Refinamentos longos mantêm o texto novo dentro do limite de 500 caracteres.
+
+## v2.2 — Comparação com GGUF e teste de geração
 
 1. Abra **Configurações → IA local experimental**, escolha um GGUF e toque em **Carregar modelo**.
 2. Toque em **Testar modelo**. O app executa uma geração curta e mostra o tempo de preparação, de processamento da entrada e até o primeiro token.

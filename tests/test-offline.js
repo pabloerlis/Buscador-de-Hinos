@@ -45,6 +45,8 @@ const samples=[
  assert.equal((await api.request('/api/status')).semantic_topics,41);
  let r=await api.request('/api/search',{query:'Hino 1'});
  assert.equal(r.total,1);assert.equal(r.results[0].number,'001');assert.equal(r.results[0].relevance_percent,100);assert.equal(r.results[0].match_type,'numero');
+ assert.equal(r.exact_number,true);
+ assert.equal((await api.request('/api/search',{query:'Hino 9999'})).exact_number,true);
  r=await api.request('/api/search',{query:'Maranata'});assert.ok(r.results.some(x=>x.number==='003'));
  r=await api.request('/api/search',{query:'confiar'});assert.ok(r.results.some(x=>x.number==='001'));
  r=await api.request('/api/search',{query:'gratidão'});assert.equal(r.results.length,5);assert.equal(r.has_more,true);assert.ok(r.results.every(x=>x.relevance_percent>=20&&x.relevance_percent<=98));
@@ -60,9 +62,16 @@ const samples=[
  const watch=await api.request('/api/search',{query:'preparação da igreja'});
  assert.ok(watch.results.some(x=>x.number==='003'),'Preparação deve alcançar hinos que falam de vigiar/volta');
  const refine=await api.request('/api/search',{query:'sem alegria',refine:true,previous:'gratidão'});assert.ok(refine.excluded.includes('alegria'));assert.ok(refine.results.every(x=>x.number==='002'));
+ const explicit=await api.request('/api/search',{query:'não quero alegria',refine:true,previous:'gratidão'});
+ assert.equal(explicit.effective_query,'gratidão');assert.equal(explicit.excluded[0],'alegria');
+ const recent='priorize '+('confiança em Deus '.repeat(26)).trim();
+ const longRefine=await api.request('/api/search',{query:recent,refine:true,previous:'gratidão '.repeat(40)});
+ assert.ok(longRefine.effective_query.length<=500);
+ assert.ok(longRefine.effective_query.endsWith(recent));
+ await assert.doesNotReject(api.request('/api/search',{query:longRefine.effective_query,page:2}));
  const nothing=await api.request('/api/search',{query:'xyzabcnotfound'});assert.equal(nothing.total,0);
  const prior=await api.request('/api/status');
  await assert.rejects(api.request('/api/import',{data:{invalid:true}}),/Nenhuma coleção/);
  assert.equal((await api.request('/api/status')).hymn_count,prior.hymn_count);
- console.log('Testes offline, semânticos, versículos e percentuais: 39 verificações aprovadas.');
+ console.log('Testes offline, semânticos, versículos, refinamentos e percentuais aprovados.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

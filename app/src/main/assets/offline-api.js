@@ -286,14 +286,16 @@ const OfflineAPI = (() => {
     const best=lines.reduce((prev,next)=>weight(next)>weight(prev)?next:prev,lines[0]);
     return best.length>210?best.slice(0,210)+'…':best;
   }
+  const MAX_QUERY_LENGTH=500;
   function contextQuery(query,previous){
     const fresh=/\b(nova busca|recomecar|do zero|esqueca anterior)\b/i.test(normalize(query));
     const excluded=[];
-    const pattern=/\b(?:sem|exclua|evite|nao quero)\s+(?:os?\s+|as?\s+|de\s+)?([\wÀ-ÿ-]+(?:\s+[\wÀ-ÿ-]+){0,2})/gi;
+    const pattern=/\b(?:sem|exclua|evite|n[aã]o quero)\s+(?:os?\s+|as?\s+|de\s+)?([\wÀ-ÿ-]+(?:\s+[\wÀ-ÿ-]+){0,2})/gi;
     let text=query.replace(pattern,(_,phrase)=>{excluded.push(phrase.trim().replace(/[.,!?]+$/,''));return ' ';}).trim();
-    const old=String(previous||'').slice(0,350).trim();
-    if(!fresh&&old&&(text.length<140||/\b(apenas|somente|mais|menos|agora|desses|destes|tambem|priorize|foco|enfatiz)/i.test(normalize(text))))text=old+'. '+text;
-    return {query:text.trim().slice(0,600),excluded:excluded.slice(0,4)};
+    const previousBudget=Math.min(350,Math.max(0,MAX_QUERY_LENGTH-text.length-2));
+    const old=String(previous||'').slice(0,previousBudget).trim();
+    if(!fresh&&old&&(text.length<140||/\b(apenas|somente|mais|menos|agora|desses|destes|tambem|priorize|foco|enfatiz)/i.test(normalize(text))))text=text?old+'. '+text:old;
+    return {query:text.slice(0,MAX_QUERY_LENGTH),excluded:excluded.slice(0,4)};
   }
   // Conversão VISUAL heurística não calibrada: NÃO é probabilidade nem confiança estatística.
   function percentage(score, exactNumber=false){
@@ -301,7 +303,7 @@ const OfflineAPI = (() => {
     return Math.max(20, Math.min(98, Math.round(30 + 68*(1-Math.exp(-score/22)))));
   }
   function search(payload){
-    let query=String(payload?.query||'').trim();if(!query||query.length>500)throw Error('Digite uma consulta de até 500 caracteres.');
+    let query=String(payload?.query||'').trim();if(!query||query.length>MAX_QUERY_LENGTH)throw Error(`Digite uma consulta de até ${MAX_QUERY_LENGTH} caracteres.`);
     const opts=searchOptions(payload?.settings);
     const page=Math.max(1,Math.min(100,Number(payload.page)||1));
     const inherited=(Array.isArray(payload?.exclude)?payload.exclude:[]).filter(x=>typeof x==='string'&&x.length<=80).slice(0,4);
@@ -309,14 +311,13 @@ const OfflineAPI = (() => {
     const ctx=payload?.refine?contextQuery(query,payload.previous):{query,excluded:inherited};
     query=ctx.query;
     const excluded=payload?.refine? [...new Set([...(fresh?[]:inherited),...ctx.excluded])].slice(0,4):ctx.excluded;
-    if(!query)return {results:[],page,total:0,has_more:false,effective_query:query,excluded,used_ai:false,summary:'Nenhum critério positivo informado.'};
+    if(!query)return {results:[],page,page_size:opts.pageSize,total:0,has_more:false,effective_query:query,excluded,used_ai:false,summary:'Nenhum critério positivo informado.'};
     const norm=normalize(query), numberMatch=norm.match(/^(?:(coletanea|principal|avulsos?|cia|criancas|infantil)\s+)?(?:hino\s*|louvor\s*)?(\d{1,4})$/);
     const bible=typeof BibleContext!=='undefined'?BibleContext.lookup(query):null;
     const scripture=opts.scripture&&scriptureIndex?scriptureIndex.lookup(query):null;
     const graphCtx=opts.scripture&&opts.bibleGraph&&opts.mode!=='literal'&&bibleGraph&&!numberMatch?bibleGraph.resolve(query,opts):null;
     const isBiblicalRef=typeof BibleContext!=='undefined' && BibleContext.looksLikeReference(query);
     const hints=validateHints(payload?.semantic_hints);
-    const analysisQuery=numberMatch?query:[query,bible?.theme||'',...hints].filter(Boolean).join(' ');
     const storyIntent=opts.mode!=='literal'&&opts.narratives&&narratives&&!numberMatch?narratives.interpret(query,opts.customAliases):null;
     // Subtrair o alias reconhecido: a palavra genérica "filho" não vira evidência de Filho Pródigo.
     const lexicalQuery=storyIntent?.matches?.length?storyIntent.residual:[query].join(' ');
@@ -443,7 +444,7 @@ const OfflineAPI = (() => {
         passage:(graphCtx?.sourceText||scripture?.text||'').slice(0,220),
         topics:[...new Set([...(graphCtx?.concepts||[]).map(topic=>topic.label),...selectedTopics])].slice(0,4)
       },
-      interpretation,effective_query:query,excluded,used_ai:hints.length>0,applied_hints:hints,
+      interpretation,effective_query:query,excluded,exact_number:Boolean(numberMatch),used_ai:hints.length>0,applied_hints:hints,
       _fullRanked:payload?._forRecommendations===true?ranked:undefined,
       summary:graphCtx?'Busca por contexto bíblico offline: '+graphCtx.reference+'. Resultados baseados nas evidências das letras.':scripture?'Texto da Bíblia Livre consultado offline: '+scripture.reference+'.':bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef&&!storyIntent?.matches.length?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',
       bible_reference:graphCtx?.reference||scripture?.reference||bible?.reference||null,bible_verses:scripture?.verses?.length||0,scripture_source:scripture?.source||null};
