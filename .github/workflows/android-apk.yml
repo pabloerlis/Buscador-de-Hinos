@@ -127,6 +127,16 @@ jobs:
         run: python3 scripts/build_e5_assets.py
       - name: Auditar estrutura, origem, SHA e cobertura de estrofes
         run: python3 scripts/qa_e5.py
+      - name: Medir recuperação E5 com consultas de diferentes narrativas
+        run: python3 scripts/benchmark_e5.py
+      - name: Registrar métricas de recuperação sem letras
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e5-stanza-metrics
+          path: qa-report/e5-metrics.json
+          retention-days: 30
+          if-no-files-found: ignore
       - name: Preservar apenas os artefatos que entram no APK E5
         uses: actions/upload-artifact@v4
         with:
