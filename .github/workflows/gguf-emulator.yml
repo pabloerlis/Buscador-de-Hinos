@@ -1,0 +1,30 @@
+name: Check Android emulator for GGUF diagnostics
+on:
+  push:
+    branches: [diagnostics/gguf-emulator]
+permissions:
+  contents: read
+jobs:
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check emulator hardware acceleration
+        run: |
+          test -c /dev/kvm
+          sudo chmod a+rw /dev/kvm
+          "$ANDROID_HOME/emulator/emulator" -accel-check
+      - name: Start an x86_64 Android 35 emulator
+        run: |
+          set -euo pipefail
+          image='system-images;android-35;google_apis;x86_64'
+          sdkmanager "$image"
+          printf 'no\n' | avdmanager create avd --force --name hino-gguf --package "$image"
+          "$ANDROID_HOME/emulator/emulator" -avd hino-gguf -no-window -no-boot-anim -no-audio -gpu swiftshader_indirect -memory 4096 -cores 4 > "$RUNNER_TEMP/hino-emulator.log" 2>&1 &
+          timeout 150s adb wait-for-device
+          timeout 150s bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done'
+          adb shell getprop ro.product.cpu.abilist
+          adb shell getprop ro.build.version.sdk
+      - name: Show emulator log on failure
+        if: failure()
+        run: test ! -f "$RUNNER_TEMP/hino-emulator.log" || tail -100 "$RUNNER_TEMP/hino-emulator.log"
