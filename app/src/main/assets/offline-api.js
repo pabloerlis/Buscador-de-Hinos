@@ -584,8 +584,9 @@ const OfflineAPI = (() => {
           // Coincidências de verbos e substantivos comuns não sobrepõem o
           // ranking de narrativas que já tinha evidência local confirmada.
           const confirmation=Math.min(1,Math.max(0,((graphResult?.score||0)-8)/25));
-          appliedEventPoints=eventResult.score*semanticWeight*confirmation;
-          if(appliedEventPoints>=4){
+          const proposedPoints=eventResult.score*semanticWeight*confirmation;
+          if(proposedPoints>=4){
+            appliedEventPoints=proposedPoints;
             score+=appliedEventPoints;
             biblicalSignal+=appliedEventPoints;
             if(eventResult.reason)evidence.unshift(eventResult.reason);
