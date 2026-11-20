@@ -64,9 +64,12 @@ const StoryEngine = (() => {
           }
         }
         const strongPhrase=phraseHits.some(phrase=>normalize(phrase).split(' ').length>=2);
-        // Camadas genéricas de confiabilidade: evidência direta e concentrada
-        // vale mais que pistas espalhadas ou dois conceitos isolados.
-        const tier=(localCoverage>=3||(strongPhrase&&localCoverage>=2))?2:
+        // Vários conceitos no mesmo verso não demonstram uma história.
+        // Ações verbais reforçam a evidência em todas as narrativas sem
+        // proibir a recuperação de textos sem conjugação no passado.
+        const actionCoverage=new Set((normLyrics.match(/\b[a-z]{4,}(?:ei|ou|iu|amos|aram|eram|iram)\b/g)||[])).size;
+        const tier=((localCoverage>=3&&actionCoverage>=2)||
+          (strongPhrase&&localCoverage>=2))?2:
           (groups.length>=3&&localCoverage>=2)||(strongPhrase&&groups.length>=2)?1:0;
         const evidence=[...new Set([...phraseHits,...localCues,...groups.flat()])];
         const score=Math.min(18,phraseHits.length*7.5+
