@@ -12,6 +12,7 @@
   <script src="semantic-engine.js" defer></script>
   <script src="story-engine.js" defer></script>
   <script src="scripture-index.js" defer></script>
+  <script src="bible-graph-engine.js" defer></script>
   <script src="bridge-engine.js" defer></script>
   <script src="bible-context.js" defer></script>
   <script src="recommendation-engine.js" defer></script>
@@ -151,7 +152,7 @@
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Vetores E5 validados</span><strong id="settings-embeddings">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Vetores E5 validados</span><strong id="settings-embeddings">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
       <section class="semantic-settings" aria-label="Coleções e importação">
         <div class="setting-section-heading"><h3>Biblioteca unificada</h3><span class="local-badge">Offline</span></div>
         <p class="subtle-note">Escolha onde pesquisar. Hinos idênticos em várias coleções aparecem uma única vez, preservando suas referências de origem.</p>
@@ -176,6 +177,11 @@
         <label class="setting-check"><input id="related-toggle" type="checkbox" checked>Considerar temas relacionados e sinônimos</label>
         <label class="setting-check"><input id="bridge-toggle" type="checkbox" checked>Reconhecer contextos com expressões do cotidiano</label>
         <label class="setting-check"><input id="scripture-toggle" type="checkbox" checked>Consultar texto da Bíblia Livre para referências bíblicas (offline)</label>
+        <label class="setting-check"><input id="bible-graph-toggle" type="checkbox" checked>Usar assuntos bíblicos e narrativas para recomendar hinos (sem IA)</label>
+        <label class="setting-check"><input id="bible-links-toggle" type="checkbox" checked>Considerar referências cruzadas</label>
+        <label for="bible-depth">Abrangência das referências relacionadas</label>
+        <select id="bible-depth"><option value="0">Somente passagem informada</option><option value="1" selected>Conservadora (recomendada)</option><option value="2">Ampliada</option></select>
+        <p class="subtle-note">Digite “Marcos 5:25-34” ou “Mulher do fluxo de sangue”. O grafo usa dados bíblicos locais, não IA generativa. Referências cruzadas têm peso menor que o texto informado.</p>
         <p class="subtle-note">Versículos são usados para identificar temas, nunca para alterar o texto dos hinos. Relevância é estimada por evidências da letra.</p>
         <label for="min-affinity">Afinidade mínima exibida <strong id="min-affinity-value">0%</strong></label>
         <input id="min-affinity" type="range" min="0" max="90" step="5" value="0">
@@ -212,7 +218,7 @@
         <div class="settings-actions"><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div><div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
       </section></details>
-      <p class="subtle-note">Fonte bíblica: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
+      <p class="subtle-note">Fontes das relações: Bible Topics Dataset (NEUU, CC BY 4.0) e Bible Cross-References Dataset (NEUU/OpenBible, CC BY 4.0), com curadoria de nomes narrativos em português. Fontes: <a href="https://github.com/neuu-org/bible-topics-dataset">Temas</a> e <a href="https://github.com/neuu-org/bible-crossrefs-dataset">Referências cruzadas</a>. Texto bíblico: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
       <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p></div>
     </section>
   </div>

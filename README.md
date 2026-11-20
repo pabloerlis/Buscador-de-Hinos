@@ -1,3 +1,21 @@
+# Buscador de Hinos v2.0 — Índice bíblico offline
+
+- Pesquisa por livros, capítulos e intervalos de versículos (ex.: `Marcos 5:25-34`).
+- Busca por 48 nomes narrativos e sinônimos (ex.: `mulher do fluxo de sangue`), mantidos como suplemento, não limite da cobertura.
+- Grafo compilado no GitHub Actions com tópicos bíblicos NEUU (CC BY 4.0) e referências cruzadas de OpenBible/NEUU (CC BY 4.0).
+- Tópicos ingleses são filtrados e mapeados a 41 categorias em português. Não é uma tradução indiscriminada das 5.745 entradas.
+- Referências cruzadas configuráveis: desativadas, conservadoras e ampliadas; evidência direta sempre tem prioridade.
+- Pontuação explicável por evidência encontrada na própria letra do hino; evita classificar pela simples menção de Deus/Jesus.
+- Mecanismo estritamente local, sem invocar o E5 ou o GGUF para consultas bíblicas reconhecidas. O E5 permanece opcional para consultas livres.
+- APK preserva as três coleções importáveis e mantém a compatibilidade com o armazenamento existente.
+- Fontes fixadas em commits para compilação reproduzível. Os dados de hinos não são redistribuídos junto ao APK.
+
+Atribuição: Bible Topics Dataset © NEUU, CC BY 4.0, https://github.com/neuu-org/bible-topics-dataset. Bible Cross-References Dataset © NEUU / OpenBible, CC BY 4.0, https://github.com/neuu-org/bible-crossrefs-dataset. Bíblia Livre © 2018 Diego Santos, Mario Sérgio e Marco Teles, CC BY 4.0 Brasil.
+
+Essas associações são heurísticas de recuperação textual; não representam julgamento doutrinário nem probabilidades estatísticas.
+
+---
+
 # Buscador de Hinos — Android v1.9
 
 ## Novidade: três bibliotecas pesquisáveis

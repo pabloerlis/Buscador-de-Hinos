@@ -6,3 +6,5 @@ local.properties
 *.apk
 # Bíblia licenciada gerada durante o build, origem verificada no script
 app/src/main/assets/scripture-pt.json
+# Grafo bíblico gerado a partir das fontes públicas fixadas
+app/src/main/assets/bible-graph.json

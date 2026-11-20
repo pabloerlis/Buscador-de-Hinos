@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
-  searchSettings:{vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,scripture:true,bridge:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true}};
+  searchSettings:{vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true}};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 let toastTimer=null;
@@ -26,6 +26,7 @@ async function refreshStatus(){
   $('settings-vectors').textContent=result.semantic_ready?`${result.semantic_topics} temas locais`:'Não carregada';
   $('settings-stories').textContent=result.story_ready?`${result.story_count} narrativas locais`:'Não carregada';
   $('settings-scripture').textContent=result.scripture_ready?`${result.scripture_books} livros · Bíblia Livre`:'Indisponível';
+  $('settings-bible-graph').textContent=result.bible_graph_ready?`${result.bible_graph_stats?.verse_topics||0} versículos com temas · ${result.bible_graph_narratives} narrativas`:'Indisponível';
   $('settings-embeddings').textContent=result.vector_count?`${result.vector_count} hinos · E5 Small`:'Não disponível para esta coletânea';
   $('settings-bridge').textContent=result.bridge_ready?`${result.bridge_entries} associações`:'Indisponível';
   if(typeof GGUF!=='undefined')GGUF.info();
@@ -55,12 +56,13 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   if(!state.ready){toast('Importe a coletânea para começar.');$('import-panel').scrollIntoView({behavior:'smooth',block:'center'});return false;}
   if(!String(query).trim())return false;
   if(page===1){state.searchEpoch++;state.vectorQuery=null;if(!refine&&!retainRoot)state.searchRootQuery=query;state.originalQuery=query;state.hymnTrail=[];showResults();$('results-list').innerHTML=Array.from({length:3},()=>'<div class="loading-skeleton"></div>').join('');$('load-more').classList.add('hidden');}
-  busySearch(true);let succeeded=false;
+  busySearch(true);let succeeded=false;let isBibleSearch=false;
   try {
     let data;
     if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,exclude:state.exclude,semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
     else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',exclude:refine?state.exclude:[],semantic_hints:semanticHints,settings:state.searchSettings});
     if(page===1){
+      isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.semanticHints=semanticHints;
       state.lastResults=data.results.slice();
       $('results-list').innerHTML='';$('results-title').textContent=refine?'Pesquisa refinada':'Hinos encontrados';
@@ -86,8 +88,8 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     if(page===1)$('results-list').innerHTML='<div class="empty-results"><h3>Falha na pesquisa</h3><p>Verifique a coletânea e tente novamente.</p></div>';
     toast(error.message);
   }finally{busySearch(false);}
-  if(succeeded&&page===1)EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
-  if(succeeded && page===1 && autoAI && !semanticHints.length && typeof GGUF!=='undefined') GGUF.maybeAuto(query);
+  if(succeeded&&page===1&&!isBibleSearch)EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
+  if(succeeded && page===1 && !isBibleSearch && autoAI && !semanticHints.length && typeof GGUF!=='undefined') GGUF.maybeAuto(query);
   return succeeded;
 }
 function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;}
@@ -172,9 +174,9 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 // Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
 const SearchPreferences=(()=>{
   const ids={vectorMode:'vector-mode',mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
-    narratives:'story-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
+    narratives:'story-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',bibleGraph:'bible-graph-toggle',bibleLinks:'bible-links-toggle',bibleDepth:'bible-depth',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
     recWeight:'rec-weight',recCount:'rec-count',recContext:'rec-context',recAvoidVisited:'rec-visited',recBreakdown:'rec-breakdown'};
-  const defaults={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
+  const defaults={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   let stories=[];
   function renderAliases(){
     const container=$('alias-list');container.replaceChildren();let count=0;
@@ -207,7 +209,7 @@ const SearchPreferences=(()=>{
   function readInputs(){
     const options={...state.searchSettings};
     for(const [key,id] of Object.entries(ids)){
-      const input=$(id);options[key]=input.type==='checkbox'?input.checked:input.type==='range'||key==='pageSize'?Number(input.value):input.value;
+      const input=$(id);options[key]=input.type==='checkbox'?input.checked:input.type==='range'||key==='pageSize'||key==='bibleDepth'?Number(input.value):input.value;
     }
     options.collections=Object.fromEntries(['principal','avulsos','cia','pessoal'].map(id=>[id,$('collection-'+id).checked]));
     return OfflineAPI.searchOptions(options);
@@ -275,6 +277,7 @@ const EmbeddingSearch=(()=>{
   });}
   async function maybeUpdate(query,epoch){
     if(state.searchSettings.vectorMode==='off'||!state.ready||!state.status?.vector_count)return;
+    if(typeof ScriptureIndex!=='undefined'&&ScriptureIndex.parse(query))return;
     if(!window.NativeVector||!/^(?!\s*(?:hino\s*)?\d{1,4}\s*$)/i.test(query))return;
     status('E5 Small: interpretando a consulta no aparelho…');
     try{

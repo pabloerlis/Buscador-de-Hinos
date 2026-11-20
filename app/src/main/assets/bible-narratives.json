@@ -1,0 +1,749 @@
+{
+  "schema_version": 1,
+  "narratives": [
+    {
+      "id": "mulher_do_fluxo_de_sangue",
+      "label": "Mulher do fluxo de sangue",
+      "reference": "Marcos 5:25-34",
+      "aliases": [
+        "mulher fluxo de sangue",
+        "mulher do fluxo de sangue",
+        "mulher hemorrágica",
+        "mulher que tocou em jesus",
+        "mulher que tocou as vestes de jesus",
+        "cura da mulher hemorrágica",
+        "mulher enferma há doze anos"
+      ],
+      "topics": [
+        "fe",
+        "cura",
+        "confianca",
+        "graca"
+      ]
+    },
+    {
+      "id": "filho_pródigo",
+      "label": "Filho pródigo",
+      "reference": "Lucas 15:11-32",
+      "aliases": [
+        "filho pródigo",
+        "filho prodigo",
+        "filho perdido",
+        "retorno do filho pródigo",
+        "filho que voltou para o pai",
+        "volta à casa do pai"
+      ],
+      "topics": [
+        "arrependimento",
+        "perdao",
+        "graca",
+        "renovacao"
+      ]
+    },
+    {
+      "id": "ovelha_perdida",
+      "label": "Ovelha perdida",
+      "reference": "Lucas 15:3-7",
+      "aliases": [
+        "ovelha perdida",
+        "parábola da ovelha perdida",
+        "pastor procura a ovelha"
+      ],
+      "topics": [
+        "salvacao",
+        "amor",
+        "graca"
+      ]
+    },
+    {
+      "id": "bom_samaritano",
+      "label": "Bom samaritano",
+      "reference": "Lucas 10:25-37",
+      "aliases": [
+        "bom samaritano",
+        "parábola do bom samaritano",
+        "homem ferido na estrada"
+      ],
+      "topics": [
+        "amor",
+        "servico",
+        "graca"
+      ]
+    },
+    {
+      "id": "jesus_acalma_a_tempestade",
+      "label": "Jesus acalma a tempestade",
+      "reference": "Marcos 4:35-41",
+      "aliases": [
+        "jesus acalma tempestade",
+        "tempestade no mar da galileia",
+        "barco em meio à tempestade",
+        "jesus repreende o vento"
+      ],
+      "topics": [
+        "fe",
+        "paz",
+        "confianca",
+        "protecao"
+      ]
+    },
+    {
+      "id": "multiplicação_dos_pães",
+      "label": "Multiplicação dos pães",
+      "reference": "João 6:1-14",
+      "aliases": [
+        "multiplicação dos pães",
+        "cinco pães e dois peixes",
+        "jesus alimenta a multidão"
+      ],
+      "topics": [
+        "graca",
+        "gratidao",
+        "confianca"
+      ]
+    },
+    {
+      "id": "jesus_anda_sobre_as_águas",
+      "label": "Jesus anda sobre as águas",
+      "reference": "Mateus 14:22-33",
+      "aliases": [
+        "jesus anda sobre as águas",
+        "pedro anda sobre as águas",
+        "pedro afundou no mar",
+        "caminhando sobre as águas"
+      ],
+      "topics": [
+        "fe",
+        "confianca",
+        "protecao"
+      ]
+    },
+    {
+      "id": "ressurreição_de_lázaro",
+      "label": "Ressurreição de Lázaro",
+      "reference": "João 11:1-44",
+      "aliases": [
+        "ressurreição de lázaro",
+        "jesus ressuscita lázaro",
+        "lázaro sai do sepulcro"
+      ],
+      "topics": [
+        "fe",
+        "ressurreicao",
+        "vida_eterna"
+      ]
+    },
+    {
+      "id": "cego_bartimeu",
+      "label": "Cego Bartimeu",
+      "reference": "Marcos 10:46-52",
+      "aliases": [
+        "cego bartimeu",
+        "cura de bartimeu",
+        "bartimeu clama jesus",
+        "filho de davi tem misericórdia"
+      ],
+      "topics": [
+        "fe",
+        "cura",
+        "oracao"
+      ]
+    },
+    {
+      "id": "cego_de_nascença",
+      "label": "Cego de nascença",
+      "reference": "João 9:1-41",
+      "aliases": [
+        "cego de nascença",
+        "cura do cego de nascença",
+        "cego de nascimento",
+        "barro nos olhos do cego"
+      ],
+      "topics": [
+        "cura",
+        "fe",
+        "direcao"
+      ]
+    },
+    {
+      "id": "paralítico_de_cafarnaum",
+      "label": "Paralítico de Cafarnaum",
+      "reference": "Marcos 2:1-12",
+      "aliases": [
+        "paralítico de cafarnaum",
+        "paralitico descido pelo telhado",
+        "amigos carregam o paralítico",
+        "paralítico pelo telhado"
+      ],
+      "topics": [
+        "cura",
+        "fe",
+        "perdao"
+      ]
+    },
+    {
+      "id": "dez_leprosos",
+      "label": "Dez leprosos",
+      "reference": "Lucas 17:11-19",
+      "aliases": [
+        "cura dos dez leprosos",
+        "dez leprosos",
+        "leproso agradecido",
+        "um leproso voltou para agradecer"
+      ],
+      "topics": [
+        "cura",
+        "gratidao",
+        "fe"
+      ]
+    },
+    {
+      "id": "mulher_samaritana",
+      "label": "Mulher samaritana",
+      "reference": "João 4:1-42",
+      "aliases": [
+        "mulher samaritana",
+        "jesus e a samaritana",
+        "mulher no poço de jacó",
+        "água viva no poço"
+      ],
+      "topics": [
+        "salvacao",
+        "fe",
+        "graca",
+        "evangelizacao"
+      ]
+    },
+    {
+      "id": "zaqueu",
+      "label": "Zaqueu",
+      "reference": "Lucas 19:1-10",
+      "aliases": [
+        "zaqueu na árvore",
+        "zaqueu cobrador de impostos",
+        "zaqueu sobe no sicômoro",
+        "jesus na casa de zaqueu"
+      ],
+      "topics": [
+        "arrependimento",
+        "salvacao",
+        "renovacao"
+      ]
+    },
+    {
+      "id": "nicodemos",
+      "label": "Nicodemos",
+      "reference": "João 3:1-21",
+      "aliases": [
+        "nicodemos visita jesus",
+        "jesus e nicodemos",
+        "novo nascimento nicodemos",
+        "nascer de novo nicodemos"
+      ],
+      "topics": [
+        "salvacao",
+        "fe",
+        "renovacao"
+      ]
+    },
+    {
+      "id": "jairo_e_sua_filha",
+      "label": "Jairo e sua filha",
+      "reference": "Marcos 5:21-43",
+      "aliases": [
+        "filha de jairo",
+        "jesus ressuscita a filha de jairo",
+        "menina de jairo",
+        "talita cumi"
+      ],
+      "topics": [
+        "fe",
+        "cura",
+        "ressurreicao"
+      ]
+    },
+    {
+      "id": "viúva_de_naim",
+      "label": "Viúva de Naim",
+      "reference": "Lucas 7:11-17",
+      "aliases": [
+        "viúva de naim",
+        "filho da viúva de naim",
+        "ressurreição do jovem de naim"
+      ],
+      "topics": [
+        "ressurreicao",
+        "graca",
+        "consolo"
+      ]
+    },
+    {
+      "id": "jó_em_sofrimento",
+      "label": "Jó em sofrimento",
+      "reference": "Jó 1:1-22",
+      "aliases": [
+        "sofrimento de jó",
+        "história de jó",
+        "provações de jó",
+        "paciência de jó"
+      ],
+      "topics": [
+        "tribulacao",
+        "perseveranca",
+        "fe"
+      ]
+    },
+    {
+      "id": "daniel_na_cova_dos_leões",
+      "label": "Daniel na cova dos leões",
+      "reference": "Daniel 6:1-28",
+      "aliases": [
+        "daniel na cova dos leões",
+        "daniel com os leões",
+        "livramento de daniel"
+      ],
+      "topics": [
+        "fe",
+        "protecao",
+        "oracao"
+      ]
+    },
+    {
+      "id": "três_jovens_na_fornalha",
+      "label": "Três jovens na fornalha",
+      "reference": "Daniel 3:1-30",
+      "aliases": [
+        "fornalha ardente",
+        "três jovens na fornalha",
+        "sad raque mesa que abede nego",
+        "sadraque mesaque e abede nego"
+      ],
+      "topics": [
+        "fe",
+        "protecao",
+        "vitoria"
+      ]
+    },
+    {
+      "id": "davi_e_golias",
+      "label": "Davi e Golias",
+      "reference": "1 Samuel 17:1-58",
+      "aliases": [
+        "davi e golias",
+        "luta de davi contra golias",
+        "gigante golias"
+      ],
+      "topics": [
+        "fe",
+        "confianca",
+        "vitoria"
+      ]
+    },
+    {
+      "id": "josé_vendido_pelos_irmãos",
+      "label": "José vendido pelos irmãos",
+      "reference": "Gênesis 37:1-36",
+      "aliases": [
+        "josé vendido pelos irmãos",
+        "josé do egito",
+        "josé sonhador",
+        "história de josé do egito"
+      ],
+      "topics": [
+        "confianca",
+        "perdao",
+        "direcao"
+      ]
+    },
+    {
+      "id": "travessia_do_mar_vermelho",
+      "label": "Travessia do Mar Vermelho",
+      "reference": "Êxodo 14:1-31",
+      "aliases": [
+        "travessia do mar vermelho",
+        "mar vermelho se abriu",
+        "moisés abre o mar vermelho"
+      ],
+      "topics": [
+        "protecao",
+        "fe",
+        "vitoria"
+      ]
+    },
+    {
+      "id": "maná_no_deserto",
+      "label": "Maná no deserto",
+      "reference": "Êxodo 16:1-36",
+      "aliases": [
+        "maná no deserto",
+        "pão do céu no deserto",
+        "israel alimentado no deserto"
+      ],
+      "topics": [
+        "confianca",
+        "gratidao",
+        "protecao"
+      ]
+    },
+    {
+      "id": "queda_dos_muros_de_jericó",
+      "label": "Queda dos muros de Jericó",
+      "reference": "Josué 6:1-27",
+      "aliases": [
+        "muros de jericó",
+        "queda de jericó",
+        "sete voltas em jericó"
+      ],
+      "topics": [
+        "fe",
+        "obediencia",
+        "vitoria"
+      ]
+    },
+    {
+      "id": "jonas_e_o_grande_peixe",
+      "label": "Jonas e o grande peixe",
+      "reference": "Jonas 1:1-17",
+      "aliases": [
+        "jonas e a baleia",
+        "jonas e o grande peixe",
+        "jonas no ventre do peixe"
+      ],
+      "topics": [
+        "arrependimento",
+        "obediencia",
+        "graca"
+      ]
+    },
+    {
+      "id": "noé_e_a_arca",
+      "label": "Noé e a arca",
+      "reference": "Gênesis 6:9-22",
+      "aliases": [
+        "arca de noé",
+        "dilúvio e arca de noé",
+        "noé constrói a arca"
+      ],
+      "topics": [
+        "fe",
+        "obediencia",
+        "protecao"
+      ]
+    },
+    {
+      "id": "abraão_e_isaque",
+      "label": "Abraão e Isaque",
+      "reference": "Gênesis 22:1-19",
+      "aliases": [
+        "sacrifício de isaque",
+        "abraão oferece isaque",
+        "abraão e isaque no monte"
+      ],
+      "topics": [
+        "fe",
+        "obediencia",
+        "confianca"
+      ]
+    },
+    {
+      "id": "escada_de_jacó",
+      "label": "Escada de Jacó",
+      "reference": "Gênesis 28:10-22",
+      "aliases": [
+        "escada de jacó",
+        "sonho de jacó com anjos",
+        "visão da escada de jacó"
+      ],
+      "topics": [
+        "confianca",
+        "fe",
+        "direcao"
+      ]
+    },
+    {
+      "id": "elias_no_monte_carmelo",
+      "label": "Elias no Monte Carmelo",
+      "reference": "1 Reis 18:20-40",
+      "aliases": [
+        "elias no monte carmelo",
+        "fogo do céu monte carmelo",
+        "elias e profetas de baal"
+      ],
+      "topics": [
+        "fe",
+        "oracao",
+        "vitoria"
+      ]
+    },
+    {
+      "id": "elias_e_a_viúva_de_sarepta",
+      "label": "Elias e a viúva de Sarepta",
+      "reference": "1 Reis 17:8-24",
+      "aliases": [
+        "viúva de sarepta",
+        "elias e o azeite e farinha",
+        "viúva alimenta elias"
+      ],
+      "topics": [
+        "confianca",
+        "graca",
+        "fe"
+      ]
+    },
+    {
+      "id": "pentecostes",
+      "label": "Pentecostes",
+      "reference": "Atos 2:1-41",
+      "aliases": [
+        "dia de pentecostes",
+        "descida do espírito santo",
+        "línguas de fogo pentecostes"
+      ],
+      "topics": [
+        "espirito_santo",
+        "evangelizacao",
+        "igreja"
+      ]
+    },
+    {
+      "id": "conversão_de_saulo",
+      "label": "Conversão de Saulo",
+      "reference": "Atos 9:1-22",
+      "aliases": [
+        "conversão de saulo",
+        "saulo caminho de damasco",
+        "paulo encontra jesus na estrada"
+      ],
+      "topics": [
+        "salvacao",
+        "renovacao",
+        "graca"
+      ]
+    },
+    {
+      "id": "pedro_libertado_da_prisão",
+      "label": "Pedro libertado da prisão",
+      "reference": "Atos 12:1-19",
+      "aliases": [
+        "pedro libertado da prisão",
+        "anjo liberta pedro da prisão",
+        "pedro sai das cadeias"
+      ],
+      "topics": [
+        "protecao",
+        "oracao",
+        "fe"
+      ]
+    },
+    {
+      "id": "paulo_e_silas_na_prisão",
+      "label": "Paulo e Silas na prisão",
+      "reference": "Atos 16:16-40",
+      "aliases": [
+        "paulo e silas na prisão",
+        "louvor de paulo e silas",
+        "terremoto na prisão filipense"
+      ],
+      "topics": [
+        "louvor",
+        "fe",
+        "vitoria"
+      ]
+    },
+    {
+      "id": "estêvão_apedrejado",
+      "label": "Estêvão apedrejado",
+      "reference": "Atos 7:54-60",
+      "aliases": [
+        "estevão apedrejado",
+        "martírio de estevão",
+        "estevão primeiro mártir"
+      ],
+      "topics": [
+        "fe",
+        "perdao",
+        "perseveranca"
+      ]
+    },
+    {
+      "id": "a_última_ceia",
+      "label": "A última ceia",
+      "reference": "Lucas 22:14-23",
+      "aliases": [
+        "última ceia de jesus",
+        "jesus institui a ceia",
+        "pão e cálice na última ceia"
+      ],
+      "topics": [
+        "ceia",
+        "cruz",
+        "comunhao"
+      ]
+    },
+    {
+      "id": "jesus_no_getsêmani",
+      "label": "Jesus no Getsêmani",
+      "reference": "Mateus 26:36-46",
+      "aliases": [
+        "jesus no getsêmani",
+        "oração de jesus no jardim",
+        "jesus suando sangue no jardim"
+      ],
+      "topics": [
+        "oracao",
+        "obediencia",
+        "cruz"
+      ]
+    },
+    {
+      "id": "jesus_no_calvário",
+      "label": "Jesus no Calvário",
+      "reference": "Lucas 23:26-49",
+      "aliases": [
+        "crucificação de jesus",
+        "jesus no calvário",
+        "jesus morre na cruz",
+        "morte do senhor jesus"
+      ],
+      "topics": [
+        "cruz",
+        "perdao",
+        "salvacao"
+      ]
+    },
+    {
+      "id": "ressurreição_de_jesus",
+      "label": "Ressurreição de Jesus",
+      "reference": "Mateus 28:1-10",
+      "aliases": [
+        "ressurreição de jesus",
+        "jesus ressuscitou",
+        "sepulcro vazio de jesus"
+      ],
+      "topics": [
+        "ressurreicao",
+        "vida_eterna",
+        "vitoria"
+      ]
+    },
+    {
+      "id": "jesus_e_os_discípulos_de_emaús",
+      "label": "Jesus e os discípulos de Emaús",
+      "reference": "Lucas 24:13-35",
+      "aliases": [
+        "discípulos de emaús",
+        "caminho de emaús",
+        "jesus na estrada de emaús"
+      ],
+      "topics": [
+        "fe",
+        "consolo",
+        "biblia"
+      ]
+    },
+    {
+      "id": "grande_comissão",
+      "label": "Grande comissão",
+      "reference": "Mateus 28:16-20",
+      "aliases": [
+        "grande comissão",
+        "ide por todo o mundo e pregai",
+        "ide e fazei discípulos"
+      ],
+      "topics": [
+        "missao",
+        "evangelizacao",
+        "obediencia"
+      ]
+    },
+    {
+      "id": "parábola_do_semeador",
+      "label": "Parábola do semeador",
+      "reference": "Mateus 13:1-23",
+      "aliases": [
+        "parábola do semeador",
+        "semeador saiu a semear",
+        "sementes em diferentes terrenos"
+      ],
+      "topics": [
+        "biblia",
+        "fe",
+        "perseveranca"
+      ]
+    },
+    {
+      "id": "dez_virgens",
+      "label": "Dez virgens",
+      "reference": "Mateus 25:1-13",
+      "aliases": [
+        "parábola das dez virgens",
+        "cinco virgens prudentes",
+        "dez virgens e o noivo"
+      ],
+      "topics": [
+        "volta_jesus",
+        "vigilancia",
+        "fe"
+      ]
+    },
+    {
+      "id": "talentos",
+      "label": "Talentos",
+      "reference": "Mateus 25:14-30",
+      "aliases": [
+        "parábola dos talentos",
+        "servos e talentos",
+        "homem esconde talento na terra"
+      ],
+      "topics": [
+        "servico",
+        "obediencia",
+        "vigilancia"
+      ]
+    },
+    {
+      "id": "ovelhas_e_bodes",
+      "label": "Ovelhas e bodes",
+      "reference": "Mateus 25:31-46",
+      "aliases": [
+        "ovelhas e bodes",
+        "separação de ovelhas e bodes",
+        "juízo das nações"
+      ],
+      "topics": [
+        "amor",
+        "servico",
+        "vida_eterna"
+      ]
+    },
+    {
+      "id": "transfiguração_de_jesus",
+      "label": "Transfiguração de Jesus",
+      "reference": "Mateus 17:1-13",
+      "aliases": [
+        "transfiguração de jesus",
+        "jesus no monte da transfiguração",
+        "moisés e elias com jesus"
+      ],
+      "topics": [
+        "adoracao",
+        "fe"
+      ]
+    },
+    {
+      "id": "cristo_e_a_mulher_adúltera",
+      "label": "Cristo e a mulher adúltera",
+      "reference": "João 8:1-11",
+      "aliases": [
+        "mulher adúltera",
+        "mulher pega em adultério",
+        "quem não tem pecado atire a primeira pedra"
+      ],
+      "topics": [
+        "perdao",
+        "graca",
+        "arrependimento"
+      ]
+    }
+  ]
+}
