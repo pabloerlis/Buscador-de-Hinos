@@ -2,6 +2,8 @@ name: Build Android APK
 on:
   push:
     branches: [main, android-apk]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 jobs:
   build:
@@ -28,7 +30,7 @@ jobs:
       - name: Build biblical-topic and cross-reference graph
         run: python3 scripts/build_bible_graph.py
       - name: Run local-search tests
-        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js && node tests/test-v21.js
+        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js && node tests/test-v21.js && node tests/test-narrative-events.js
       - name: Evaluate offline semantic ranking
         run: node tests/test-stanza-ranking.js
       - name: Build APK
