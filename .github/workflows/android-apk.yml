@@ -169,12 +169,16 @@ jobs:
           node tests/qa_e5_real_catalog.js /tmp/e5-catalogo-verificado.json
       - name: Medir recuperação E5 com consultas de diferentes narrativas
         run: python3 scripts/benchmark_e5.py
+      - name: Comparar ranking híbrido real com o ranking anterior
+        run: node tests/qa_e5_hybrid.js /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json
       - name: Registrar métricas de recuperação sem letras
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e5-stanza-metrics
-          path: qa-report/e5-metrics.json
+          path: |
+            qa-report/e5-metrics.json
+            qa-report/e5-hybrid.json
           retention-days: 30
           if-no-files-found: ignore
       - name: Preservar apenas os artefatos que entram no APK E5
