@@ -116,6 +116,7 @@ const OfflineAPI = (() => {
         storyIndex.get(item.id).add(song.id);
       }
     }
+    if(bibleGraph&&typeof bibleGraph.setCorpus==='function')bibleGraph.setCorpus(hymns);
     recommender=typeof RecommendationEngine!=='undefined'?RecommendationEngine.create(hymns):null;
     queryRankingCache.clear();
   }
