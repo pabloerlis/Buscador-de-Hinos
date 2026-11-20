@@ -25,7 +25,7 @@ jobs:
         with:
           gradle-version: '8.9'
       - name: Run local-search tests
-        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js
+        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js
       - name: Build APK
         run: gradle --no-daemon --stacktrace assembleDebug
       - uses: actions/upload-artifact@v4

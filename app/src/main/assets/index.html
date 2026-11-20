@@ -10,6 +10,7 @@
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
   <script src="semantic-engine.js" defer></script>
+  <script src="story-engine.js" defer></script>
   <script src="bible-context.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="app.js" defer></script>
@@ -44,6 +45,7 @@
             <button data-suggestion="Salvação pela graça" type="button">Salvação</button>
             <button data-suggestion="Volta de Jesus e vigilância" type="button">Volta de Jesus</button>
             <button data-suggestion="Salmo 23" type="button">Salmo 23</button><button data-suggestion="Filipenses 4:6" type="button">Fp 4:6</button>
+            <button data-suggestion="Filho Pródigo" type="button">Filho Pródigo</button>
           </div>
         </div>
         <div class="hero-accent" aria-hidden="true"><span>♪</span><span>♫</span><span>♪</span></div>
@@ -77,10 +79,11 @@
             <div><span class="section-kicker">RESULTADOS DA PESQUISA</span><h2 id="results-title">Hinos encontrados</h2><p id="results-subtitle"></p></div>
             <button id="new-search" class="text-action" type="button">Nova pesquisa <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5M4 4v4h4"/></svg></button>
           </div>
-          <p class="score-method">Os percentuais são índices heurísticos de correspondência, não probabilidades nem avaliações teológicas certificadas.</p>
+          <p class="score-method">Afinidade estimada por evidências da letra e relações semânticas. Os percentuais não são probabilidades.</p>
           <div class="results-layout">
             <div class="results-main">
               <div id="notice" class="notice hidden" role="status"></div>
+              <div id="search-diagnostics" class="semantic-interpret hidden"><strong>Como o índice interpretou a busca</strong><div id="search-concepts" class="concept-list"></div></div>
               <div id="ai-workspace" class="ai-workspace" aria-live="polite">
                 <div class="ai-workspace-head"><strong id="ai-state-badge" class="ai-stage">IA não carregada</strong><span id="ai-timer" class="ai-timer"></span></div>
                 <div id="ai-task" class="ai-task">Busca local disponível.</div>
@@ -120,7 +123,32 @@
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca textual e contextual em letras de uma coletânea. Esta versão Android usa uma taxonomia semântica local e aceita um modelo GGUF opcional, executado no próprio aparelho, sem enviar consultas à internet.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong></div><section class="gguf-box" aria-label="Modelo de IA local">
+      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong></div>
+      <section class="semantic-settings" aria-label="Preferências de busca semântica">
+        <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>
+        <label for="search-mode">Prioridade da pesquisa</label>
+        <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
+        <label for="semantic-power">Força das relações semânticas <strong id="semantic-power-value">75%</strong></label>
+        <input id="semantic-power" type="range" min="0" max="100" step="5" value="75">
+        <label class="setting-check"><input id="story-toggle" type="checkbox" checked>Reconhecer narrativas bíblicas (Filho Pródigo, Ovelha Perdida etc.)</label>
+        <label class="setting-check"><input id="related-toggle" type="checkbox" checked>Considerar temas relacionados e sinônimos</label>
+        <label for="min-affinity">Afinidade mínima exibida <strong id="min-affinity-value">0%</strong></label>
+        <input id="min-affinity" type="range" min="0" max="90" step="5" value="0">
+        <label for="page-size">Resultados por página</label><select id="page-size"><option value="5">5 hinos</option><option value="10">10 hinos</option></select>
+        <label class="setting-check"><input id="explain-toggle" type="checkbox" checked>Mostrar justificativa em cada resultado</label>
+        <label class="setting-check"><input id="concepts-toggle" type="checkbox" checked>Mostrar como a consulta foi interpretada</label>
+        <p class="subtle-note">Afinidade é uma pontuação heurística. Associações são sugeridas a partir de evidências da letra, não são avaliação teológica oficial.</p>
+        <div class="settings-actions"><button id="settings-search-save" class="primary-btn" type="button">Aplicar preferências</button><button id="settings-search-reset" class="secondary-btn" type="button">Restaurar padrões</button></div>
+      </section>
+      <section class="semantic-settings" aria-label="Dicionário de sinônimos pessoal">
+        <h3>Dicionário personalizado</h3>
+        <p class="subtle-note">Associe expressões que você costuma pesquisar às narrativas conhecidas. Isso muda a interpretação da consulta, sem alterar a letra dos hinos.</p>
+        <label for="alias-term">Expressão ou sinônimo</label><input id="alias-term" type="text" maxlength="90" placeholder="Ex.: reencontro com meu pai">
+        <label for="alias-story">Relacionar à narrativa</label><select id="alias-story"></select>
+        <div class="settings-actions"><button id="alias-add" class="secondary-btn" type="button">Adicionar associação</button></div>
+        <div id="alias-list" class="alias-list" aria-live="polite"></div>
+      </section>
+      <details class="advanced-settings"><summary>IA local experimental (GGUF) — opcional</summary><section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (GGUF)</h3>
         <p>Escolha um arquivo <code>.gguf</code> do telefone. O modelo servirá apenas para sugerir até 4 temas de busca; a classificação e o detalhamento são feitos pelo índice offline. O modelo não é enviado a servidores. Preferencialmente use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
         <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
@@ -130,7 +158,7 @@
         <p id="gguf-last" class="gguf-phase" aria-live="polite">Última execução: nenhuma</p>
         <div class="settings-actions"><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div><div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
-      </section>
+      </section></details>
       <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p><div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar do GitHub</button><label class="secondary-btn file-upload">Importar outro JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div></div>
     </section>
   </div>

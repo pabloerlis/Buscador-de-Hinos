@@ -1,7 +1,9 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],currentHymn:null};
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],currentHymn:null,
+  searchSettings:{mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{}}};
+try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 let toastTimer=null;
 function toast(message){const el=$('toast');el.textContent=message;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),6000);}
@@ -15,6 +17,7 @@ async function refreshStatus(){
   $('settings-collection').textContent=result.collection||'Não importada';
   $('settings-count').textContent=result.hymn_count;
   $('settings-vectors').textContent=result.semantic_ready?`${result.semantic_topics} temas locais`:'Não carregada';
+  $('settings-stories').textContent=result.story_ready?`${result.story_count} narrativas locais`:'Não carregada';
   if(typeof GGUF!=='undefined')GGUF.info();
   return result;
 }
@@ -32,7 +35,7 @@ function resultCard(hymn){
   return `<article class="result-card" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
   <h3>${escapeHTML(hymn.title)}</h3><div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
-  <p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason||'Correspondência textual ou temática.')}</p>
+  ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
 }
 function showResults(){$('welcome-panel').classList.add('hidden');$('results-panel').classList.remove('hidden');$('results-panel').scrollIntoView({behavior:'smooth',block:'start'});}
@@ -44,8 +47,8 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   busySearch(true);let succeeded=false;
   try {
     let data;
-    if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,exclude:state.exclude,semantic_hints:state.semanticHints});
-    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',exclude:refine?state.exclude:[],semantic_hints:semanticHints});
+    if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,exclude:state.exclude,semantic_hints:state.semanticHints,settings:state.searchSettings});
+    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',exclude:refine?state.exclude:[],semantic_hints:semanticHints,settings:state.searchSettings});
     if(page===1){
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.semanticHints=semanticHints;
       state.lastResults=data.results.slice();
@@ -57,11 +60,16 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
       if(data.summary)fragments.push(data.summary);
       if(data.excluded?.length)fragments.push('Excluindo: '+data.excluded.join(', ')+'.');
       $('notice').textContent=fragments.join(' ');$('notice').classList.toggle('hidden',!fragments.length);
+      const concepts=data.interpretation||[];
+      $('search-diagnostics').classList.toggle('hidden',!concepts.length);
+      $('search-concepts').replaceChildren();
+      for(const text of concepts){const item=document.createElement('span');item.className='concept-chip';item.textContent=text;$('search-concepts').appendChild(item);}
     }else state.lastResults.push(...data.results);
     state.page=data.page;state.total=data.total;state.hasMore=data.has_more;
     if(data.results.length)$('results-list').insertAdjacentHTML('beforeend',data.results.map(resultCard).join(''));
     else if(page===1)$('results-list').innerHTML='<div class="empty-results"><h3>Nenhum hino encontrado</h3><p>Experimente termos mais gerais, outro tema ou uma frase da letra. Não apresentamos sugestões sem evidência mínima.</p></div>';
     $('load-more').classList.toggle('hidden',!data.has_more);
+    $('load-more').textContent='Carregar mais '+data.page_size+' hinos';
     succeeded=true;
   }catch(error){
     if(page===1)$('results-list').innerHTML='<div class="empty-results"><h3>Falha na pesquisa</h3><p>Verifique a coletânea e tente novamente.</p></div>';
@@ -107,6 +115,79 @@ $('import-file').addEventListener('change',ev=>importFile(ev.target));$('setting
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeLayer));document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeLayer();});
 
 // O GGUF nunca gera números de hinos: todas as recomendações são conferidas no JSON local.
+
+// Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
+const SearchPreferences=(()=>{
+  const ids={mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
+    narratives:'story-toggle',related:'related-toggle',showReasons:'explain-toggle',showConcepts:'concepts-toggle'};
+  const defaults={mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{}};
+  let stories=[];
+  function renderAliases(){
+    const container=$('alias-list');container.replaceChildren();let count=0;
+    for(const story of stories){
+      for(const term of state.searchSettings.customAliases?.[story.id]||[]){
+        count++;
+        const row=document.createElement('div');row.className='alias-row';
+        const label=document.createElement('span');label.textContent='“'+term+'” → '+story.label;
+        const remove=document.createElement('button');remove.textContent='Remover';remove.className='alias-remove';remove.type='button';
+        remove.onclick=()=>{const aliases=state.searchSettings.customAliases;
+          aliases[story.id]=(aliases[story.id]||[]).filter(t=>t!==term);save();renderAliases();};
+        row.append(label,remove);container.appendChild(row);
+      }
+    }
+    if(!count)container.textContent='Nenhuma associação pessoal cadastrada.';
+  }
+  function fill(){
+    const cfg=state.searchSettings;
+    for(const [key,id] of Object.entries(ids)){
+      const input=$(id);if(input.type==='checkbox')input.checked=cfg[key]!==false;
+      else input.value=String(cfg[key]);
+    }
+    $('semantic-power-value').textContent=cfg.strength+'%';$('min-affinity-value').textContent=cfg.minAffinity+'%';
+    renderAliases();
+  }
+  function readInputs(){
+    const options={...state.searchSettings};
+    for(const [key,id] of Object.entries(ids)){
+      const input=$(id);options[key]=input.type==='checkbox'?input.checked:input.type==='range'||key==='pageSize'?Number(input.value):input.value;
+    }
+    return OfflineAPI.searchOptions(options);
+  }
+  function save(){
+    state.searchSettings=readInputs();
+    localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
+    fill();
+  }
+  function refreshSearch(){
+    if(state.ready&&state.effectiveQuery)performSearch(state.effectiveQuery,{autoAI:false});
+  }
+  $('semantic-power').oninput=()=>{$('semantic-power-value').textContent=$('semantic-power').value+'%';};
+  $('min-affinity').oninput=()=>{$('min-affinity-value').textContent=$('min-affinity').value+'%';};
+  $('settings-search-save').onclick=()=>{save();closeLayer();refreshSearch();toast('Preferências de busca aplicadas.');};
+  $('settings-search-reset').onclick=()=>{
+    state.searchSettings=OfflineAPI.searchOptions(defaults);localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
+    fill();toast('Configurações restauradas.');
+  };
+  $('alias-add').onclick=()=>{
+    const term=$('alias-term').value.trim();const id=$('alias-story').value;
+    if(term.length<4||term.length>90||!id){toast('Informe uma expressão de 4 a 90 caracteres e uma narrativa.');return;}
+    if(!stories.some(s=>s.id===id)){toast('Narrativa indisponível.');return;}
+    const aliases=state.searchSettings.customAliases||{};
+    if(Object.values(aliases).flat().length>=50){toast('Limite de 50 associações pessoais.');return;}
+    aliases[id]=[...new Set([...(aliases[id]||[]),term])];state.searchSettings.customAliases=aliases;
+    save();$('alias-term').value='';renderAliases();toast('Associação adicionada.');
+  };
+  async function initialize(){
+    try{const data=await jsonRequest('/api/stories');stories=data.stories||[];
+      const select=$('alias-story');select.replaceChildren();
+      for(const item of stories){const opt=document.createElement('option');opt.value=item.id;opt.textContent=item.label;select.appendChild(opt);}
+    }catch(error){console.warn('Dicionário de narrativas indisponível:',error.message);}
+    fill();
+  }
+  initialize();
+  return {fill};
+})();
+
 const GGUF=(()=>{
   const native=()=>window.NativeGGUF||null;
   const selectedState={ready:false,busy:false,task:null,lastResult:'',startTime:0,lastQuery:'',autoGeneration:false,lastError:'',timerId:null};
@@ -146,7 +227,8 @@ const GGUF=(()=>{
     $('gguf-model-meta').textContent=`Tamanho GGUF: ${fmt(status.modelMB)} · Armazenamento livre: ${fmt(status.storageMB)} · Cache local: ${fmt(status.cachedMB)} · RAM disponível: ${fmt(status.availableMB)} · RAM total: ${fmt(status.totalMB)} · Memória nativa usada: ${fmt(status.nativeMB)}. Valores aproximados, sujeitos às restrições do Android.`;
     if(status.lastError){$('gguf-last').textContent='Erro mais recente: '+status.lastError;}
     else if(status.lastDurationMs>0){$('gguf-last').textContent=`Última execução: ${Math.round(status.lastDurationMs/1000)} s`;}
-    $('gguf-banner').classList.toggle('hidden',!state.ready);
+    $('gguf-banner').classList.toggle('hidden',!state.ready||(!selectedState.ready&&!selectedState.busy));
+    $('ai-workspace').classList.toggle('hidden',!selectedState.ready&&!selectedState.busy);
     $('gguf-banner-text').textContent=selectedState.ready?'Busca local pronta. IA disponível somente para sugerir termos.':'Busca local pronta. Para sugestões de IA, carregue um GGUF em Configurações.';
     updateIndicator(status);
     return status;

@@ -49,3 +49,27 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 @media(max-width:560px){.ai-indicator{font-size:9px;padding:6px 7px}.top-state{display:none}.ai-buttons{width:100%}.ai-buttons button{flex:1}.ai-workspace{padding:12px}}
 .score-track{height:5px;background:#e8eee8;border-radius:99px;overflow:hidden;margin:12px 0 2px}
 .score-track span{display:block;height:100%;background:linear-gradient(90deg,#7cac83,#2b8151);border-radius:99px}
+
+/* v1.5: mecanismos de semântica offline e controles avançados. */
+.semantic-settings{margin:20px 0 18px;padding:17px;border:1px solid #dbe6dd;background:#f9fcf9;border-radius:14px;display:flex;flex-direction:column;gap:10px}
+.semantic-settings h3{font-size:16px;color:#1d4933;margin:0}
+.semantic-settings label{font-size:12px;font-weight:650;color:#385547;margin:6px 0 0}
+.semantic-settings select,.semantic-settings input[type="text"]{width:100%;min-height:42px;background:#fff;color:#273d30;border:1px solid #cbdad0;border-radius:9px;padding:10px;font-size:13px}
+.semantic-settings input[type="range"]{width:100%;height:32px;accent-color:#29704a;cursor:pointer}
+.semantic-settings label strong{float:right;font-variant-numeric:tabular-nums}
+.semantic-settings .setting-check{display:flex;align-items:flex-start;gap:9px;font-weight:500;font-size:12px;line-height:1.55;cursor:pointer}
+.semantic-settings .setting-check input{width:17px;height:17px;flex-shrink:0;accent-color:#246b47}
+.semantic-settings .settings-actions{margin-top:10px}
+.setting-section-heading{display:flex;align-items:center;gap:10px;justify-content:space-between}
+.local-badge{font-size:10px;letter-spacing:.5px;color:#226c45;background:#e4f4e7;padding:5px 8px;border-radius:20px;font-weight:800}
+.advanced-settings{margin:18px 0;border:1px solid #dbe4dd;border-radius:12px;padding:12px;background:#fff}
+.advanced-settings summary{font-size:14px;font-weight:700;color:#537060;cursor:pointer;padding:7px}
+.advanced-settings .gguf-box{margin:8px 0 0}
+.alias-list{display:flex;flex-direction:column;gap:7px;font-size:12px;color:#768b7c;margin-top:4px}
+.alias-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eff5ef;padding:9px;border-radius:9px;color:#284d38;overflow-wrap:anywhere}
+.alias-remove{background:#fff;border:1px solid #d7dfd7;border-radius:7px;padding:6px 8px;color:#70554b;cursor:pointer;font-size:11px}
+.semantic-interpret{padding:13px 15px;margin-bottom:16px;background:#f1f7f2;border-left:3px solid #357957;border-radius:10px;font-size:12px;color:#355b41}
+.semantic-interpret strong{display:block;margin-bottom:10px}
+.concept-list{display:flex;flex-wrap:wrap;gap:7px}
+.concept-chip{display:inline-block;padding:6px 9px;border-radius:8px;background:#fff;border:1px solid #d7e8d9;color:#3d6851;font-size:11px}
+@media(max-width:560px){.semantic-settings{padding:13px}.setting-section-heading h3{font-size:15px}}

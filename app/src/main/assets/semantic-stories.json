@@ -1,0 +1,647 @@
+{
+  "schema_version": 1,
+  "revision": "2026-11-narratives-1",
+  "description": "Regras temáticas de narrativas bíblicas. Um hino só é associado quando traz evidências textuais suficientes. Não representa indexação teológica validada.",
+  "stories": [
+    {
+      "id": "filho_prodigo",
+      "label": "Filho Pródigo",
+      "reference": "Lucas 15:11-32",
+      "aliases": [
+        "filho pródigo",
+        "parábola do filho pródigo",
+        "filho perdido que voltou",
+        "voltar para a casa do pai",
+        "retorno ao pai",
+        "lucas 15:11",
+        "lc 15:11",
+        "lc 15:20"
+      ],
+      "phrases": [
+        "voltei pra ti meu pai",
+        "voltei para ti meu pai",
+        "voltei a ti meu pai",
+        "volto pra ti meu pai",
+        "retorno à casa do pai",
+        "voltar à casa do pai",
+        "de volta aos braços do pai",
+        "meu pai me recebeu",
+        "meu pai me acolheu",
+        "perdido e fui achado",
+        "estava perdido e fui achado",
+        "eu regressei ao pai"
+      ],
+      "groups": [
+        [
+          "voltei",
+          "volto",
+          "voltarei",
+          "retornei",
+          "retornar",
+          "retorno",
+          "regressei",
+          "regressar",
+          "regresso",
+          "de volta",
+          "tornarei",
+          "voltar",
+          "retornar para ti",
+          "quero voltar"
+        ],
+        [
+          "pai",
+          "meu pai",
+          "ó pai",
+          "a ti senhor",
+          "para ti senhor",
+          "casa do pai",
+          "meu lar",
+          "minha casa"
+        ],
+        [
+          "perdão",
+          "perdoa-me",
+          "perdoaste",
+          "acolheu",
+          "recebeu",
+          "abraçou",
+          "misericórdia",
+          "arrependido",
+          "pecador",
+          "perdido",
+          "afastado",
+          "longe de ti",
+          "deixei teu caminho"
+        ]
+      ],
+      "topics": [
+        "arrependimento",
+        "perdao",
+        "graca"
+      ],
+      "description": "Retorno a Deus após afastamento, arrependimento e acolhimento do Pai."
+    },
+    {
+      "id": "ovelha_perdida",
+      "label": "Ovelha perdida",
+      "reference": "Lucas 15:3-7",
+      "aliases": [
+        "ovelha perdida",
+        "parábola da ovelha perdida",
+        "pastor busca ovelha",
+        "lucas 15:4",
+        "lc 15:4"
+      ],
+      "phrases": [
+        "cem ovelhas",
+        "a ovelha perdida",
+        "ovelha que se perdeu",
+        "buscou-me o bom pastor",
+        "veio me buscar no deserto",
+        "pastor me encontrou"
+      ],
+      "groups": [
+        [
+          "ovelha",
+          "rebanho",
+          "redil",
+          "ovelhas"
+        ],
+        [
+          "perdida",
+          "perdido",
+          "desgarrado",
+          "desviada",
+          "desviado",
+          "longe",
+          "errante"
+        ],
+        [
+          "pastor",
+          "procurou",
+          "buscou",
+          "encontrou",
+          "resgatou",
+          "trouxe de volta"
+        ]
+      ],
+      "topics": [
+        "salvacao",
+        "protecao",
+        "graca"
+      ],
+      "description": "O cuidado do pastor ao procurar e resgatar quem se perdeu."
+    },
+    {
+      "id": "bom_samaritano",
+      "label": "Bom Samaritano",
+      "reference": "Lucas 10:25-37",
+      "aliases": [
+        "bom samaritano",
+        "parábola do bom samaritano",
+        "lucas 10:30",
+        "lc 10:30",
+        "amar o próximo como o samaritano"
+      ],
+      "phrases": [
+        "bom samaritano",
+        "curou minhas feridas",
+        "socorreu o ferido",
+        "cuidou do caído",
+        "passou e viu o ferido"
+      ],
+      "groups": [
+        [
+          "ferido",
+          "feridas",
+          "caído",
+          "machucado",
+          "enfermo"
+        ],
+        [
+          "socorro",
+          "socorreu",
+          "ajudou",
+          "cuidou",
+          "curou",
+          "levantou"
+        ],
+        [
+          "próximo",
+          "compaixão",
+          "misericórdia",
+          "amor",
+          "bondade"
+        ]
+      ],
+      "topics": [
+        "amor",
+        "servico",
+        "humildade"
+      ],
+      "description": "Compaixão ativa e cuidado ao próximo, especialmente ao necessitado."
+    },
+    {
+      "id": "bom_pastor",
+      "label": "O Bom Pastor",
+      "reference": "João 10:11",
+      "aliases": [
+        "bom pastor",
+        "o senhor é meu pastor",
+        "salmo 23",
+        "joão 10:11",
+        "jo 10:11",
+        "salmos 23"
+      ],
+      "phrases": [
+        "o senhor é meu pastor",
+        "jesus é meu bom pastor",
+        "nada me faltará",
+        "verde pasto me faz repousar",
+        "pastor da minha alma"
+      ],
+      "groups": [
+        [
+          "pastor",
+          "pastoreia",
+          "rebanho",
+          "ovelhas"
+        ],
+        [
+          "guia",
+          "guia-me",
+          "conduz",
+          "conduzir",
+          "leva-me",
+          "cuidado",
+          "sustenta"
+        ],
+        [
+          "pastos",
+          "águas tranquilas",
+          "vale da sombra",
+          "vara e cajado",
+          "nada faltará"
+        ]
+      ],
+      "topics": [
+        "confianca",
+        "protecao",
+        "direcao"
+      ],
+      "description": "Deus conduz, sustenta e protege seu povo como pastor."
+    },
+    {
+      "id": "tempestade",
+      "label": "Jesus acalma a tempestade",
+      "reference": "Marcos 4:35-41",
+      "aliases": [
+        "jesus acalma a tempestade",
+        "tempestade acalmada",
+        "cristo acalma o mar",
+        "marcos 4:39",
+        "mc 4:39"
+      ],
+      "phrases": [
+        "aquieta-te mar",
+        "acalma o mar",
+        "o vento se calou",
+        "a tempestade se acalmou",
+        "até o vento lhe obedece"
+      ],
+      "groups": [
+        [
+          "tempestade",
+          "temporal",
+          "ondas",
+          "vento",
+          "mar bravio",
+          "vendaval"
+        ],
+        [
+          "acalma",
+          "acalmou",
+          "quietude",
+          "paz",
+          "silenciou",
+          "sossegou",
+          "sossegai"
+        ],
+        [
+          "cristo",
+          "jesus",
+          "senhor",
+          "salvador"
+        ]
+      ],
+      "topics": [
+        "paz",
+        "confianca",
+        "tribulacao"
+      ],
+      "description": "Confiança em Jesus diante das tempestades da vida."
+    },
+    {
+      "id": "emaus",
+      "label": "Caminho de Emaús",
+      "reference": "Lucas 24:13-35",
+      "aliases": [
+        "caminho de emaús",
+        "discípulos de emaús",
+        "lucas 24:13",
+        "lc 24:13"
+      ],
+      "phrases": [
+        "no caminho de emaús",
+        "fica conosco senhor",
+        "arde o coração ao ouvir a palavra",
+        "partiu o pão e o reconheceram"
+      ],
+      "groups": [
+        [
+          "caminho",
+          "caminhando",
+          "jornada",
+          "estrada"
+        ],
+        [
+          "arde",
+          "ardente",
+          "coração",
+          "palavra",
+          "escrituras"
+        ],
+        [
+          "fica conosco",
+          "reconheceram",
+          "pão",
+          "companhia",
+          "presença"
+        ]
+      ],
+      "topics": [
+        "fe",
+        "comunhao",
+        "esperanca"
+      ],
+      "description": "O reconhecimento do Cristo ressurreto no caminho."
+    },
+    {
+      "id": "mulher_samaritana",
+      "label": "Mulher Samaritana",
+      "reference": "João 4:1-26",
+      "aliases": [
+        "mulher samaritana",
+        "samaritana no poço",
+        "água viva",
+        "joão 4:10",
+        "jo 4:10"
+      ],
+      "phrases": [
+        "água viva que nunca acaba",
+        "água que salta para vida eterna",
+        "jesus junto ao poço",
+        "dá-me dessa água viva",
+        "fonte de água viva"
+      ],
+      "groups": [
+        [
+          "poço",
+          "água",
+          "sede",
+          "sedento",
+          "sede da alma"
+        ],
+        [
+          "água viva",
+          "fonte",
+          "sacia",
+          "saciou",
+          "beber",
+          "saciar"
+        ],
+        [
+          "jesus",
+          "cristo",
+          "senhor",
+          "salvador"
+        ]
+      ],
+      "topics": [
+        "salvacao",
+        "vida_eterna",
+        "graca"
+      ],
+      "description": "Jesus oferece água viva e vida transformada."
+    },
+    {
+      "id": "lazaro",
+      "label": "Ressurreição de Lázaro",
+      "reference": "João 11:1-44",
+      "aliases": [
+        "lázaro",
+        "ressurreição de lázaro",
+        "jesus ressuscita lázaro",
+        "joão 11:43",
+        "jo 11:43"
+      ],
+      "phrases": [
+        "lázaro vem para fora",
+        "lázaro vem pra fora",
+        "eu sou a ressurreição e a vida",
+        "sai do sepulcro"
+      ],
+      "groups": [
+        [
+          "lázaro",
+          "lazaro",
+          "sepulcro",
+          "túmulo"
+        ],
+        [
+          "levanta",
+          "ressuscita",
+          "ressurgiu",
+          "vida",
+          "reviveu"
+        ],
+        [
+          "jesus",
+          "cristo",
+          "senhor",
+          "mestre"
+        ]
+      ],
+      "topics": [
+        "ressurreicao",
+        "fe",
+        "vida_eterna"
+      ],
+      "description": "Jesus chama Lázaro à vida e manifesta seu poder sobre a morte."
+    },
+    {
+      "id": "vale_ossos",
+      "label": "Vale de Ossos Secos",
+      "reference": "Ezequiel 37:1-14",
+      "aliases": [
+        "vale de ossos secos",
+        "ossos secos",
+        "visão de ezequiel",
+        "ezequiel 37"
+      ],
+      "phrases": [
+        "ossos secos viverão",
+        "vale de ossos secos",
+        "profetiza sobre os ossos",
+        "sopro de vida nos ossos"
+      ],
+      "groups": [
+        [
+          "ossos",
+          "vale",
+          "secos"
+        ],
+        [
+          "reviver",
+          "revivem",
+          "vida",
+          "renovação",
+          "restauração"
+        ],
+        [
+          "sopra",
+          "sopro",
+          "espírito",
+          "profetiza"
+        ]
+      ],
+      "topics": [
+        "renovacao",
+        "espirito_santo",
+        "esperanca"
+      ],
+      "description": "Restauração de esperança e vida figurada pelo vale de ossos secos."
+    },
+    {
+      "id": "paulo_silas",
+      "label": "Paulo e Silas na prisão",
+      "reference": "Atos 16:25-34",
+      "aliases": [
+        "paulo e silas",
+        "paulo e silas na prisão",
+        "atos 16:25",
+        "at 16:25",
+        "louvor na prisão"
+      ],
+      "phrases": [
+        "paulo e silas cantavam",
+        "louvor na prisão",
+        "cadeias se romperam",
+        "as cadeias se abriram",
+        "prisioneiros cantavam louvores"
+      ],
+      "groups": [
+        [
+          "prisão",
+          "cadeia",
+          "algemas",
+          "grilhões"
+        ],
+        [
+          "louvor",
+          "cantar",
+          "cantavam",
+          "oravam",
+          "oração"
+        ],
+        [
+          "libertou",
+          "livrou",
+          "romperam",
+          "abriram",
+          "tremeram"
+        ]
+      ],
+      "topics": [
+        "louvor",
+        "confianca",
+        "vitoria"
+      ],
+      "description": "Oração e louvor mesmo na prisão, seguidos de libertação."
+    },
+    {
+      "id": "dez_virgens",
+      "label": "Parábola das dez virgens",
+      "reference": "Mateus 25:1-13",
+      "aliases": [
+        "dez virgens",
+        "parábola das dez virgens",
+        "virgens prudentes",
+        "mateus 25:1",
+        "mt 25:1"
+      ],
+      "phrases": [
+        "lâmpadas acesas",
+        "azeite nas lâmpadas",
+        "o noivo vem chegando",
+        "preparadas para o noivo"
+      ],
+      "groups": [
+        [
+          "noivo",
+          "virgens",
+          "lâmpadas",
+          "lamparinas"
+        ],
+        [
+          "azeite",
+          "vigiai",
+          "vigilantes",
+          "prontas",
+          "preparadas",
+          "acesas"
+        ],
+        [
+          "virá",
+          "vem",
+          "chegando",
+          "espera",
+          "aguardar"
+        ]
+      ],
+      "topics": [
+        "vigilancia",
+        "volta_jesus",
+        "perseveranca"
+      ],
+      "description": "Vigilância e preparo espiritual para a vinda do Noivo."
+    },
+    {
+      "id": "davi_golias",
+      "label": "Davi e Golias",
+      "reference": "1 Samuel 17",
+      "aliases": [
+        "davi e golias",
+        "gigante golias",
+        "1 samuel 17",
+        "1sm 17"
+      ],
+      "phrases": [
+        "davi venceu golias",
+        "o gigante caiu",
+        "pedra e funda",
+        "não venho com espada"
+      ],
+      "groups": [
+        [
+          "davi",
+          "gigante",
+          "golias",
+          "funda",
+          "pedra"
+        ],
+        [
+          "vitória",
+          "venceu",
+          "derrotou",
+          "enfrentou",
+          "confiou"
+        ],
+        [
+          "senhor",
+          "deus",
+          "fé",
+          "poder"
+        ]
+      ],
+      "topics": [
+        "fe",
+        "vitoria",
+        "confianca"
+      ],
+      "description": "A vitória alcançada pela confiança em Deus diante de um desafio maior."
+    },
+    {
+      "id": "pao_peixes",
+      "label": "Multiplicação dos pães",
+      "reference": "João 6:1-15",
+      "aliases": [
+        "multiplicação dos pães",
+        "cinco pães e dois peixes",
+        "joão 6:9",
+        "jo 6:9"
+      ],
+      "phrases": [
+        "cinco pães e dois peixes",
+        "multiplicou os pães",
+        "milagre dos pães"
+      ],
+      "groups": [
+        [
+          "pães",
+          "pão",
+          "peixes",
+          "alimento"
+        ],
+        [
+          "multiplicou",
+          "provisão",
+          "sustentou",
+          "alimentou"
+        ],
+        [
+          "multidão",
+          "milagre",
+          "senhor",
+          "jesus"
+        ]
+      ],
+      "topics": [
+        "gratidao",
+        "confianca",
+        "protecao"
+      ],
+      "description": "Provisão abundante a partir de poucos recursos."
+    }
+  ]
+}

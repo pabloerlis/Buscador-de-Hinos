@@ -1,4 +1,4 @@
-# Buscador de Hinos — Android 1.4
+# Buscador de Hinos — Android 1.5
 
 Aplicativo Android ARM64 com busca offline, ranking estimado e motor GGUF opcional (`llama.cpp`).
 
@@ -60,3 +60,21 @@ Com os requisitos instalados: `gradle assembleDebug`.
 - Comparação dos cinco melhores resultados e resumo de temas são **100% offline**, sem GGUF.
 - Se o GGUF falhar ou esgotar o tempo, a busca local permanece funcional.
 - A porcentagem é heurística; não representa probabilidade ou confiança calibrada.
+
+
+## Versão 1.5 — Busca por narrativas, sem depender de IA
+
+- **Base auxiliar de 13 narrativas bíblicas**, com aliases de pesquisa, referências para contextualização, expressões discriminativas e grupos de evidências. Inclui Filho Pródigo, Ovelha Perdida, Bom Samaritano, Bom Pastor, Tempestade Acalmada, Emaús, Mulher Samaritana, Lázaro, Vale de Ossos Secos, Paulo e Silas, Dez Virgens, Davi e Golias e Multiplicação dos Pães.
+- A busca por **Filho Pródigo** reconhece letras que descrevem voltar ao Pai, ser recebido e ser perdoado mesmo sem dizer "filho". Uma menção isolada a "filho" ou "pai" não é suficiente para classificar uma narrativa.
+- As associações narrativas têm justificativas baseadas nos trechos efetivos da letra e a indicação de referência bíblica serve apenas como metadado da narrativa, **não como citação presente na letra**.
+- Preferências: busca literal/equilibrada/contextual, intensidade semântica, ligar/desligar narrativas e temas relacionados, afinidade mínima, 5 ou 10 por página, justificativas e painel "como a busca interpretou".
+- Dicionário de sinônimos **personalizável**: associar expressões digitadas a narrativas; armazenado localmente, sem alterar a coletânea.
+- A base importada anteriormente é reindexada automaticamente na primeira abertura, sem exigir importação novamente. A primeira abertura pode demorar mais; as buscas seguintes usam índices em memória.
+- Área GGUF mantida sob **Configurações → IA local experimental**; sem IA automática por padrão. O painel da IA fica oculto quando não há modelo carregado.
+- São regras semânticas curadas, **não embeddings**; não há garantia de reconhecimento para toda parábola, referência bíblica ou hino. Validar resultados no contexto da letra.
+
+### Testes
+
+`node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js`
+
+O teste v1.5 usa letras sintéticas, não a coletânea integral de 2018. A precisão no catálogo real precisa ser avaliada após a importação.
