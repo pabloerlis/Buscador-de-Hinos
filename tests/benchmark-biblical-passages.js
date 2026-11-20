@@ -58,8 +58,10 @@ const cases=[
     outcome.push({query:item.query,expected,falsePositive,
       top10:ranked.slice(0,10).map(x=>({number:x.number,title:x.title,
         collection:x.collection,score:x.relevance_score,reason:x.reason}))});
-    assert.ok(expected.some(x=>x.position&&x.position<=20),
-      'Nenhum hino diretamente relacionado recuperado no top 20: '+item.query);
   }
   console.log('BENCHMARK_BIBLICO '+JSON.stringify({count:imported.count,outcome}));
+  for(const row of outcome){
+    assert.ok(row.expected.some(x=>x.position&&x.position<=20),
+      'Nenhum hino diretamente relacionado recuperado no top 20: '+row.query);
+  }
 })().catch(e=>{console.error(e);process.exitCode=1;});
