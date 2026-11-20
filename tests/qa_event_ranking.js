@@ -105,6 +105,8 @@ function evalMetrics(rows,key){
   // Todos os hinos relevantes são rotulados apenas em parte; comparam-se
   // OS MESMOS casos nas duas configurações, sem exceções por hino.
   const maxLoss=1/current.count;
+  assert.ok(current.recall_at_10+1e-9>=baseline.recall_at_10-maxLoss,
+    'Eventos deslocaram mais de um alvo relevante do top10');
   assert.ok(current.recall_at_20+1e-9>=baseline.recall_at_20-maxLoss,
     'Eventos perderam mais de um hino relevante no top20');
   assert.ok(current.ndcg_at_5+1e-9>=baseline.ndcg_at_5-.04,
