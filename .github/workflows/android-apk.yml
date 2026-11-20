@@ -110,7 +110,7 @@ jobs:
 
   embeddings:
     name: "Agente 5 | E5, vetores por estrofe e proveniencia"
-    needs: static
+    needs: [sources, static]
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -171,6 +171,10 @@ jobs:
         run: python3 scripts/benchmark_e5.py
       - name: Comparar ranking híbrido real com o ranking anterior
         run: node tests/qa_e5_hybrid.js /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          path: app/src/main/assets
       - name: Comparar ações e personagens com mecanismo ligado e desligado
         run: node tests/qa_event_ranking.js /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json
       - name: Registrar métricas de recuperação sem letras
