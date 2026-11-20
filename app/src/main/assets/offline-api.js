@@ -3,7 +3,7 @@
  * Nenhum servidor Python, chave de API ou rede é necessário após a importação.
  */
 const OfflineAPI = (() => {
-  const SOURCE = 'https://raw.githubusercontent.com/italozaina/projection-html5-icm/master/data/data.json';
+  const SOURCE = 'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json';
   const THEME_WORDS = {
     'Alegria':['alegria','alegre','jubilo','regozijo','felicidade','celebracao','festa','contente','exultacao'],
     'Gratidão':['gratidao','agradecer','agradecimento','grato','graca recebida','dar gracas','bendizer','louvor','obrigado','acao de gracas'],
