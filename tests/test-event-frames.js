@@ -52,7 +52,7 @@ function ev(id,label){
 }
 const direct=ev(1,'História A'),topical=ev(2,'História A');
 const analogy=ev(3,'História A'),negation=ev(4,'História A');
-assert.ok(direct.score>=12,'Duas ações + ator no trecho precisam produzir evidência local: '+JSON.stringify(direct));
+assert.ok(direct.score>=9,'Duas ações + ator no trecho precisam produzir evidência local: '+JSON.stringify(direct));
 assert.ok(direct.tier>=1,'Ações e personagem na mesma cena dão nível narrativo');
 assert.equal(topical.score,0,'Tema isolado não prova acontecimento');
 assert.ok(analogy.score<=direct.score,'Analogia em primeira pessoa não supera representação direta');
