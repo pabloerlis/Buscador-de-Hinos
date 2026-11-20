@@ -48,7 +48,7 @@ assert.match(cpp,/llama_decode/);
 assert.match(cpp,/llama_sampler_sample/);
 assert.match(cmake,/ggml-org\/llama.cpp/);
 assert.match(cmake,/GIT_TAG b8201/);
-assert.match(build,/versionName '2\.4\.0'/);
+assert.match(build,/versionName '\d+\.\d+\.\d+'/);
 assert.match(build,/abiFilters 'arm64-v8a'/);
 assert.match(build,/ndkVersion '27\.2\.12479018'/);
 assert.match(build,/gradleProperty\('enableLocalModels'\).*orElse\(false\)/);

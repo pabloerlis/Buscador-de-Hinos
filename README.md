@@ -1,15 +1,18 @@
-# Buscador de Hinos Android v2.4
+# Buscador de Hinos Android v2.4.1
 
 A busca e a comparação funcionam offline depois de importar a coletânea. O app consulta títulos, letras, temas, narrativas e referências bíblicas locais. A comparação reúne até cinco resultados com os trechos e a afinidade estimada.
 
 | Consulta | Comportamento |
 | --- | --- |
+| `apenas os de vigilância` no refinamento | Mantém os hinos da busca atual que têm vigilância no texto ou como tema direto. Requisitos sucessivos se acumulam. |
 | `gratidão sem alegria` | Exclui hinos que contêm a palavra ou têm associação direta com o tema da alegria. |
 | `gratidão sem foco em alegria` | Reduz a pontuação dos hinos associados à alegria e mantém os que atendem aos critérios. |
 | `"canto sem medo"` | Busca a sequência de palavras no título ou na letra. |
 | `nova busca por esperança` no refinamento | Limpa a consulta anterior e seus filtros. |
 
 O ranking prioriza o título exato, consulta a frequência das palavras na coletânea e admite um erro simples de grafia nos modos Equilibrada e Contextual. No modo Literal, a busca usa correspondências de texto.
+
+Os filtros acompanham a paginação e a lista de hinos não aprendidos. Use aspas em um requisito para exigir o trecho exato, como em `somente "vem logo senhor"`.
 
 O APK padrão desativa GGUF e E5. O GitHub Actions compila com `gradle assembleDebug` e verifica o conteúdo do APK gerado. Para desenvolvimento com os modelos locais, a compilação usa `gradle assembleDebug -PenableLocalModels=true`, NDK 27.2.12479018 e CMake 3.22.1. O E5 também exige os dados locais gerados pelo script em `scripts/build_e5_assets.py`.
 

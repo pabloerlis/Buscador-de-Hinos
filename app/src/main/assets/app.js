@@ -1,7 +1,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -74,12 +74,12 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   busySearch(true);let succeeded=false;let isBibleSearch=false;
   try {
     let data;
-    if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,exclude:state.exclude,deprioritize:state.deprioritize,semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,exclude:state.exclude,deprioritize:state.deprioritize,semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',exclude:refine?state.exclude:[],deprioritize:refine?state.deprioritize:[],semantic_hints:semanticHints,settings:state.searchSettings});
+    if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),semantic_hints:semanticHints,settings:state.searchSettings});
     if(page===1){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
-      state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.deprioritize=data.deprioritized||[];state.semanticHints=semanticHints;
+      state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.deprioritize=data.deprioritized||[];state.requiredTerms=data.required||[];state.semanticHints=semanticHints;
       if(data.reset_context||(!refine&&!preserveContext))state.searchRootQuery=state.effectiveQuery;
       state.lastResults=data.results.slice();
       state.aiContext=data.ai_context;
@@ -92,6 +92,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
       if(data.summary)fragments.push(data.summary);
       if(data.excluded?.length)fragments.push('Excluindo: '+data.excluded.join(', ')+'.');
       if(data.deprioritized?.length)fragments.push('Menor prioridade para '+data.deprioritized.join(', ')+'.');
+      if(data.required?.length)fragments.push('Critérios obrigatórios: '+data.required.join(', ')+'.');
       $('notice').textContent=fragments.join(' ');$('notice').classList.toggle('hidden',!fragments.length);
       const concepts=data.interpretation||[];
       $('search-diagnostics').classList.toggle('hidden',!concepts.length);
@@ -117,6 +118,9 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
   GGUF.info?.();
   return succeeded;
+}
+function searchRestrictions(){
+  return {exclude:state.exclude,deprioritize:state.deprioritize,require:state.requiredTerms};
 }
 function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;}
 function relatedCard(hymn,{unlearned=false}={}){
@@ -191,7 +195,7 @@ $('search-form').addEventListener('submit',ev=>{ev.preventDefault();performSearc
 $('refine-form').addEventListener('submit',async ev=>{ev.preventDefault();const message=$('refine-input').value.trim();if(!message||state.busy)return;appendConversation('user',message);$('refine-input').value='';const success=await performSearch(message,{refine:true});appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados. Acrescente outra restrição se necessário.`:'Não consegui refinar a pesquisa.');});
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;performSearch(b.dataset.suggestion);}));
 $('open-settings').addEventListener('click',()=>openLayer('settings'));$('ai-indicator').addEventListener('click',()=>openLayer('settings'));
 $('import-remote').addEventListener('click',importRemote);$('settings-import').addEventListener('click',importRemote);$('upgrade-import').addEventListener('click',importRemote);
@@ -330,7 +334,7 @@ const RepertoireUI=(()=>{
       toast(flag?'Hino marcado como não aprendido. Continua disponível na seção separada.':'Hino devolvido às indicações principais.');
       if(state.ready&&state.effectiveQuery){
         const epoch=state.searchEpoch;
-        const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,exclude:state.exclude,deprioritize:state.deprioritize,
+        const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
           semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
         if(epoch===state.searchEpoch){
           state.page=1;state.total=response.total;state.hasMore=response.has_more;state.lastResults=response.results.slice();
@@ -362,7 +366,7 @@ const RepertoireUI=(()=>{
     operation=true;const next=hiddenPage+1;
     try{
       const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,not_learned_page:next,
-        exclude:state.exclude,deprioritize:state.deprioritize,semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+        ...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
       hiddenPage=next;
       $('not-learned-list').insertAdjacentHTML('beforeend',response.not_learned_results.map(h=>resultCard(h,{unlearned:true})).join(''));
       $('not-learned-more').classList.toggle('hidden',!response.not_learned_has_more);
@@ -413,7 +417,7 @@ const EmbeddingSearch=(()=>{
       const answer=await request(query);
       if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off')return;
       state.vectorQuery=answer.vector;
-      const result=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,exclude:state.exclude,deprioritize:state.deprioritize,
+      const result=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
         semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings});
       if(epoch!==state.searchEpoch)return;
       state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
