@@ -40,3 +40,12 @@ Além de testes unitários, **o próprio APK candidato** é instalado no emulado
 O tokenizer Java de produção deve produzir os **mesmos IDs** de ao menos 20 consultas do tokenizer original do modelo Python, incluindo acentos, referências e pontuação, antes do build. A integração JS também deve testar importação, indexação, trecho recuperado, desligamento E5, número exato e repertório não aprendido.
 
 Nota: o emulador testa o APK x86_64; dispositivos reais arm64-v8a podem apresentar desempenho diferente. Um teste automatizado não substitui ensaio manual em aparelhos-alvo.
+
+## Etapa 3 — fusão híbrida RRF v2.6.3
+
+- Novo motor independente `rrf-fusion.js`, com `k=60` e listas de ranking lexical, semântico, bíblico, narrativo e E5.
+- Não codificar exceções para referências, nomes de histórias ou números de hinos.
+- O RRF opera **somente quando há consulta E5 válida**; modo literal/número/título exato continuam prioritários. `fusionMode=legacy` deve permitir auditoria comparativa sem modificar a funcionalidade anterior.
+- Testes obrigatórios: `tests/test-rrf-fusion.js`, `tests/test-e5-api-integration.js`, `tests/qa_e5_hybrid.js` com avaliações separadas `baseline` (sem E5), `additive` (E5 anterior) e `rrf`.
+- Reprovar se o RRF perder mais de um resultado no top20 ou reduzir nDCG@5 mais do que 0,025 no conjunto comparativo; avaliar em mais consultas antes de interpretar variações como melhorias comprovadas.
+- Executar a versão 2.6.3 **no emulador Android sem rede**, confirmar que o script RRF e a opção de configurações carregam e que `NativeVector.embed` retorna vetor normalizado. Auditar o APK assinado.
