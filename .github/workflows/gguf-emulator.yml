@@ -1,4 +1,4 @@
-name: Check Android emulator for GGUF diagnostics
+name: Teste de GGUF em Android x86_64
 on:
   push:
     branches: [diagnostics/gguf-emulator]
@@ -6,25 +6,75 @@ permissions:
   contents: read
 jobs:
   emulator:
+    name: GGUF / ${{ matrix.model }}
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - model: Qwen3.5-2B-Q4_K_M
+            expected: generate
+            url: https://huggingface.co/gguf/Qwen3.5-2B-GGUF/resolve/main/qwen3.5-2b-Q4_K_M.gguf
+            sha256: 9a3d0aa6c920f096441139b6a254542da855223fdad06855ea00c6c087fd713d
+          - model: Gemma-4-E2B-Q4_0
+            expected: unsupported
+            url: https://huggingface.co/ggml-org/gemma-4-E2B-it-GGUF/resolve/main/gemma-4-E2B-it-Q4_0.gguf
+            sha256: 8e30dff3ac4c8434c49a7036fa15564bdbb6044e42bf04550bf1a096ad7e6a52
     steps:
-      - name: Check emulator hardware acceleration
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Install Android build and emulator tools
         run: |
+          set -euo pipefail
+          sdkmanager="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$sdkmanager"
+          "$sdkmanager" 'emulator' 'platform-tools' 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1' 'system-images;android-35;google_apis;x86_64'
+          dirname "$sdkmanager" >> "$GITHUB_PATH"
+          echo "$ANDROID_HOME/platform-tools" >> "$GITHUB_PATH"
           test -c /dev/kvm
           sudo chmod a+rw /dev/kvm
           "$ANDROID_HOME/emulator/emulator" -accel-check
-      - name: Start an x86_64 Android 35 emulator
+      - name: Build and start Android x86_64
         run: |
           set -euo pipefail
-          image='system-images;android-35;google_apis;x86_64'
-          sdkmanager "$image"
-          printf 'no\n' | avdmanager create avd --force --name hino-gguf --package "$image"
-          "$ANDROID_HOME/emulator/emulator" -avd hino-gguf -no-window -no-boot-anim -no-audio -gpu swiftshader_indirect -memory 4096 -cores 4 > "$RUNNER_TEMP/hino-emulator.log" 2>&1 &
-          timeout 150s adb wait-for-device
-          timeout 150s bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done'
+          printf 'no\n' | avdmanager create avd --force --name hino-gguf --package 'system-images;android-35;google_apis;x86_64'
+          gradle --no-daemon -PsmokeAbi=x86_64 assembleDebug assembleDebugAndroidTest
+          "$ANDROID_HOME/emulator/emulator" -avd hino-gguf -no-window -no-boot-anim -no-audio -gpu swiftshader_indirect -memory 4096 -cores 4 -partition-size 8192 > "$RUNNER_TEMP/hino-emulator.log" 2>&1 &
+          timeout 180s adb wait-for-device
+          timeout 180s bash -c 'until [ "$(adb shell getprop sys.boot_completed | tr -d "\r")" = 1 ]; do sleep 2; done'
           adb shell getprop ro.product.cpu.abilist
-          adb shell getprop ro.build.version.sdk
-      - name: Show emulator log on failure
+          adb install -t app/build/outputs/apk/debug/app-debug.apk
+          adb install -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+      - name: Download and verify the reference GGUF
+        env:
+          MODEL_URL: ${{ matrix.url }}
+          MODEL_SHA256: ${{ matrix.sha256 }}
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --connect-timeout 15 --max-time 360 --retry 2 --output "$RUNNER_TEMP/reference.gguf" "$MODEL_URL"
+          printf '%s  %s\n' "$MODEL_SHA256" "$RUNNER_TEMP/reference.gguf" | sha256sum -c -
+          stat -c 'GGUF bytes: %s' "$RUNNER_TEMP/reference.gguf"
+      - name: Exercise the real Android JNI and WebView bridge
+        env:
+          MODEL_NAME: ${{ matrix.model }}
+          EXPECTED: ${{ matrix.expected }}
+        run: |
+          set -euo pipefail
+          package=br.com.buscadordehinos.app
+          adb shell "run-as $package mkdir -p files"
+          adb shell -T "run-as $package sh -c 'cat > files/smoke.gguf'" < "$RUNNER_TEMP/reference.gguf"
+          adb shell "run-as $package sha256sum files/smoke.gguf"
+          timeout 240s adb shell am instrument -w -e model "$MODEL_NAME" -e expect "$EXPECTED" "$package.test/$package.GgufSmokeRunner" | tee "$RUNNER_TEMP/hino-gguf-result.log"
+          grep -q '^INSTRUMENTATION_RESULT: result=PASS' "$RUNNER_TEMP/hino-gguf-result.log"
+      - name: Read emulator and app diagnostics
         if: failure()
-        run: test ! -f "$RUNNER_TEMP/hino-emulator.log" || tail -100 "$RUNNER_TEMP/hino-emulator.log"
+        run: |
+          test ! -f "$RUNNER_TEMP/hino-emulator.log" || tail -80 "$RUNNER_TEMP/hino-emulator.log"
+          adb logcat -d -t 400 -s HinoGgufSmoke AndroidRuntime DEBUG || true
