@@ -326,8 +326,8 @@ const GGUF=(()=>{
   $('gguf-cancel').addEventListener('click',cancelIfBusy);if($('ai-cancel'))$('ai-cancel').addEventListener('click',cancelIfBusy);
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
-  const savedAuto=localStorage.getItem('hinos-gguf-auto-v14');$('gguf-auto').checked=savedAuto==='1';
-  $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-gguf-auto-v14',$('gguf-auto').checked?'1':'0'));
+  const savedAuto=localStorage.getItem('hinos-gguf-auto-v15');$('gguf-auto').checked=savedAuto==='1';
+  $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-gguf-auto-v15',$('gguf-auto').checked?'1':'0'));
   setInterval(()=>{const status=info();if((status.phase==='copying'||status.phase==='loading'||status.phase==='generating')&&selectedState.startTime){$('ai-timer').textContent=Math.round((Date.now()-selectedState.startTime)/1000)+' s';}},1250);
   info();return {info,maybeAuto,cancelIfBusy};
 })();
