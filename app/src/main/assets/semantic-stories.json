@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "revision": "2026-11-narratives-2-events",
+  "revision": "2026-11-narratives-2-passages",
   "description": "Regras temáticas de narrativas bíblicas. Um hino só é associado quando traz evidências textuais suficientes. Não representa indexação teológica validada.",
   "stories": [
     {
@@ -79,129 +79,7 @@
         "perdao",
         "graca"
       ],
-      "description": "Retorno a Deus após afastamento, arrependimento e acolhimento do Pai.",
-      "anchors": [
-        "meu pai",
-        "o pai",
-        "casa do pai",
-        "coracao de pai",
-        "pai"
-      ],
-      "events": [
-        {
-          "id": "afastamento",
-          "label": "afastamento",
-          "cues": [
-            "quis te deixar",
-            "deixei meu pai",
-            "deixei a casa",
-            "abandonei-te",
-            "abandonei",
-            "parti de casa",
-            "partir e ser livre",
-            "fui embora",
-            "saí da casa",
-            "longe do meu pai",
-            "afastei-me de ti"
-          ]
-        },
-        {
-          "id": "perda",
-          "label": "perda e sofrimento",
-          "cues": [
-            "tudo perdi",
-            "bem cedo tudo perdi",
-            "solidão tomou conta",
-            "vivi na solidão",
-            "fiquei sozinho",
-            "perdi tudo",
-            "passei fome",
-            "pobre e sem nada",
-            "em grande miséria",
-            "em terra distante"
-          ]
-        },
-        {
-          "id": "arrependimento",
-          "label": "arrependimento",
-          "cues": [
-            "lembrei-me da casa do pai",
-            "lembrei da casa do pai",
-            "me arrependi",
-            "arrependido",
-            "contrito",
-            "caí em mim",
-            "decidi voltar",
-            "resolvi voltar",
-            "errei contra ti",
-            "pequei contra o céu"
-          ]
-        },
-        {
-          "id": "retorno",
-          "label": "retorno",
-          "cues": [
-            "voltei meu pai",
-            "voltei para o pai",
-            "voltei para casa",
-            "voltando para ti",
-            "voltando ao pai",
-            "regressei ao pai",
-            "retornei ao pai",
-            "quero voltar para o pai",
-            "voltei a ti",
-            "voltei",
-            "retornei",
-            "regressei"
-          ]
-        },
-        {
-          "id": "acolhimento",
-          "label": "acolhimento",
-          "cues": [
-            "me abraçaste",
-            "me acolheste",
-            "me recebeste",
-            "pai me recebeu",
-            "meu pai me acolheu",
-            "meu pai me recebeu",
-            "de longe viste chegar",
-            "correu ao meu encontro",
-            "abraçou seu filho",
-            "pai me abraçou",
-            "pai o recebeu"
-          ]
-        },
-        {
-          "id": "celebracao",
-          "label": "celebração",
-          "cues": [
-            "festa nos céus",
-            "houve cânticos",
-            "houve festa",
-            "festa na casa",
-            "houve alegria",
-            "celebraram",
-            "festejaram",
-            "festa no céu",
-            "fizeram festa",
-            "alegria no céu"
-          ]
-        }
-      ],
-      "perspective": {
-        "label": "filho em primeira pessoa",
-        "cues": [
-          "eu quis te deixar",
-          "abandonei-te",
-          "meu pai",
-          "voltei meu pai",
-          "me abraçaste",
-          "lembrei-me da casa do pai",
-          "me acolheste",
-          "eu regressei"
-        ]
-      }
+      "description": "Retorno a Deus após afastamento, arrependimento e acolhimento do Pai."
     },
     {
       "id": "ovelha_perdida",
@@ -252,78 +130,7 @@
         "protecao",
         "graca"
       ],
-      "description": "O cuidado do pastor ao procurar e resgatar quem se perdeu.",
-      "anchors": [
-        "ovelha",
-        "ovelhas",
-        "rebanho",
-        "redil",
-        "aprisco"
-      ],
-      "events": [
-        {
-          "id": "perda",
-          "label": "ovelha se perde",
-          "cues": [
-            "ovelha perdida",
-            "ovelha que se perdeu",
-            "me perdi",
-            "me afastei do rebanho",
-            "desgarrada",
-            "desgarrado",
-            "longe do aprisco"
-          ]
-        },
-        {
-          "id": "busca",
-          "label": "pastor procura",
-          "cues": [
-            "pastor me buscou",
-            "pastor me procurou",
-            "procurou a ovelha",
-            "buscou a ovelha",
-            "veio me buscar",
-            "saiu em busca",
-            "foi me procurar"
-          ]
-        },
-        {
-          "id": "encontro",
-          "label": "ovelha encontrada",
-          "cues": [
-            "pastor me encontrou",
-            "me encontrou no deserto",
-            "encontrou a ovelha",
-            "me achou",
-            "ovelha encontrada",
-            "fui encontrado"
-          ]
-        },
-        {
-          "id": "resgate",
-          "label": "resgate e retorno",
-          "cues": [
-            "nos ombros",
-            "carregou de volta",
-            "levou ao aprisco",
-            "trouxe de volta",
-            "voltou ao rebanho",
-            "me resgatou",
-            "ao redil me conduziu"
-          ]
-        },
-        {
-          "id": "alegria",
-          "label": "alegria pelo resgate",
-          "cues": [
-            "alegria no céu",
-            "festa no céu",
-            "alegria por uma ovelha",
-            "com alegria",
-            "alegrou-se comigo"
-          ]
-        }
-      ]
+      "description": "O cuidado do pastor ao procurar e resgatar quem se perdeu."
     },
     {
       "id": "bom_samaritano",
