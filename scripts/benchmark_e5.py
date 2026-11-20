@@ -69,6 +69,11 @@ report={'schema_version':1,'model':index['model'],'catalog_count':len(rows),
 dest=ROOT/'qa-report/e5-metrics.json'
 dest.parent.mkdir(exist_ok=True)
 dest.write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+# Queries vetorizadas pelo modelo real para teste do ranking híbrido JS.
+(ROOT/'qa-report/e5-query-vectors.json').write_text(json.dumps([
+    {'query':case[0],'collection':case[1][0],'number':case[1][1],
+     'vector':vector.tolist()} for case,vector in zip(cases,embedded)
+],ensure_ascii=False,separators=(',',':'))+'\n',encoding='utf-8')
 print('E5 por estrofes:',len(rows),'hinos,',len(vectors),'passagens')
 for x in output:
     print(f"  {x['consulta']}: esperado {x['alvo_colecao']}:{x['alvo_numero']} rank={x['posicao']}")
