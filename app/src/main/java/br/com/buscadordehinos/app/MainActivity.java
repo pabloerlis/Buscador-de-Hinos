@@ -61,6 +61,7 @@ public final class MainActivity extends Activity {
     private static native String nativeLoad(String path);
     private static native int nativeLoadProgress();
     private static native String nativeGenerate(String prompt,int maxTokens);
+    private static native void nativeCancel();
     private static native void nativeUnload();
     private WebView web;
     private ValueCallback<Uri[]> pendingFile;
@@ -194,8 +195,9 @@ public final class MainActivity extends Activity {
         }catch(Exception ignored){}
         return -1;
     }
-    // ACTION_OPEN_DOCUMENT autoriza o URI; o acesso via /proc/self/fd pode ser negado ao motor nativo.
-    // Copiar por streaming evita manter o modelo inteiro em RAM e fornece um caminho real para mmap.
+    // ACTION_OPEN_DOCUMENT concede acesso ao URI, não um caminho de arquivo reabrível por llama.cpp.
+    // O Android nega a reabertura de /proc/self/fd/N em vários provedores SAF.
+    // Copiar por fluxo para o diretório privado do app permite mmap por caminho real, sem permissão global.
     private File modelCacheDir() throws IOException {
         File dir = new File(getFilesDir(), "gguf-cache");
         if (!dir.isDirectory() && !dir.mkdirs()) throw new IOException("Não foi possível criar a pasta privada do modelo.");
@@ -229,6 +231,7 @@ public final class MainActivity extends Activity {
             return target;
         }
         if(target.exists()&&!target.delete())throw new IOException("Não foi possível substituir a cópia anterior do modelo.");
+        // Uma única cópia é mantida: modelos antigos são liberados antes de testar espaço.
         File[] stored=dir.listFiles();
         if(stored!=null)for(File file:stored)if(!file.equals(target)&&file.isFile())file.delete();
         long available=new StatFs(dir.getAbsolutePath()).getAvailableBytes();
@@ -342,6 +345,12 @@ public final class MainActivity extends Activity {
                 }finally{llmBusy=false;}
             });
         }
+        @JavascriptInterface public void cancel(){
+            if(NATIVE_AVAILABLE && llmBusy && "generating".equals(modelPhase)){
+                nativeCancel();
+                ggufEvent("phase",true,"Solicitada interrupção da IA; preservando busca local.");
+            }
+        }
         @JavascriptInterface public void generate(String prompt){
             if(llmBusy){ggufEvent("generate",false,"O modelo já está em uso.");return;}
             if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um GGUF primeiro.");return;}
@@ -351,10 +360,16 @@ public final class MainActivity extends Activity {
             ggufEvent("phase",true,"Interpretando contexto…");
             llmExecutor.execute(()->{
                 try {
-                    String output=nativeGenerate(prompt,152);
+                    String output=nativeGenerate(prompt,36);
                     lastDurationMs=android.os.SystemClock.elapsedRealtime()-start;
                     modelPhase="ready";ggufEvent("generate",true,output);
-                }catch(Throwable ex){modelPhase="error";modelError=errorMessage(ex);ggufEvent("generate",false,modelError);}
+                }catch(Throwable ex){
+                    String message=errorMessage(ex);
+                    boolean cancelled=message.contains("interrompida")||message.contains("cancelada");
+                    modelPhase=cancelled?"ready":"error";
+                    modelError=cancelled?"":message;
+                    ggufEvent("generate",false,cancelled?"Tempo limite atingido; mantendo os resultados locais.":message);
+                }
                 finally{llmBusy=false;}
             });
         }

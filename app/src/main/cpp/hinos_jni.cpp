@@ -17,6 +17,8 @@ static std::mutex g_log_mutex;
 static bool g_initialized=false;
 static std::string g_recent_logs;
 static std::atomic<int> g_load_progress{0};
+static std::atomic<bool> g_cancel{false};
+static bool shouldCancel(void*) {return g_cancel.load(std::memory_order_relaxed);}
 
 static jstring asJava(JNIEnv* env,const std::string& value){return env->NewStringUTF(value.c_str());}
 static void javaException(JNIEnv* env,const std::string& message){
@@ -41,6 +43,11 @@ static std::string logDetail(){
 static bool modelProgress(float progress,void*){
     g_load_progress.store(std::clamp(static_cast<int>(progress*100.0f),0,100));
     return true;
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_br_com_buscadordehinos_app_MainActivity_nativeCancel(JNIEnv*,jclass){
+    g_cancel.store(true,std::memory_order_relaxed);
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -95,6 +102,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
     if(!cprompt){javaException(env,"Consulta não pôde ser interpretada.");return nullptr;}
     std::string prompt(cprompt);env->ReleaseStringUTFChars(promptString,cprompt);
     try {
+        g_cancel.store(false,std::memory_order_relaxed);
         const char* tmpl=llama_model_chat_template(g_model,nullptr);
         llama_chat_message message={"user",prompt.c_str()};
         int formattedSize=llama_chat_apply_template(tmpl,&message,1,true,nullptr,0);
@@ -110,12 +118,13 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         std::vector<llama_token> tokens(n_tokens);
         int count=llama_tokenize(vocab,prompt.c_str(),prompt.size(),tokens.data(),n_tokens,true,true);
         if(count<0){javaException(env,"Falha na tokenização do prompt.");return nullptr;}
-        const int predict=std::clamp(static_cast<int>(tokenLimit),1,160);
+        const int predict=std::clamp(static_cast<int>(tokenLimit),1,48);
         llama_context_params cp=llama_context_default_params();
         cp.n_ctx=1280;
-        cp.n_batch=128;
-        cp.n_ubatch=128;
+        cp.n_batch=96;
+        cp.n_ubatch=96;
         cp.n_seq_max=1;
+        cp.abort_callback=shouldCancel;
         cp.n_threads=std::min(4,std::max(1,(int)std::thread::hardware_concurrency()));
         cp.n_threads_batch=cp.n_threads;
         llama_context* ctx=llama_init_from_model(g_model,cp);
@@ -125,13 +134,15 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         std::string out;
         bool failed=false;
         // O processamento em lotes menores reduz o pico de memória nativa no Android.
-        for(int begin=0;begin<count;begin+=128){
-            int length=std::min(128,count-begin);
+        for(int begin=0;begin<count;begin+=96){
+            if(g_cancel.load()) {failed=true;break;}
+            int length=std::min(96,count-begin);
             llama_batch batch=llama_batch_get_one(tokens.data()+begin,length);
             if(llama_decode(ctx,batch)!=0){failed=true;break;}
         }
         if(!failed){
             for(int i=0;i<predict;i++){
+                if(g_cancel.load()){failed=true;break;}
                 llama_token next=llama_sampler_sample(sampler,ctx,-1);
                 if(llama_vocab_is_eog(vocab,next))break;
                 int size=llama_token_to_piece(vocab,next,nullptr,0,0,true);
@@ -148,6 +159,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
             }
         }
         llama_sampler_free(sampler);llama_free(ctx);
+        if(g_cancel.load()){javaException(env,"Geração interrompida por tempo limite ou pelo usuário.");return nullptr;}
         if(failed){javaException(env,"Falha de avaliação do modelo. O contexto ou os tensores podem não ser compatíveis com o motor atual.");return nullptr;}
         if(out.empty()){javaException(env,"Modelo não produziu resposta. Use um GGUF Instruct compatível.");return nullptr;}
         return asJava(env,out);

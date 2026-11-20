@@ -1,4 +1,4 @@
-# Buscador de Hinos — Android 1.3.1
+# Buscador de Hinos — Android 1.4
 
 Aplicativo Android ARM64 com busca offline, ranking estimado e motor GGUF opcional (`llama.cpp`).
 
@@ -6,9 +6,9 @@ Aplicativo Android ARM64 com busca offline, ranking estimado e motor GGUF opcion
 
 - Seleção pelo seletor oficial do Android (`ACTION_OPEN_DOCUMENT`) e permissão persistente de leitura quando disponível.
 - Corrigido o erro `/proc/self/fd/N (Permission denied)`: o GGUF é copiado por streaming, sem ocupar RAM equivalente ao tamanho do arquivo, para o diretório privado do app antes de carregar com `llama.cpp`.
-- Progresso de cópia separado do progresso de carregamento, com exibição do armazenamento livre e do cache.
-- A cópia é reutilizada em carregamentos seguintes. Exige espaço livre para uma cópia adicional do GGUF.
-- Ainda é necessária validação real com Qwen3.5 2B/Gemma 4 E2B no smartphone.
+- Barra de progresso de cópia separada do progresso de carregamento; mostra espaço de armazenamento livre e volume do cache. A cópia é reutilizada em carregamentos seguintes.
+- Exige espaço para uma cópia adicional do GGUF no armazenamento do dispositivo. **Essa cópia não representa consumo de RAM.**
+- Continua sendo necessária validação com Qwen3.5 2B e Gemma 4 E2B no aparelho físico.
 
 ## O que mudou
 
@@ -48,3 +48,15 @@ Com os requisitos instalados: `gradle assembleDebug`.
 - Modelo escolhido no aparelho, não incluído no APK.
 - Sem publicação de letras antes de confirmar direitos de uso.
 - Inference e carregamento de Qwen3.5 2B/Gemma4 E2B **ainda não testados em aparelho físico**.
+
+
+## Versão 1.4 — Pesquisa rápida e GGUF opcional
+
+- Busca lexical e temas indexados em memória: a coletânea é ordenada localmente sem aguardar um modelo.
+- A IA local só escolhe **até 4 temas existentes na taxonomia**. Não recebe letras ou títulos completos de hinos.
+- Resposta nativa limitada a **36 tokens** (antes 152), em vez de comparações/análises longas.
+- **16 segundos** como limite de solicitação, com cancelamento cooperativo nativo; o modelo pode demorar um pouco para abortar operações internas.
+- IA automática **desligada por padrão**, inclusive em instalações que usavam a configuração da versão antiga. Pode ativá-la nas configurações.
+- Comparação dos cinco melhores resultados e resumo de temas são **100% offline**, sem GGUF.
+- Se o GGUF falhar ou esgotar o tempo, a busca local permanece funcional.
+- A porcentagem é heurística; não representa probabilidade ou confiança calibrada.

@@ -39,6 +39,41 @@ const OfflineAPI = (() => {
   let metadata={collection:'',edition:'',hymn_count:0};
   let initialized;
   let semantic=null;
+  // Índices residentes em memória: calculados uma vez na importação/abertura.
+  // A IA jamais percorre hinos nem altera a coletânea: apenas produz termos de consulta.
+  let numberIndex=new Map(),wordIndex=new Map(),topicIndex=new Map(),wordSets=new Map();
+  function rebuildIndexes(){
+    numberIndex=new Map();wordIndex=new Map();topicIndex=new Map();wordSets=new Map();
+    for(const song of hymns){
+      if(song.number)numberIndex.set(Number(song.number),song);
+      const words=new Set((song.searchable.match(/[a-z0-9]+/g)||[]));
+      wordSets.set(song.id,words);
+      for(const word of words){
+        if(word.length<2)continue;
+        if(!wordIndex.has(word))wordIndex.set(word,new Set());
+        wordIndex.get(word).add(song.id);
+      }
+      for(const item of (song.semantic_profile||[])){
+        if(!topicIndex.has(item.id))topicIndex.set(item.id,new Set());
+        topicIndex.get(item.id).add(song.id);
+      }
+    }
+  }
+  function candidateSongs(numberMatch,queryTokens,intent){
+    if(numberMatch){const match=numberIndex.get(Number(numberMatch[1]));return match?[match]:[];}
+    const ids=new Set();
+    for(const word of queryTokens)for(const id of (wordIndex.get(word)||[]))ids.add(id);
+    if(intent)for(const topic of [...intent.direct,...intent.related])for(const id of (topicIndex.get(topic.id)||[]))ids.add(id);
+    // Consulta literal ou parcialmente flexionada: reavaliar todos quando a indexação não encontrar nada.
+    if(!ids.size)return hymns;
+    // Uma frase exata pode existir mesmo quando palavras curtas forem descartadas como stopwords.
+    return hymns.filter(h=>ids.has(h.id));
+  }
+  const semanticLabels=()=>semantic?semantic.labels():Object.keys(THEME_WORDS);
+  function validateHints(hints){
+    const allowed=new Map(semanticLabels().map(label=>[normalize(label),label]));
+    return [...new Set((Array.isArray(hints)?hints:[]).map(h=>allowed.get(normalize(h))).filter(Boolean))].slice(0,4);
+  }
   async function loadSemantic(){
     if(typeof SemanticEngine==='undefined')return;
     try {
@@ -90,7 +125,7 @@ const OfflineAPI = (() => {
     }finally{db.close();}
   }
   async function init(){
-    if (!initialized)initialized=(async()=>{await loadSemantic();const cache=await readCache();if(cache&&Array.isArray(cache.hymns)){hymns=cache.hymns;metadata=cache.metadata;if(semantic&&cache.semantic_revision!==semantic.revision){for(let i=0;i<hymns.length;i++){const song=hymns[i];song.semantic_profile=semantic.indexHymn(song.title,song.lyrics);song.topics=song.semantic_profile.slice(0,12).map(t=>t.label);if(i&&i%100===0)await yieldThread();}await writeCache({hymns,metadata,semantic_revision:semantic.revision});}} })().catch(e=>{initialized=null;throw e;});
+    if (!initialized)initialized=(async()=>{await loadSemantic();const cache=await readCache();if(cache&&Array.isArray(cache.hymns)){hymns=cache.hymns;metadata=cache.metadata;if(semantic&&cache.semantic_revision!==semantic.revision){for(let i=0;i<hymns.length;i++){const song=hymns[i];song.semantic_profile=semantic.indexHymn(song.title,song.lyrics);song.topics=song.semantic_profile.slice(0,12).map(t=>t.label);if(i&&i%100===0)await yieldThread();}await writeCache({hymns,metadata,semantic_revision:semantic.revision});}rebuildIndexes();} })().catch(e=>{initialized=null;throw e;});
     return initialized;
   }
   async function importJson(data){
@@ -115,7 +150,7 @@ const OfflineAPI = (() => {
     if(!next.length)throw Error('Nenhum hino válido neste JSON.');
     const newMeta={collection,edition,hymn_count:next.length};
     await writeCache({hymns:next,metadata:newMeta,semantic_revision:semantic?.revision||null});
-    hymns=next;metadata=newMeta;
+    hymns=next;metadata=newMeta;rebuildIndexes();
     return {ok:true,collection,edition,count:hymns.length};
   }
   function makeSnippet(song,qTokens,selectedTopics,semanticCues=[]){
@@ -152,13 +187,13 @@ const OfflineAPI = (() => {
     const norm=normalize(query), numberMatch=norm.match(/^(?:hino\s*|louvor\s*)?(\d{1,4})$/);
     const bible=typeof BibleContext!=='undefined'?BibleContext.lookup(query):null;
     const isBiblicalRef=typeof BibleContext!=='undefined' && BibleContext.looksLikeReference(query);
-    const hints=Array.isArray(payload?.semantic_hints)?payload.semantic_hints.filter(x=>typeof x==='string'&&x.length<90).slice(0,6):[];
+    const hints=validateHints(payload?.semantic_hints);
     const analysisQuery=numberMatch?query:[query,bible?.theme||'',...hints].filter(Boolean).join(' ');
     const intent=semantic?semantic.interpret(analysisQuery):null;
     const selectedTopics=intent?intent.direct.map(t=>t.label):themes(analysisQuery),qTokens=tokens(analysisQuery);
     const excludedNorm=excluded.map(normalize);
     const ranked=[];
-    for(const song of hymns){
+    for(const song of candidateSongs(numberMatch,qTokens,intent)){
       let score=0;const evidence=[];let semanticResult=null;
       if(numberMatch){
         if(!song.number||Number(song.number)!==Number(numberMatch[1]))continue;
@@ -196,7 +231,7 @@ const OfflineAPI = (() => {
     }
     ranked.sort((a,b)=>b.relevance_score-a.relevance_score||(a.number||'9999').localeCompare(b.number||'9999')||a.id-b.id);
     const from=(page-1)*5;
-    return {page,total:ranked.length,has_more:from+5<ranked.length,results:ranked.slice(from,from+5),topics:selectedTopics,effective_query:query,excluded,used_ai:hints.length>0,summary:bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',bible_reference:bible?.reference||null};
+    return {page,total:ranked.length,has_more:from+5<ranked.length,results:ranked.slice(from,from+5),topics:selectedTopics,effective_query:query,excluded,used_ai:hints.length>0,applied_hints:hints,summary:bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',bible_reference:bible?.reference||null};
   }
   function hymnDetail(id){
     const song=hymns.find(s=>s.id===id);if(!song)throw Error('Hino não encontrado.');
@@ -228,5 +263,5 @@ const OfflineAPI = (() => {
     if(match)return hymnDetail(Number(match[1]));
     throw Error('Operação não reconhecida.');
   }
-  return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage};
+  return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints};
 })();

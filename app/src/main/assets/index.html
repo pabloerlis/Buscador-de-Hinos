@@ -84,12 +84,12 @@
               <div id="ai-workspace" class="ai-workspace" aria-live="polite">
                 <div class="ai-workspace-head"><strong id="ai-state-badge" class="ai-stage">IA não carregada</strong><span id="ai-timer" class="ai-timer"></span></div>
                 <div id="ai-task" class="ai-task">Busca local disponível.</div>
-                <p id="ai-detail" class="ai-detail">Quando carregar um GGUF, ele poderá interpretar sua pesquisa, comparar resultados e analisar letras.</p>
-                <div id="ai-activity" class="ai-activity hidden"><span class="ai-spinner"></span><span id="ai-progress">Preparando...</span></div>
+                <p id="ai-detail" class="ai-detail">A busca e a comparação são feitas localmente. A IA opcional somente sugere temas para refinar a pesquisa.</p>
+                <button id="ai-cancel" class="secondary-btn hidden" type="button">Interromper IA</button><div id="ai-activity" class="ai-activity hidden"><span class="ai-spinner"></span><span id="ai-progress">Preparando...</span></div>
                 <p id="ai-last" class="ai-last"></p>
               </div>
               <div id="gguf-banner" class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto: escolha como utilizar a IA.</span>
-                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Interpretar contexto</button><button id="gguf-compare" class="secondary-btn" type="button">Comparar 5 hinos</button></div></div>
+                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare" class="secondary-btn" type="button">Comparar 5 (offline)</button></div></div>
         <div id="results-list" class="results-list" aria-live="polite"></div>
               <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
             </div>
@@ -97,7 +97,7 @@
               <div class="refine-header"><span class="refine-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6 3 3M6 18l3-3m6-6 3-3"/></svg></span><div><h3>Refinar com contexto</h3><p id="refine-mode">Busca contextual</p></div></div>
               <div id="conversation" class="conversation" aria-live="polite"><div class="assistant-message">Precisa de algo mais específico? Descreva a mensagem ou ocasião desejada.</div></div>
               <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
-              <p class="privacy-note">A busca local sempre funciona. Um GGUF carregado pode complementar a busca ou analisar hinos; o texto não sai do aparelho. Percentuais são estimativas de relevância, não certezas.</p>
+              <p class="privacy-note">A busca local sempre funciona. Um GGUF carregado pode sugerir temas para refinar a consulta; o texto não sai do aparelho. Percentuais são estimativas de relevância, não certezas.</p>
             </aside>
           </div>
         </div>
@@ -111,7 +111,7 @@
     <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-top"><div><span class="modal-overline" id="modal-number">HINO</span><h2 id="modal-title">Detalhes do hino</h2></div><button class="icon-button" data-close="modal" aria-label="Fechar detalhes">×</button></div>
       <div class="modal-body"><div class="modal-section"><h3>Letra da coletânea</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
-      <div class="modal-section ai-modal-section"><h3>Análise contextual com IA local</h3><p class="subtle-note">O modelo interpreta apenas trechos do hino selecionado. A análise não representa doutrina oficial.</p><button id="modal-ai-ask" class="secondary-btn" type="button" disabled>Carregue um GGUF para analisar</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
+      <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local. O GGUF é usado apenas para sugerir palavras da busca, não para analisar letras.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
       <div class="modal-bottom"><span id="modal-edition"></span><button class="secondary-btn" data-close="modal">Fechar</button></div>
     </section>
   </div>
@@ -122,13 +122,13 @@
       <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
       <div class="settings-content"><p>Busca textual e contextual em letras de uma coletânea. Esta versão Android usa uma taxonomia semântica local e aceita um modelo GGUF opcional, executado no próprio aparelho, sem enviar consultas à internet.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong></div><section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (GGUF)</h3>
-        <p>Escolha um arquivo <code>.gguf</code> do telefone e carregue-o para interpretar contexto, comparar resultados e analisar hinos. O modelo não é enviado a servidores. Preferencialmente use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
+        <p>Escolha um arquivo <code>.gguf</code> do telefone. O modelo servirá apenas para sugerir até 4 temas de busca; a classificação e o detalhamento são feitos pelo índice offline. O modelo não é enviado a servidores. Preferencialmente use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
         <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
         <p id="gguf-phase" class="gguf-phase">Estado: verificando</p><p id="gguf-model-meta" class="subtle-note">Nenhum modelo foi carregado na memória.</p>
-        <label class="ai-switch"><input type="checkbox" id="gguf-auto" checked><span>Usar IA automaticamente para interpretar pesquisas quando o modelo estiver pronto.</span></label>
-        <p class="subtle-note">Como funciona: 1) busca imediata pelo índice local; 2) IA identifica conceitos; 3) resultados são recalculados com evidências da letra. O resultado inicial permanece disponível se o modelo falhar.</p>
+        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Usar IA automaticamente para sugerir palavras-chave (desativado por padrão). A busca offline sempre aparece primeiro.</span></label>
+        <p class="subtle-note">Como funciona: 1) pesquisa instantânea no índice local; 2) opcionalmente, o GGUF sugere até quatro temas em uma resposta curta; 3) o índice local reclassifica os hinos. A IA pode ser interrompida e nunca precisa ler toda a coletânea.</p>
         <p id="gguf-last" class="gguf-phase" aria-live="polite">Última execução: nenhuma</p>
-        <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
+        <div class="settings-actions"><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div><div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
       </section>
       <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p><div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar do GitHub</button><label class="secondary-btn file-upload">Importar outro JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div></div>
