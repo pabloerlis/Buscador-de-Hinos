@@ -471,7 +471,9 @@ const OfflineAPI = (() => {
     const analysisText=opts.mode==='literal'?query:[graphCtx?.residual??scripture?.residual??lexicalQuery,bible?.theme||'',...hints].filter(Boolean).join(' ');
     const bridgeIntent=opts.bridge&&bridge&&opts.mode!=='literal'?bridge.interpret(analysisText):null;
     const intent=semantic&&opts.mode!=='literal'?semantic.interpret(analysisText):null;
-    const scriptureTopics=scripture&&semantic&&opts.mode!=='literal'?
+    // O grafo já interpreta o texto bíblico e filtra associações ambíguas.
+    // Não reintroduzir os mesmos temas por uma segunda interpretação independente.
+    const scriptureTopics=!graphCtx&&scripture&&semantic&&opts.mode!=='literal'?
       semantic.indexHymn('',scripture.text).filter(t=>t.score>=1.20).slice(0,4):[];
     if(intent){
       const seen=new Set(intent.direct.map(t=>t.id));
