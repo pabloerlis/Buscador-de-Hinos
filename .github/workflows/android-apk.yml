@@ -274,12 +274,7 @@ jobs:
           heap-size: 512M
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
-          script: |
-            adb install -r apk-candidate/app-debug.apk
-            adb install -r apk-instrumentation/app-debug-androidTest.apk
-            adb shell svc wifi disable
-            adb shell svc data disable
-            adb shell am instrument -w -r -e class br.com.buscadordehinos.app.E5DeviceSmokeTest br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner
+          script: bash scripts/qa_android_emulator.sh
 
   audit_apk:
     name: "Agente 7 | Auditoria do APK validado em Android"
