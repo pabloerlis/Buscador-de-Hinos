@@ -61,9 +61,10 @@ const OfflineAPI = (() => {
   let recommender=null;
   let scriptureIndex=null;
   let bibleGraph=null;
+  let eventFrames=null;
   let bridge=null;
   let queryRankingCache=new Map();
-  const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',fusionMode:'rrf',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
+  const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',fusionMode:'rrf',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,eventEvidence:true,bibleLinks:true,bibleDepth:1,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   function searchOptions(raw){
     const p=raw&&typeof raw==='object'?raw:{};
     const clamp=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;
@@ -79,7 +80,7 @@ const OfflineAPI = (() => {
       strength:clamp(p.strength,0,100,75),narratives:p.narratives!==false,
       related:p.related!==false,minAffinity:clamp(p.minAffinity,0,90,0),
       pageSize:[5,10].includes(Number(p.pageSize))?Number(p.pageSize):5,
-      showReasons:p.showReasons!==false,showConcepts:p.showConcepts!==false,scripture:p.scripture!==false,bridge:p.bridge!==false,bibleGraph:p.bibleGraph!==false,bibleLinks:p.bibleLinks!==false,bibleDepth:[0,1,2].includes(Number(p.bibleDepth))?Number(p.bibleDepth):1,customAliases:aliases,
+      showReasons:p.showReasons!==false,showConcepts:p.showConcepts!==false,scripture:p.scripture!==false,bridge:p.bridge!==false,bibleGraph:p.bibleGraph!==false,eventEvidence:p.eventEvidence!==false,bibleLinks:p.bibleLinks!==false,bibleDepth:[0,1,2].includes(Number(p.bibleDepth))?Number(p.bibleDepth):1,customAliases:aliases,
       recWeight:clamp(p.recWeight,0,100,65),recCount:[5,10].includes(Number(p.recCount))?Number(p.recCount):5,
       recContext:p.recContext!==false,recAvoidVisited:p.recAvoidVisited!==false,recBreakdown:p.recBreakdown!==false};
   }
@@ -117,6 +118,7 @@ const OfflineAPI = (() => {
       }
     }
     if(bibleGraph&&typeof bibleGraph.setCorpus==='function')bibleGraph.setCorpus(hymns);
+    if(eventFrames&&typeof eventFrames.setCorpus==='function')eventFrames.setCorpus(hymns);
     recommender=typeof RecommendationEngine!=='undefined'?RecommendationEngine.create(hymns):null;
     queryRankingCache.clear();
   }
@@ -190,7 +192,9 @@ const OfflineAPI = (() => {
     if(typeof BibleGraphEngine!=='undefined'&&scriptureIndex)try{
       const response=await fetch('bible-graph.json');
       if(!response.ok)throw Error('Grafo bíblico offline indisponível');
-      bibleGraph=BibleGraphEngine.create(await response.json(),scriptureIndex,semantic);
+      const graphData=await response.json();
+      bibleGraph=BibleGraphEngine.create(graphData,scriptureIndex,semantic);
+      if(typeof EventFrameEngine!=='undefined')eventFrames=EventFrameEngine.create(graphData,scriptureIndex);
     }catch(error){console.warn('Índice de temas e referências cruzadas indisponível:',error.message);}
   }
 
@@ -519,6 +523,7 @@ const OfflineAPI = (() => {
       const namedCollection=numberMatch?.[1]?collectionId(numberMatch[1]):null;
       if(numberMatch&&!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2]) && (!namedCollection||ref.id===namedCollection) && opts.collections[ref.id]!==false))continue;
       let score=0;let lexicalSignal=0,semanticSignal=0,biblicalSignal=0,narrativeSignal=0,vectorSignal=0;
+      let eventResult=null;
       const evidence=[],spelling=[];let semanticResult=null,storyResult=null,graphResult=null;
       if(numberMatch){
         if(!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2])))continue;
@@ -572,6 +577,15 @@ const OfflineAPI = (() => {
           score+=graphResult.score*semanticWeight;
           if(graphResult.reasons.length)evidence.unshift(...graphResult.reasons.slice(0,2));
         }
+        if(graphCtx?.narrative&&opts.eventEvidence&&eventFrames){
+          eventResult=eventFrames.evaluate(song,graphCtx);
+          if(eventResult.score>=5){
+            const eventPoints=eventResult.score*semanticWeight;
+            score+=eventPoints;
+            biblicalSignal+=eventPoints;
+            if(eventResult.reason)evidence.unshift(eventResult.reason);
+          }
+        }
         if(storyIntent?.matches.length){
           storyResult=narratives.evaluate(song.story_profile||[],storyIntent);
           narrativeSignal=Math.max(0,storyResult.score*semanticWeight);
@@ -592,7 +606,8 @@ const OfflineAPI = (() => {
       const reason=numberMatch?'Número exato do hino.':evidence.length?evidence.slice(0,2).join('. ')+'.':matchedTokens.length?'A letra contém termos relacionados: '+matchedTokens.slice(0,3).join(', ')+'.':'Possível relação temática; confira a letra antes de utilizar.';
       const percent=percentage(score,!!numberMatch);
       if(percent<opts.minAffinity)continue;
-      const explanations=[...(graphResult?.reasons||[]),...(storyResult?.reasons||[]),...(semanticResult?.proof||[])].slice(0,3);
+      const explanations=[...(eventResult?.reason?[eventResult.reason]:[]),...(graphResult?.reasons||[]),
+        ...(storyResult?.reasons||[]),...(semanticResult?.proof||[])].slice(0,3);
       const selectedRef=numberMatch? song.collectionRefs.find(ref=>Number(ref.number)===Number(numberMatch[2])&&(!namedCollection||ref.id===namedCollection)) : song.collectionRefs.find(ref=>opts.collections[ref.id]!==false);
       ranked.push({id:song.id,number:selectedRef?.number||song.number,title:song.title,collection:selectedRef?.name||song.collection,collection_ids:song.collections.slice(),edition:selectedRef?.edition||song.edition,
         topics:[...new Set([...(graphResult?.matched||[]),...(storyResult?.matched||[]),...song.topics])].slice(0,7),
@@ -600,13 +615,14 @@ const OfflineAPI = (() => {
           ...(graphResult?.cues||[]),...(storyResult?.cues||[]),...(semanticResult?.cues||[])],
         reason:opts.showReasons?reason+(lowered.length?' Menor prioridade por '+lowered.join(', ')+'.':''):'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
-        _narrativeTier:storyResult?.tier||0,
+        _narrativeTier:Math.max(storyResult?.tier||0,eventResult?.tier||0),
+        _eventSnippet:eventResult?.tier>=1?eventResult.snippet:'',
         _fusionSignals:{lexical:lexicalSignal,semantic:semanticSignal,biblical:biblicalSignal,
           narrative:narrativeSignal,vector:vectorSignal},
         _fusionPenalty:lowered.length?1-Math.min(.45,lowered.length*.25):1,
         _vectorRange:vectorRanges.get(song.id)||null,
         vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
-        match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
+        match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':eventResult?.tier>=1?'acontecimento':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     // Consulta composta: preservar o peso dos outros requisitos; o nível
@@ -632,12 +648,12 @@ const OfflineAPI = (() => {
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
-    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_fusionSignals,_fusionPenalty,_vectorRange,...hit})=>{
+    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_eventSnippet,_fusionSignals,_fusionPenalty,_vectorRange,...hit})=>{
       const hymn=hymns[hit.id-1];
       const vectorText=vectorEnabled&&hit.vector_similarity>=76&&!sharedPassage&&!numberMatch&&
         !quoted.length&&!required.length&&typeof VectorIndex.passageForSong==='function'?
         VectorIndex.passageForSong(hymn,_vectorRange):'';
-      return {...hit,snippet:sharedPassage?.text||vectorText||
+      return {...hit,snippet:sharedPassage?.text||_eventSnippet||vectorText||
         makeSnippet(hymn,[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)};
     };
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
@@ -648,6 +664,7 @@ const OfflineAPI = (() => {
       ...selectedTopics.slice(0,6).map(t=>'Tema: '+t),
       ...(scripture?['Bíblia Livre offline: '+scripture.reference+(scripture.partial?' (amostra do capítulo)':'')]:[]),
       ...(graphCtx?['Grafo bíblico: '+graphCtx.reference+(graphCtx.narrative?' · '+graphCtx.narrative:'')]:[]),
+      ...(graphCtx?.narrative&&opts.eventEvidence&&eventFrames?['Ações e sequência bíblica: comparação lexical de acontecimentos']:[]),
       ...(graphCtx?.concepts||[]).slice(0,6).map(t=>'Tema do texto bíblico: '+t.label),
       ...(graphCtx?.relatedCount?['Referências cruzadas: '+graphCtx.relatedCount+' ligações consultadas']:[]),
       ...(bridgeIntent?.aliases||[]).map(t=>'Associação lexical: '+t),
@@ -671,7 +688,7 @@ const OfflineAPI = (() => {
   }
   function queryRanking(query,opts){
     if(!query||!query.trim()||/^(?:hino\s*)?\d{1,4}$/i.test(query.trim()))return new Map();
-    const key=JSON.stringify([query,opts.mode,opts.strength,opts.narratives,opts.related,opts.customAliases,opts.collections,opts.vectorMode,opts.fusionMode]);
+    const key=JSON.stringify([query,opts.mode,opts.strength,opts.narratives,opts.related,opts.customAliases,opts.collections,opts.vectorMode,opts.fusionMode,opts.eventEvidence]);
     if(queryRankingCache.has(key))return queryRankingCache.get(key);
     const ranked=search({query,page:1,parsed_query:true,settings:{...opts,minAffinity:0},_forRecommendations:true});
     const scores=new Map(ranked._fullRanked.map(x=>[x.id,x.relevance_percent]));
@@ -751,6 +768,7 @@ const OfflineAPI = (() => {
       story_ready:!!narratives,story_count:narratives?.stories||0,story_revision:narratives?.revision||null,
       scripture_ready:!!scriptureIndex,scripture_books:scriptureIndex?.bookCount||0,
       bible_graph_ready:!!bibleGraph,bible_graph_stats:bibleGraph?.stats||null,bible_graph_narratives:bibleGraph?.narrativeCount||0,
+      event_ready:!!eventFrames,event_stats:eventFrames?.stats()||null,
       bridge_ready:!!bridge,bridge_entries:bridge?.entries||0,collections:libraryCounts(),
       collection:metadata.collection,edition:metadata.edition,ai_configured:false,source_url:SOURCE,chat_mode:narratives?'Narrativas bíblicas + temas offline':'Busca contextual local'};
     if(url==='/api/stories')return {stories:narratives?.list()||[]};
