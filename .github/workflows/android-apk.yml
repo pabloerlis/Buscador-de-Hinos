@@ -129,7 +129,7 @@ jobs:
             "huggingface_hub>=0.27,<1" requests
       - name: Reutilizar índice E5 auditável entre compilações
         id: e5-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             app/src/main/assets/e5-model.onnx
@@ -141,6 +141,17 @@ jobs:
       - name: Preparar modelo int8 pinado e gerar vetores por trecho
         if: steps.e5-cache.outputs.cache-hit != 'true'
         run: python3 scripts/build_e5_assets.py
+      - name: Preservar pesos e índice após geração, mesmo se testes posteriores reprovarem
+        if: steps.e5-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            app/src/main/assets/e5-model.onnx
+            app/src/main/assets/e5-vocab.bin
+            app/src/main/assets/e5-index.json
+            app/src/main/assets/e5-source.txt
+            tests/e5-tokenizer-cases.json
+          key: ${{ steps.e5-cache.outputs.cache-primary-key }}
       - name: Verificar tokens Android contra tokenizer original
         run: python3 scripts/qa_e5_android_tokenizer.py
       - name: Auditar estrutura, origem, SHA e cobertura de estrofes
