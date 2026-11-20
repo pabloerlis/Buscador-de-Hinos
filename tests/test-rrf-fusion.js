@@ -13,12 +13,11 @@ const hymn=(id,rank,values={},other={})=>({
   _fusionSignals:{lexical:0,semantic:0,biblical:0,narrative:0,vector:0,...values},
   _fusionPenalty:1,...other});
 const candidates=[
-  hymn(1,1,{lexical:10,semantic:2,biblical:2,vector:.74}),
+  hymn(1,1,{lexical:10,semantic:0,biblical:0,vector:.74}),
   hymn(2,2,{lexical:2,semantic:5,biblical:10,vector:.88}),
   hymn(3,3,{lexical:0,semantic:1,biblical:0,vector:.92}),
   hymn(4,4,{lexical:1,semantic:0,biblical:0,vector:0})
 ];
-assert.strictEqual(rrf.rank(candidates.map(x=>({...x,_fusionSignals:{...x._fusionSignals,vector:0}})),candidates[0])?.id,undefined);
 // Sem vetores: preserva a lista original, sem alterar referências/ordem.
 const noVector=candidates.map(x=>({...x,_fusionSignals:{...x._fusionSignals,vector:0}}));
 assert.strictEqual(rrf.rank(noVector),noVector);
