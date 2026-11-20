@@ -331,6 +331,45 @@ const OfflineAPI = (() => {
     }
     return best.length>210?best.slice(0,210)+'…':best;
   }
+  function lyricPassages(lyrics){
+    const passages=new Map();
+    for(const stanza of lyrics.split(/\n[ \t]*\n+/)){
+      const lines=stanza.split('\n').map(line=>line.replace(/\s+/g,' ').trim()).filter(Boolean);
+      for(let start=0;start<lines.length;start++){
+        let text=lines[start];
+        if(text.length>210)continue;
+        for(let i=start+1;i<Math.min(lines.length,start+4);i++){
+          if(text.length+3+lines[i].length>210)break;
+          text+=' / '+lines[i];
+        }
+        const key=normalizeLyrics(text);
+        if(key&&!passages.has(key))passages.set(key,text);
+      }
+    }
+    return [...passages].map(([key,text])=>({searchable:' '+key+' ',text}));
+  }
+  function findSharedPassage(song,indexedText,topicIds){
+    const topics=(song.semantic_profile||[]).filter(topic=>topicIds.has(topic.id));
+    if(topics.length<2)return null;
+    const clues=topics.flatMap(topic=>topic.evidence.map(normalizeLyrics).filter(Boolean).map(cue=>({topic,cue})));
+    indexedText.passages??=lyricPassages(song.lyrics);
+    for(const passage of indexedText.passages){
+      const hits=[];
+      for(const clue of clues){
+        const start=passage.searchable.indexOf(' '+clue.cue+' ');
+        if(start<0)continue;
+        const end=start+clue.cue.length;
+        const other=hits.find(hit=>hit.topic.id!==clue.topic.id&&hit.cue!==clue.cue&&
+          (hit.end<=start||end<=hit.start));
+        if(other){
+          const labels=[other.topic.label,clue.topic.label].map(label=>label.toLocaleLowerCase('pt-BR'));
+          return {text:passage.text,reason:'Temas no mesmo trecho: '+labels.join(' e ')};
+        }
+        hits.push({...clue,start,end});
+      }
+    }
+    return null;
+  }
   const MAX_QUERY_LENGTH=500;
   const RESET_QUERY=/^(?:nova busca|recome[cç]ar|do zero|esque[cç]a (?:a )?anterior)(?:\b|$)[\s,:;.-]*(?:por\s+)?/i;
   const QUOTED_TEXT=/"([^"]+)"|“([^”]+)”/g;
@@ -451,13 +490,18 @@ const OfflineAPI = (() => {
     const excludedCriteria=excluded.map(term=>searchCriterion(term,allowTopics));
     const lowerCriteria=deprioritized.map(term=>searchCriterion(term,allowTopics));
     const snippetPhrases=[...new Set([...requiredCriteria.map(item=>item.normalized).filter(Boolean),...(quoted.length?quoted:exactPhrase.length>=4?[exactPhrase]:[])])];
+    // A proximidade complementa buscas temáticas livres e preserva a evidência de consultas exatas.
+    const usePassages=semanticWeight>0&&!numberMatch&&!quoted.length&&!required.length&&
+      !scripture&&!isBiblicalRef&&!storyIntent?.matches.length;
+    const passageTopics=new Set(usePassages?intent?.direct.map(topic=>topic.id):[]);
     const vectorEnabled=opts.vectorMode!=='off' && opts.mode!=='literal' && !numberMatch && typeof VectorIndex!=='undefined' && VectorIndex.status().ready && VectorIndex.checkQuery(payload?.vector_query);
     const vectorHits=vectorEnabled?VectorIndex.topForQuery(payload.vector_query,100):[];
     const vectorScores=new Map(vectorHits.map(h=>[h.id,h.similarity]));
     const ranked=[];
     for(const song of (graphCtx||quoted.length?hymns:candidateSongs(numberMatch,lexicalCandidates,intent,storyIntent,vectorHits,exactTitles))){
       if(!collectionEnabled(song,opts))continue;
-      const {title,lyrics,titleWords,words}=searchTexts.get(song.id);
+      const indexedText=searchTexts.get(song.id);
+      const {title,lyrics,titleWords,words}=indexedText;
       const matchesText=term=>hasWord(title,term)||hasWord(lyrics,term);
       if(quoted.some(phrase=>!matchesText(phrase)))continue;
       const matchesTopic=criterion=>song.semantic_profile?.find(topic=>criterion.topicIds.has(topic.id));
@@ -522,6 +566,11 @@ const OfflineAPI = (() => {
         }
       }
       if(score<(semanticResult?.score>0||storyResult?.score>0||graphResult?.score>=7||vectorScores.get(song.id)>0.76||spelling.length?4.7:7))continue;
+      const sharedPassage=passageTopics.size>=2?findSharedPassage(song,indexedText,passageTopics):null;
+      if(sharedPassage){
+        score+=9*Math.min(semanticWeight,1);
+        evidence.unshift(sharedPassage.reason);
+      }
       const lowered=numberMatch?[]:lowerCriteria.filter(matchesCriterion).map(criterion=>criterion.term);
       if(lowered.length)score*=1-Math.min(.45,lowered.length*.25);
       const matchedTokens=qTokens.filter(x=>words.has(x));
@@ -532,7 +581,7 @@ const OfflineAPI = (() => {
       const selectedRef=numberMatch? song.collectionRefs.find(ref=>Number(ref.number)===Number(numberMatch[2])&&(!namedCollection||ref.id===namedCollection)) : song.collectionRefs.find(ref=>opts.collections[ref.id]!==false);
       ranked.push({id:song.id,number:selectedRef?.number||song.number,title:song.title,collection:selectedRef?.name||song.collection,collection_ids:song.collections.slice(),edition:selectedRef?.edition||song.edition,
         topics:[...new Set([...(graphResult?.matched||[]),...(storyResult?.matched||[]),...song.topics])].slice(0,7),
-        spelling,cues:[...requiredCriteria.flatMap(criterion=>matchesTopic(criterion)?.evidence||[]),
+        spelling,sharedPassage,cues:[...requiredCriteria.flatMap(criterion=>matchesTopic(criterion)?.evidence||[]),
           ...(graphResult?.cues||[]),...(storyResult?.cues||[]),...(semanticResult?.cues||[])],
         reason:opts.showReasons?reason+(lowered.length?' Menor prioridade por '+lowered.join(', ')+'.':''):'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
@@ -550,8 +599,8 @@ const OfflineAPI = (() => {
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
-    const withSnippet=({spelling,cues,...hit})=>({...hit,
-      snippet:makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
+    const withSnippet=({spelling,sharedPassage,cues,...hit})=>({...hit,
+      snippet:sharedPassage?.text||makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
     const interpretation=opts.showConcepts?[
       ...(vectorEnabled?['Embeddings E5: '+VectorIndex.status().count+' hinos indexados']:[]),

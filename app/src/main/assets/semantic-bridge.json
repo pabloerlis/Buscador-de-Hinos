@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "revision": "2026-11-20-curated-2",
+  "revision": "2026-11-20-curated-3",
   "description": "Mapa curado de expressões cotidianas e conceitos de louvor. Relações são hipóteses semânticas, confirmadas por evidências das letras; não são declarações doutrinárias.",
   "entries": [
     {"phrases":["não consigo dormir","estou preocupado","minha mente não descansa","medo do futuro","muita ansiedade","estou ansioso","preocupação constante"],"topics":["paz","confianca","consolo"]},
@@ -8,6 +8,7 @@
     {"phrases":["quero voltar para deus","voltar para deus","retornar para deus","afastei me do senhor","quero recomeçar","errei e quero voltar","voltar a minha fé","voltar para casa do pai"],"topics":["arrependimento","perdao","renovacao"]},
     {"phrases":["começar de novo","uma nova chance","restaurar minha vida","recomeço espiritual","vida restaurada"],"topics":["renovacao","graca","perdao"]},
     {"phrases":["sem forças para continuar","estou desanimado","quase desistindo","não vou suportar","caminho muito difícil"],"topics":["perseveranca","consolo","esperanca"]},
+    {"phrases":["cansado de esperar","cansada de esperar","cansados de esperar","cansadas de esperar","difícil continuar esperando"],"topics":["perseveranca"]},
     {"phrases":["preciso tomar uma decisão","não sei qual caminho seguir","estou sem rumo","direção para minha vida","escolher meu caminho"],"topics":["direcao","confianca","oracao"]},
     {"phrases":["sinto me sozinho","me sinto abandonado","ninguém me entende","na solidão","solidão e tristeza"],"topics":["consolo","amor","confianca"]},
     {"phrases":["deus me encontrou","estava perdido","fui resgatado","ele veio me buscar","me achou perdido"],"topics":["salvacao","graca","perdao"]},

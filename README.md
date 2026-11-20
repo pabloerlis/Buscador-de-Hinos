@@ -1,6 +1,10 @@
-# Buscador de Hinos Android v2.4.1
+# Buscador de Hinos Android v2.5.0
 
 A busca e a comparação funcionam offline depois de importar a coletânea. O app consulta títulos, letras, temas, narrativas e referências bíblicas locais. A comparação reúne até cinco resultados com os trechos e a afinidade estimada.
+
+Em buscas temáticas, o ranking favorece hinos que sustentam dois temas da consulta em até quatro versos da mesma estrofe. O cartão exibe esse trecho. A frase curada “cansado de esperar” aciona o tema perseverança e pode ser combinada com expressões como “ainda confio em Deus”.
+
+`node tests/test-stanza-ranking.js` avalia a ordem dos cinco primeiros resultados em 40 consultas temáticas e 10 controles. As notas de relevância usam letras sintéticas com os temas juntos e separados. A opção `--baseline=<diretório de assets>` compara outra versão. A opção `--catalog=<arquivo JSON>` mede separadamente a presença de evidência na coletânea fornecida.
 
 | Consulta | Comportamento |
 | --- | --- |
