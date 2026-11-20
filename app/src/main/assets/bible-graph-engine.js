@@ -65,21 +65,29 @@ const BibleGraphEngine=(()=>{
       const candidates=(context.passageRoots||[]).filter(root=>doc.unique.has(root)).map(root=>{
         const frequency=docFreq.get(root)||0;
         const idf=Math.min(4.6,Math.log(1+(totalDocs+1)/(frequency+1)));
-        return {root,idf,weight:idf*(aliases.has(root)?1.2:1),rare:totalDocs>0&&frequency<=Math.max(2,totalDocs*.12)};
+        // A âncora do acontecimento provém dos títulos e sinônimos bíblicos
+        // já catalogados para TODAS as histórias. Verbos comuns da passagem
+        // isolados não devem dominar a busca.
+        const anchor=aliases.has(root)&&frequency<=Math.max(4,totalDocs*.20);
+        return {root,idf,anchor,weight:idf*(anchor?2.2:.48)};
       });
-      let best={score:0,hits:[],rare:0};
+      let best={score:0,hits:[],anchors:0};
       for(const window of doc.windows){
         const hits=candidates.filter(item=>window.has(item.root));
         if(!hits.length)continue;
-        const rare=hits.filter(x=>x.rare).length;
-        // Pistas isoladas ou palavras genéricas não comprovam uma cena.
+        const anchored=hits.filter(x=>x.anchor),anchors=anchored.length;
         const weight=hits.reduce((sum,item)=>sum+item.weight,0);
-        const score=hits.length>=2&&rare>=1?Math.min(42,weight*2.6+(hits.length-1)*1.9+rare*1.2):
-          Math.min(4,weight*.4);
-        if(score>best.score)best={score,hits,rare};
+        // Recuperação orientada a cenas: exigir pelo menos uma âncora
+        // específica + outra pista no mesmo trecho de quatro versos.
+        // O teste é idêntico para as 48 narrativas.
+        const score=anchors>=1&&hits.length>=2?
+          Math.min(46,weight*1.7+(anchors>=2?6:0)+Math.min(6,hits.length)) :
+          Math.min(3,weight*.25);
+        if(score>best.score)best={score,hits,anchors};
       }
-      return {score:best.score,cues:best.hits.sort((a,b)=>b.weight-a.weight).slice(0,5).map(x=>x.root),
-        count:best.hits.length,rare:best.rare};
+      return {score:best.score,cues:best.hits.sort((a,b)=>b.weight-a.weight).slice(0,5)
+        .map(x=>context.cueLabels?.[x.root]||x.root),
+        count:best.hits.length,anchors:best.anchors};
     }
 
     function resolve(query,options={}){
@@ -153,11 +161,17 @@ const BibleGraphEngine=(()=>{
       }
       const lexical=[...words].sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length).slice(0,26).map(([word,n])=>({word,weight:Math.min(1.7,1+n/7)}));
       const residual=direct?reading.residual:q.replace(names[0]?.match||'',' ').replace(/\s+/g,' ').trim();
-      const aliasRoots=selected?[...new Set(roots([selected.label,...selected.aliases].join(' ')))]:[];
+      const aliasText=selected?[selected.label,...selected.aliases].join(' '):'';
+      const aliasRoots=[...new Set(roots(aliasText))];
       const passageRoots=[...new Set([...roots(snippets),...aliasRoots])].slice(0,180);
+      const cueLabels={};
+      for(const word of norm(snippets+' '+aliasText).split(' ')){
+        if(word.length<4||CUE_STOP.has(word))continue;
+        cueLabels[stem(word)]=word;
+      }
       return {reference:reading.reference,source:direct?'referência':'narrativa',narrative:selected?.label||null,
         directReference:!!direct,verses:verseIds.length,verseIds,sourceText:snippets,concepts,
-        passageRoots,aliasRoots,
+        passageRoots,aliasRoots,cueLabels,
         directConceptIds:[...directTopicIds],words:lexical,relatedCount:relatives.size,
         relatedRefs:[...relatives].sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0]),residual};
     }
@@ -176,7 +190,7 @@ const BibleGraphEngine=(()=>{
         const topicPoints=Math.min(8,direct.length*2.5+indirect.length*.5);
         const score=Math.min(50,topicPoints+episode.score);
         const reasons=[];
-        if(episode.count>=2&&episode.rare>=1){
+        if(episode.count>=2&&episode.anchors>=1){
           reasons.push('Detalhes de '+context.reference+' na letra: '+episode.cues.join(', '));
         }else if(direct.length){
           reasons.push('Relação temática com '+context.reference+': '+direct.slice(0,2).map(x=>x.label).join(', '));
