@@ -46,10 +46,22 @@ jobs:
       - name: Start Android emulator and check boot
         run: |
           set -euo pipefail
+          sdkmanager="$(command -v sdkmanager)"
+          "$sdkmanager" --uninstall 'ndk;27.2.12479018' 'cmake;3.22.1'
+          cmake -E rm -rf app/.cxx
           df -h "$RUNNER_TEMP"
+          export ANDROID_USER_HOME="$RUNNER_TEMP/hino-android"
+          export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+          export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+          mkdir -p "$ANDROID_AVD_HOME"
           "$ANDROID_HOME/platform-tools/adb" start-server
-          printf 'no\n' | avdmanager create avd --force --name hino-gguf --package 'system-images;android-35;google_apis;x86_64'
+          printf 'no\n' | "$(dirname "$sdkmanager")/avdmanager" create avd --force --name hino-gguf --package 'system-images;android-35;google_apis;x86_64' --path "$ANDROID_AVD_HOME/hino-gguf.avd"
+          test -f "$ANDROID_AVD_HOME/hino-gguf.avd/config.ini"
+          if [ ! -f "$ANDROID_AVD_HOME/hino-gguf.ini" ]; then
+            printf 'avd.ini.encoding=UTF-8\npath=%s\ntarget=android-35\n' "$ANDROID_AVD_HOME/hino-gguf.avd" > "$ANDROID_AVD_HOME/hino-gguf.ini"
+          fi
           emulator="$ANDROID_HOME/emulator/emulator"
+          "$emulator" -list-avds | grep -Fx hino-gguf
           nohup "$emulator" -avd hino-gguf -no-window -no-boot-anim -no-audio -no-snapshot -camera-back none -camera-front none -feature -Vulkan -gpu software -memory 4096 -cores 2 -partition-size 6144 > "$RUNNER_TEMP/hino-emulator.log" 2>&1 </dev/null &
           pid=$!
           for ((attempt=0; attempt<60; attempt++)); do
