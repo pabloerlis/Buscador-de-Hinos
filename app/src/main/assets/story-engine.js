@@ -29,7 +29,7 @@ const StoryEngine = (() => {
     if(!db||db.schema_version!==1||!Array.isArray(db.stories)||db.stories.length>80)throw Error('Índice de narrativas inválido');
     const stories=db.stories.map(s=>{
       if(!s.id||!s.label||!Array.isArray(s.aliases)||!Array.isArray(s.phrases)||!Array.isArray(s.groups)||s.groups.length<2)throw Error('Narrativa sem estrutura suficiente');
-      return {...s,matchAliases:s.aliases.map(a=>({text:a,normalized:normalize(a),re:matcher(a)})),
+      return {...s,matchAliases:[...new Set([s.label,...s.aliases])].map(a=>({text:a,normalized:normalize(a),re:matcher(a)})),
         matchPhrases:s.phrases.map(x=>({text:x,re:matcher(x)})),
         matchGroups:s.groups.map(group=>group.map(x=>({text:x,re:flexMatcher(x)})))};
     });
