@@ -3,7 +3,7 @@
  * Nenhum servidor Python, chave de API ou rede é necessário após a importação.
  */
 const OfflineAPI = (() => {
-  const SOURCE = 'https://raw.githubusercontent.com/italozaina/projection-html5-icm/master/data/data.json';
+  const SOURCE = 'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json';
   const THEME_WORDS = {
     'Alegria':['alegria','alegre','jubilo','regozijo','felicidade','celebracao','festa','contente','exultacao'],
     'Gratidão':['gratidao','agradecer','agradecimento','grato','graca recebida','dar gracas','bendizer','louvor','obrigado','acao de gracas'],
@@ -503,6 +503,7 @@ const OfflineAPI = (() => {
     const vectorEnabled=opts.vectorMode!=='off' && opts.mode!=='literal' && !numberMatch && typeof VectorIndex!=='undefined' && VectorIndex.status().ready && VectorIndex.checkQuery(payload?.vector_query);
     const vectorHits=vectorEnabled?VectorIndex.topForQuery(payload.vector_query,100):[];
     const vectorScores=new Map(vectorHits.map(h=>[h.id,h.similarity]));
+    const vectorRanges=new Map(vectorHits.map(h=>[h.id,h.range]));
     const ranked=[];
     for(const song of (graphCtx||quoted.length?hymns:candidateSongs(numberMatch,lexicalCandidates,intent,storyIntent,vectorHits,exactTitles))){
       if(!collectionEnabled(song,opts))continue;
@@ -558,7 +559,7 @@ const OfflineAPI = (() => {
         if(v!==undefined && v>=0.72){
           const points=Math.min(24,Math.max(0,(v-.70)*110))*(opts.vectorMode==='strong'?1.4:1);
           score+=points;
-          if(points>=4)evidence.push('significado próximo da consulta (modelo E5)');
+          if(points>=4)evidence.push('trecho de hino semanticamente próximo (E5 offline)');
         }
         if(graphCtx){
           graphResult=bibleGraph.evaluate(song,graphCtx);
@@ -592,6 +593,7 @@ const OfflineAPI = (() => {
         reason:opts.showReasons?reason+(lowered.length?' Menor prioridade por '+lowered.join(', ')+'.':''):'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
         _narrativeTier:storyResult?.tier||0,
+        _vectorRange:vectorRanges.get(song.id)||null,
         vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
         match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
@@ -610,11 +612,17 @@ const OfflineAPI = (() => {
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
-    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,...hit})=>({...hit,
-      snippet:sharedPassage?.text||makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
+    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_vectorRange,...hit})=>{
+      const hymn=hymns[hit.id-1];
+      const vectorText=vectorEnabled&&hit.vector_similarity>=76&&!sharedPassage&&!numberMatch&&
+        !quoted.length&&!required.length&&typeof VectorIndex.passageForSong==='function'?
+        VectorIndex.passageForSong(hymn,_vectorRange):'';
+      return {...hit,snippet:sharedPassage?.text||vectorText||
+        makeSnippet(hymn,[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)};
+    };
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
     const interpretation=opts.showConcepts?[
-      ...(vectorEnabled?['Embeddings E5: '+VectorIndex.status().count+' hinos indexados']:[]),
+      ...(vectorEnabled?['Embeddings E5: '+VectorIndex.status().count+' hinos / '+VectorIndex.status().passages+' trechos']:[]),
       ...reading.map(t=>'Narrativa: '+t),
       ...selectedTopics.slice(0,6).map(t=>'Tema: '+t),
       ...(scripture?['Bíblia Livre offline: '+scripture.reference+(scripture.partial?' (amostra do capítulo)':'')]:[]),

@@ -1,5 +1,6 @@
 plugins { id 'com.android.application' }
 def enableLocalModels = providers.gradleProperty('enableLocalModels').map { it.toBoolean() }.orElse(false).get()
+def enableLocalEmbeddings = providers.gradleProperty('enableLocalEmbeddings').map { it.toBoolean() }.orElse(false).get()
 // Valores incorporados ao APK: independentes de conexão e da biblioteca importada.
 def sourceRevision = (System.getenv('BUILD_SOURCE_SHA') ?: System.getenv('GITHUB_SHA') ?: 'local').replaceAll('[^a-zA-Z0-9]', '')
 def buildDateUtc = java.time.Instant.now().toString()
@@ -11,10 +12,16 @@ android {
         applicationId 'br.com.buscadordehinos.app'
         minSdk 24
         targetSdk 34
-        ndk { abiFilters 'arm64-v8a' }
-        versionCode 20
-        versionName '2.6.1'
+        ndk {
+            abiFilters 'arm64-v8a'
+            // ABI de teste adicional: APK aprovado é o mesmo instalado no emulador.
+            if (enableLocalEmbeddings) abiFilters 'x86_64'
+        }
+        testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
+        versionCode 21
+        versionName '2.6.2'
         buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
+        buildConfigField 'boolean', 'ENABLE_LOCAL_EMBEDDINGS', enableLocalEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
         buildConfigField 'String', 'BUILD_DATE_UTC', '"' + buildDateUtc + '"'
     }
@@ -26,7 +33,10 @@ android {
                 version '3.22.1'
             }
         }
-    } else {
+    }
+    // A variante E5 (sem GGUF) inclui o encoder e a biblioteca ONNX necessários
+    // para inferência offline. O APK padrão continua sem nenhum modelo.
+    if (!enableLocalEmbeddings && !enableLocalModels) {
         androidResources { ignoreAssetsPatterns.addAll(['e5-model.onnx', 'e5-index.json', 'e5-vocab.bin', 'e5-source.txt']) }
         packaging { jniLibs { excludes.add('**/libonnxruntime*.so') } }
     }
@@ -34,4 +44,9 @@ android {
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 
-dependencies { implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0' }
+dependencies {
+    implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test:core:1.6.1'
+    androidTestImplementation 'androidx.test:runner:1.6.2'
+}

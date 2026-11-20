@@ -27,7 +27,8 @@ ASSETS.mkdir(parents=True,exist_ok=True)
 # Fixa a revisão: garante modelo e tokenizer da mesma versão.
 REPO='Xenova/multilingual-e5-small'
 REVISION='761b726dd34fb83930e26aab4e9ac3899aa1fa78'
-SOURCE='https://raw.githubusercontent.com/italozaina/projection-html5-icm/master/data/data.json'
+SOURCE='https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json'
+MODEL_SHA256='4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c'
 
 class Markup(HTMLParser):
     def __init__(self): super().__init__(convert_charrefs=True);self.parts=[]
@@ -123,10 +124,57 @@ def encode(session,tok,texts,max_tokens=192):
     v=v/np.maximum(np.linalg.norm(v,axis=1,keepdims=True),1e-8)
     return v
 
+def passage_spans(lyrics, max_segments=8):
+    """Seleciona trechos locais representativos, sem perder versos intermediários.
+
+    Cada trecho se refere aos índices das linhas não vazias importadas no aparelho;
+    o APK armazena só intervalos e vetores, NUNCA o texto.
+    """
+    lines = [line.strip() for line in lyrics.split('\n') if line.strip()]
+    if not lines:
+        return [(0, 0)]
+    blocks = re.split(r'\n\s*\n', lyrics)
+    spans = []
+    offset = 0
+    for block in blocks:
+        count = len([line for line in block.split('\n') if line.strip()])
+        if not count:
+            continue
+        # Cada bloco musical preserva o contexto de no máximo cinco linhas.
+        for i in range(0, count, 3):
+            start = offset + i
+            end = min(offset + count, start + 5)
+            if end - start < 2 and start > offset:
+                start = max(offset, end - 3)
+            snippet = ' '.join(lines[start:end])
+            if len(snippet) >= 18 and not re.fullmatch(r'(?i)(?:coro|instrumentos?|bis|\d+x?)[^\w]*', snippet):
+                spans.append((start, end))
+        offset += count
+    if not spans:
+        spans = [(0, min(5, len(lines)))]
+    # Elimina trechos quase idênticos (refrões repetidos), mantém os offsets
+    # da letra; isso evita repetição artificial de um mesmo acontecimento.
+    unique = []
+    seen = set()
+    for start, end in spans:
+        signature = re.sub(r'[^a-z0-9]+', ' ', normalize(' '.join(lines[start:end]))).strip()
+        if signature and signature not in seen:
+            seen.add(signature)
+            unique.append((start, end))
+    if len(unique) <= max_segments:
+        return unique
+    # Seleção uniforme: começo, meio e final; nunca somente intro/conclusão.
+    indexes = [round(i * (len(unique)-1) / (max_segments-1)) for i in range(max_segments)]
+    return [unique[i] for i in dict.fromkeys(indexes)]
+
+
 def main():
     print('Downloading quantized ONNX model...',flush=True)
     model=Path(hf_hub_download(repo_id=REPO,filename='onnx/model_int8.onnx',revision=REVISION))
     tokenizer=Path(hf_hub_download(repo_id=REPO,filename='tokenizer.json',revision=REVISION))
+    digest=hashlib.sha256(model.read_bytes()).hexdigest()
+    if digest != MODEL_SHA256:
+        raise RuntimeError('Modelo ONNX divergente do SHA-256 pinado: '+digest)
     tok=Tokenizer.from_file(str(tokenizer))
     data=generate_vocab(tokenizer)
     print('Inputs tokenizer:',list(data.keys()), 'pre-tokenizer:',str(data.get('pre_tokenizer'))[:100],flush=True)
@@ -137,33 +185,68 @@ def main():
     print('Model:',target.stat().st_size,'bytes','inputs',[x.name for x in session.get_inputs()],'outputs',[x.name for x in session.get_outputs()],flush=True)
     hymns,collections,source_digest=fetch_hymns()
     print('Hymns:',len(hymns),'collections:',collections,flush=True)
-    # Até dois segmentos por hino, para capturar mensagens em estrofes diferentes.
+    # Indexação por trechos distribuídos do hino, e NÃO apenas início/final.
     passages=[]
+    segments_by_hymn=[]
     for h in hymns:
-        lines=[s.strip() for s in h['lyrics'].split('\n') if s.strip()]
-        first=' '.join(lines[:12])[:800]
-        last=' '.join(lines[-12:])[:800]
-        passages.append('passage: '+h['title']+'. '+first)
-        passages.append('passage: '+h['title']+'. '+last)
+        lines=[line.strip() for line in h['lyrics'].split('\n') if line.strip()]
+        segments=passage_spans(h['lyrics'],max_segments=8)
+        segments_by_hymn.append(segments)
+        for begin,end in segments:
+            passages.append('passage: '+ ' '.join(lines[begin:end])[:750])
     vectors=[]
-    bs=12
+    bs=16
     for i in range(0,len(passages),bs):
-        output=encode(session,tok,passages[i:i+bs],max_tokens=192)
+        output=encode(session,tok,passages[i:i+bs],max_tokens=160)
         vectors.extend(output)
-        if i%240==0:print('Embedded',min(i+bs,len(passages)),'/',len(passages),flush=True)
+        if i%320==0:print('Embedded',min(i+bs,len(passages)),'/',len(passages),flush=True)
+    def compress(x):
+        return base64.b64encode(np.clip(np.rint(x*127),-127,127).astype(np.int8).tobytes()).decode('ascii')
     records=[]
-    for i,h in enumerate(hymns):
-        def compress(x):return base64.b64encode(np.clip(np.rint(x*127),-127,127).astype(np.int8).tobytes()).decode('ascii')
+    offset=0
+    for h,spans in zip(hymns,segments_by_hymn):
+        vectors_here=vectors[offset:offset+len(spans)]
+        offset+=len(spans)
         records.append({'id':h['id'],'n':h['number'],'t':normalize(h['title']),'f':h['fingerprint'],'c':h['collection'],
-                        'v':[compress(vectors[2*i]),compress(vectors[2*i+1])]})
-    payload={'version':2,'model':'Xenova/multilingual-e5-small:onnx/model_int8.onnx','dimension':384,
+                        's':spans,'v':[compress(x) for x in vectors_here]})
+    assert offset==len(vectors)
+    payload={'version':3,'model':'Xenova/multilingual-e5-small:onnx/model_int8.onnx',
+             'model_sha256':MODEL_SHA256,'dimension':384,'max_passages_per_hymn':8,
+             'passage_strategy':'local windows up to five non-empty lines, selected across hymn',
              'source_sha256':source_digest,'source_url':SOURCE,'collections':collections,'count':len(records),
-             'records':records,'score_note':'cosine is not probability'}
+             'passages':len(passages),'records':records,'score_note':'cosine is not probability'}
     out=ASSETS/'e5-index.json';out.write_text(json.dumps(payload,separators=(',',':'),ensure_ascii=False),encoding='utf8')
-    assert len(records)==len(hymns) and all(len(x['v'][0])==512 for x in records)
-    print('Generated index',out.stat().st_size,'bytes, model',target.stat().st_size,'bytes',flush=True)
+    assert len(records)==len(hymns) and all(len(x['v'])==len(x['s']) and all(len(v)==512 for v in x['v']) for x in records)
+    assert len(passages)>len(hymns)*2, 'Indexação por trecho insuficiente'
+    print('Generated index',out.stat().st_size,'bytes, passages',len(passages),
+          'model',target.stat().st_size,'bytes',flush=True)
     # Arquivo compacto de diagnóstico e teste das formas de tokenização.
-    test=['query: Filho Pródigo','query: Quero voltar para Deus','query: Salmo 23','passage: Voltei pra ti meu Pai']
+    test=[
+        'query: Filho Pródigo',
+        'query: Quero voltar para Deus',
+        'query: Salmo 23',
+        'query: Marcos 5:25-34',
+        'query: Mulher do fluxo de sangue',
+        'query: Jesus acalma a tempestade',
+        'query: Lázaro foi ressuscitado',
+        'query: João 11:1-44',
+        'query: o filho pediu perdão ao pai',
+        'query: ninguém me vê, Senhor?',
+        'query: Sou feliz por Cristo!',
+        'query: CRISTO CAMINHAVA LENTAMENTE',
+        'query: a fé e o amor ao próximo',
+        'query: não era tarde demais',
+        'query: 1 João 4:7',
+        'query: Cântico de ação de graças',
+        'query: 100 ovelhas e só 99 retornaram',
+        'query: Deus está comigo — confio!',
+        'query: a tua fé te salvou',
+        'query: Há um rio de paz e amor',
+        'passage: Voltei pra ti meu Pai',
+        'passage: tocou as vestes e foi curada',
+        'passage: Mestre, o mar se revolta',
+        'passage: Não temas, pois Eu sou contigo',
+    ]
     expected={'tokenizer_type':'Unigram','test_cases':[{'text':s,'ids':tok.encode(s).ids} for s in test]}
     (ROOT/'tests/e5-tokenizer-cases.json').write_text(json.dumps(expected,ensure_ascii=False,indent=2),encoding='utf8')
     (ASSETS/'e5-source.txt').write_text('Modelo: https://huggingface.co/Xenova/multilingual-e5-small\nBase: https://huggingface.co/intfloat/multilingual-e5-small\nLicença: MIT; ver arquivos do projeto original\n\nEste APK redistribui apenas vetores codificados das três coleções 2018; as letras são importadas pelo usuário no dispositivo.\n',encoding='utf8')

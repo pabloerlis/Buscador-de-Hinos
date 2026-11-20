@@ -5,6 +5,8 @@ const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
+else if(!localStorage.getItem('hinos-search-preferences-v15'))
+  state.searchSettings.vectorMode='balanced'; // Ativa E5 por padrão apenas nas novas instalações.
 document.documentElement.classList.toggle('with-gguf',Boolean(window.NativeGGUF));
 document.documentElement.classList.toggle('with-vector',Boolean(window.NativeVector));
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
@@ -31,7 +33,7 @@ async function refreshStatus(){
   $('settings-stories').textContent=result.story_ready?`${result.story_count} narrativas locais`:'Não carregada';
   $('settings-scripture').textContent=result.scripture_ready?`${result.scripture_books} livros · Bíblia Livre`:'Indisponível';
   $('settings-bible-graph').textContent=result.bible_graph_ready?`${result.bible_graph_stats?.verse_topics||0} versículos com temas · ${result.bible_graph_narratives} narrativas`:'Indisponível';
-  $('settings-embeddings').textContent=result.vector_count?`${result.vector_count} hinos · E5 Small`:'Não disponível para esta coletânea';
+  $('settings-embeddings').textContent=result.vector_count?`${result.vector_count} hinos · ${result.vector_status?.passages||0} trechos · E5 Small`:'Não disponível para esta coletânea';
   $('settings-bridge').textContent=result.bridge_ready?`${result.bridge_entries} associações`:'Indisponível';
   if(typeof GGUF!=='undefined')GGUF.info();
   return result;

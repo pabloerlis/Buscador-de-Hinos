@@ -1,3 +1,17 @@
+# Buscador de Hinos Android v2.6.2 — E5 por estrofe
+
+A versão **2.6.2 (build 21)** habilita embeddings semânticos reais no Android, offline e sem GGUF. O índice guarda até oito vetores por hino, cobrindo trechos distribuídos pela letra (não apenas início/fim). O aplicativo compara a consulta ao vetor de cada trecho e mostra a passagem encontrada na letra importada; a semelhança não representa certeza.
+
+**Modelo:** `Xenova/multilingual-e5-small`, ONNX int8 (~118 MB), dimensionalidade 384, revisão e SHA-256 pinados. A inferência da consulta usa ONNX Runtime no aparelho. O APK completo será significativamente maior que a versão sem modelo. O primeiro uso também requer espaço extra para preparar o modelo local.
+
+**Privacidade/direitos:** o APK contém pesos do modelo, vocabulário e vetores compactados com posição das linhas, **não as letras**. Cada vetor só é associado à letra quando título e hash da letra importada correspondem exatamente ao índice. Hinos de outra edição continuam pesquisáveis pelo motor lexical e bíblico.
+
+**Build isolado:** `gradle assembleDebug -PenableLocalEmbeddings=true`, após gerar os recursos pinados via `python3 scripts/build_e5_assets.py`. A variante padrão não inclui modelos. A tela **Configurações → Busca inteligente offline** permite modos E5 desligado/equilibrado/forte. Em instalação nova com encoder disponível, o modo equilibrado é o padrão; preferências anteriores são preservadas.
+
+**QA:** agentes de fonte, código, regressões, relevância, E5 e auditoria do APK. O agente E5 mede recuperação vetorial real de consultas diversas, além de verificar a integridade e proveniência dos arquivos. A qualidade semântica ainda depende de avaliações humanas mais extensas, não apenas do ranking E5.
+
+---
+
 # Buscador de Hinos Android v2.6.0 (experimental)
 
 A partir da versão 2.6.0, **Configurações → Sobre** mostra nome do aplicativo, desenvolvedor (**Pablo Erlis**), versão, código da versão, tipo de compilação, commit e data UTC. Esses valores são obtidos do APK instalado por meio de uma interface Android, sem internet ou informação digitada manualmente na tela. Fora do aplicativo Android, os campos de compilação são marcados como indisponíveis.

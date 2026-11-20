@@ -30,6 +30,7 @@ gradle = (ROOT/"app/build.gradle").read_text(encoding="utf-8")
 version_name = re.search(r"\bversionName\s+'([^']+)'",gradle)[1]
 version_code = re.search(r"\bversionCode\s+(\d+)",gradle)[1]
 expected_sha = os.environ.get("BUILD_SOURCE_SHA", "").strip()
+expect_e5 = os.environ.get('EXPECT_E5_EMBEDDINGS','false').lower()=='true'
 check(len(expected_sha)==40 and re.fullmatch(r"[0-9a-f]{40}",expected_sha),
       "SHA do commit de origem ausente ou inválido")
 
@@ -44,12 +45,36 @@ with zipfile.ZipFile(APK) as archive:
         check(required in files,"Asset essencial ausente: "+required)
     for name in files:
         lowered = name.lower()
-        check(not (lowered.endswith((".gguf",".onnx",".tflite")) or
-                   re.search(r"/lib(?:onnxruntime|hinosllm)[^/]*\.so$",lowered)),
-              "Modelo de IA não autorizado no APK padrão: "+name)
+        if expect_e5:
+            # Permite APENAS o E5 pinado nesta variante (nunca um GGUF).
+            forbidden=(lowered.endswith((".gguf",".tflite")) or
+                       (lowered.endswith(".onnx") and name!="assets/e5-model.onnx") or
+                       re.search(r"/libhinosllm[^/]*\.so$",lowered))
+        else:
+            forbidden=(lowered.endswith((".gguf",".onnx",".tflite")) or
+                       re.search(r"/lib(?:onnxruntime|hinosllm)[^/]*\.so$",lowered))
+        check(not forbidden,"Modelo incompatível com a variante: "+name)
         check(name not in ("assets/colecao.json","assets/data/data.json",
                            "assets/hinos-avaliacao.json"),
               "Catálogo de letras incorporado indevidamente: "+name)
+    if expect_e5:
+        required_e5=("assets/e5-model.onnx","assets/e5-vocab.bin",
+                     "assets/e5-index.json","assets/e5-source.txt")
+        for required in required_e5:
+            check(required in files,"Recurso E5 ausente do APK: "+required)
+        check(any(n.endswith("/libonnxruntime.so") and "arm64-v8a" in n for n in files),
+              "Biblioteca ONNX Runtime ARM64 ausente")
+        if all(n in files for n in required_e5):
+            model_sha="4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c"
+            data=archive.read("assets/e5-model.onnx")
+            check(len(data)>100_000_000 and hashlib.sha256(data).hexdigest()==model_sha,
+                  "Modelo E5 incompatível com SHA-256 fixado")
+            idx=json.loads(archive.read("assets/e5-index.json"))
+            check(idx.get("version")==3 and idx.get("dimension")==384 and
+                  idx.get("count",0)>=1500 and idx.get("passages",0)>=4000,
+                  "Índice de estrofes E5 incompleto no APK")
+            check("MIT" in archive.read("assets/e5-source.txt").decode("utf-8"),
+                  "Licença do modelo E5 não atribuída")
     dex = b"".join(archive.read(name) for name in files if re.fullmatch(r"classes\d*\.dex",name))
     check(bool(dex),"APK sem classes Android DEX")
     check(b"Pablo Erlis" in dex,"Crédito do desenvolvedor ausente do código nativo")
@@ -85,6 +110,7 @@ sha=hashlib.sha256(APK.read_bytes()).hexdigest()
 report={"apk":APK.name,"version_name":version_name,"version_code":int(version_code),
         "source_sha":expected_sha,"sha256":sha,"bytes":APK.stat().st_size,
         "signed":apksigner.is_file() and not any("Assinatura" in e for e in errors),
+        "local_e5_embedded":expect_e5,
         "passed":not errors}
 output=ROOT/"qa-report/apk-audit.json"
 output.parent.mkdir(exist_ok=True)
