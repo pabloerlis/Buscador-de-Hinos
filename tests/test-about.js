@@ -22,8 +22,9 @@ for(const field of ['VERSION_NAME','VERSION_CODE','BUILD_TYPE','SOURCE_REVISION'
 for(const field of ['SOURCE_REVISION','BUILD_DATE_UTC']){
   assert.ok(gradle.includes("'"+field+"'"), 'Ausente na build: ' + field);
 }
-assert.match(gradle, /versionName '2\.6\.0'/);
-assert.match(gradle, /versionCode 19/);
+const versionName=gradle.match(/\bversionName\s+'([^']+)'/)?.[1];
+const versionCode=Number(gradle.match(/\bversionCode\s+(\d+)/)?.[1]);
+assert.ok(versionName && Number.isInteger(versionCode) && versionCode>0);
 assert.match(workflow, /BUILD_SOURCE_SHA:/);
 const context = vm.createContext({console, Date});
 vm.runInContext(fs.readFileSync(path.join(base,'assets/about.js'),'utf8'),context);
@@ -33,13 +34,13 @@ const elements = Object.fromEntries(ids.map(id=>[id,{textContent:''}]));
 const doc = {getElementById:id=>elements[id]};
 const fullSha = 'a'.repeat(40);
 const installed = about.render(doc,{buildInfo:()=>JSON.stringify({
-  developer:'Pablo Erlis',versionName:'2.6.0',versionCode:19,buildType:'debug',
+  developer:'Pablo Erlis',versionName,versionCode,buildType:'debug',
   sourceRevision:fullSha,buildDateUtc:'2026-11-20T20:30:00Z'
 })});
-assert.equal(installed.versionCode,19);
+assert.equal(installed.versionCode,versionCode);
 assert.equal(elements['about-developer'].textContent,'Pablo Erlis');
-assert.equal(elements['about-version'].textContent,'2.6.0');
-assert.equal(elements['about-code'].textContent,'19');
+assert.equal(elements['about-version'].textContent,versionName);
+assert.equal(elements['about-code'].textContent,String(versionCode));
 assert.equal(elements['about-type'].textContent,'debug');
 assert.equal(elements['about-commit'].textContent,'a'.repeat(12));
 assert.match(elements['about-date'].textContent,/UTC$/);

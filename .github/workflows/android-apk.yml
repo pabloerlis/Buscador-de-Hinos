@@ -1,62 +1,184 @@
-name: Build Android APK
+name: Android APK - verificacao por agentes
 on:
   push:
-    branches: [main, android-apk]
+    branches: ['**']
   pull_request:
     branches: [main]
   workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: verified-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  build:
-    timeout-minutes: 45
+  sources:
+    name: "Agente 1 | Fontes e licencas"
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gerar Biblia Livre (fonte fixada por hash)
+        run: python3 scripts/build_scripture_index.py
+      - name: Gerar grafo biblico (fontes fixadas)
+        run: python3 scripts/build_bible_graph.py
+      - name: Auditar proveniencia, integridade e cobertura
+        run: python3 scripts/qa_sources.py
+      - name: Compartilhar apenas indices biblicos licenciados
+        uses: actions/upload-artifact@v4
+        with:
+          name: bible-indexes-qa
+          path: |
+            app/src/main/assets/scripture-pt.json
+            app/src/main/assets/bible-graph.json
+          retention-days: 1
+          if-no-files-found: error
+
+  static:
+    name: "Agente 2 | Codigo e seguranca estatica"
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxe JavaScript de todos os arquivos
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(find app/src/main/assets tests -type f -name '*.js' -print0)
+      - name: Auditar interface, versao, licencas e bloqueio da compilacao
+        run: python3 scripts/qa_static.py
+
+  regressions:
+    name: "Agente 3 | Testes funcionais de regressao"
+    needs: sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          path: app/src/main/assets
+      - name: Rodar todos os testes locais
+        shell: bash
+        run: |
+          set -euo pipefail
+          for test in tests/test-*.js; do
+            echo "=== $test ==="
+            node "$test"
+          done
+
+  relevance:
+    name: "Agente 4 | Busca semantica e metricas"
+    needs: sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 14
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          path: app/src/main/assets
+      - name: Catalogo publico fixado para validacao (nunca no APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --max-time 90 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output /tmp/hinos-avaliacao.json
+          test "$(wc -c < /tmp/hinos-avaliacao.json)" -gt 100000
+      - name: Recall@10, Recall@20, nDCG@5 e exemplos analogos
+        run: node tests/qa-metrics.js /tmp/hinos-avaliacao.json
+      - name: Guardar metricas sem redistribuir letras
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-metrics
+          path: qa-report/metrics.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+  build_apk:
+    name: "Compilar apenas se os 4 agentes aprovarem"
+    needs: [sources, static, regressions, relevance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-      - name: Install Android SDK platform
+      - name: SDK Android
+        shell: bash
         run: |
+          set -euo pipefail
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
-          if [ -z "$SDKMANAGER" ]; then echo 'sdkmanager unavailable'; exit 1; fi
+          test -n "$SDKMANAGER"
           "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-      - name: Build licensed offline Bible index
-        run: python3 scripts/build_scripture_index.py
-      - name: Build biblical-topic and cross-reference graph
-        run: python3 scripts/build_bible_graph.py
-      - name: Run local-search tests
-        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js && node tests/test-v21.js && node tests/test-narrative-events.js && node tests/test-about.js
-      - name: Evaluate offline semantic ranking
-        run: node tests/test-stanza-ranking.js
-      - name: Evaluate narrative ranking on full catalog (test only)
-        run: |
-          curl --fail --location --silent --show-error --retry 2 \
-            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
-            --output /tmp/hinos-avaliacao.json
-          node tests/benchmark-narratives.js /tmp/hinos-avaliacao.json
-          node tests/benchmark-biblical-passages.js /tmp/hinos-avaliacao.json
-      - name: Build APK
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          path: app/src/main/assets
+      - name: Compilar APK debug
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: gradle --no-daemon --stacktrace assembleDebug
-      - name: Verify model-free APK contents
-        run: |
-          apk=app/build/outputs/apk/debug/app-debug.apk
-          entries="$(unzip -Z1 "$apk")"
-          grep -Fx 'assets/scripture-pt.json' <<< "$entries"
-          grep -Fx 'assets/bible-graph.json' <<< "$entries"
-          if grep -E '(^assets/e5-|/lib(hinosllm|onnxruntime[^/]*)\.so$)' <<< "$entries"; then
-            echo 'Unexpected AI assets or inference libraries in default APK.'
-            exit 1
-          fi
-          du -h "$apk"
-      - uses: actions/upload-artifact@v4
+      - name: Guardar candidato para auditoria (ainda nao aprovado)
+        uses: actions/upload-artifact@v4
         with:
-          name: Buscador-de-Hinos-Android-debug
+          name: apk-candidate-qa
           path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 1
+          if-no-files-found: error
+
+  audit_apk:
+    name: "Agente 5 | Auditar assinatura e APK final"
+    needs: build_apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ferramentas Android
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          test -n "$SDKMANAGER"
+          "$SDKMANAGER" 'build-tools;35.0.0'
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-candidate-qa
+          path: apk-candidate
+      - name: Assinatura, versao, SHA, proveniencia, integridade
+        env:
+          BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/qa_apk.py apk-candidate/app-debug.apk
+      - name: Identificar a versao do artefato
+        id: meta
+        shell: bash
+        run: |
+          version="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle | head -n 1)"
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Publicar somente APK validado
+        uses: actions/upload-artifact@v4
+        with:
+          name: Buscador-de-Hinos-v${{ steps.meta.outputs.version }}-QA-aprovado
+          path: |
+            apk-candidate/app-debug.apk
+            qa-report/apk-audit.json
+          retention-days: 90
           if-no-files-found: error
