@@ -40,7 +40,7 @@ const ctx=vm.createContext({console,crypto:crypto.webcrypto,TextEncoder,atob:s=>
   localStorage:{getItem:k=>prefs.get(k)||null,setItem:(k,v)=>prefs.set(k,String(v))},
   fetch:async name=>({ok:Object.hasOwn(data,name),json:async()=>data[name]})});
 for(const name of ['scripture-index.js','semantic-engine.js','story-engine.js','bridge-engine.js',
-  'bible-context.js','bible-graph-engine.js','recommendation-engine.js','vector-index.js',
+  'bible-context.js','bible-graph-engine.js','recommendation-engine.js','vector-index.js','rrf-fusion.js',
   'repertoire-store.js','offline-api.js'])
   vm.runInContext(read(name),ctx,{filename:name});
 const request=vm.runInContext('OfflineAPI.request',ctx);
@@ -60,6 +60,12 @@ const queryVector=[0,1,...Array(382).fill(0)];
   assert.equal(result.results[0].vector_similarity,100);
   assert.ok(result.interpretation?.some?.(x=>x.includes('trechos'))||
             (result.results[0].reason||'').includes('E5'), 'Exibir evidência de resultado E5');
+  const fallback=await request('/api/search',{query,vector_query:queryVector,settings:{vectorMode:'balanced',fusionMode:'legacy',pageSize:10}});
+  const fused=await request('/api/search',{query,vector_query:queryVector,settings:{vectorMode:'balanced',fusionMode:'rrf',pageSize:10}});
+  assert.equal(fallback.results[0].number,'001','Ranking aditivo continua disponível');
+  assert.equal(fused.results[0].number,'001','RRF precisa recuperar estrofe central com E5');
+  assert.ok(!fused.results[0]._fusionSignals,'Sinais internos não devem vazar nos cartões da interface');
+  assert.ok(fused.interpretation?.some?.(x=>x.includes('RRF')) || fused.results[0].snippet.includes('manto'),'Diagnóstico RRF ou evidência textual ausente');
   const off=await request('/api/search',{query,vector_query:queryVector,settings:{vectorMode:'off',pageSize:10}});
   assert.equal(off.total,0,'Desativar E5 não pode simular semântica neural');
   const literal=await request('/api/search',{query:'Hino 002',vector_query:queryVector,
