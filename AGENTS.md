@@ -49,3 +49,12 @@ Nota: o emulador testa o APK x86_64; dispositivos reais arm64-v8a podem apresent
 - Testes obrigatórios: `tests/test-rrf-fusion.js`, `tests/test-e5-api-integration.js`, `tests/qa_e5_hybrid.js` com avaliações separadas `baseline` (sem E5), `additive` (E5 anterior) e `rrf`.
 - Reprovar se o RRF perder mais de um resultado no top20 ou reduzir nDCG@5 mais do que 0,025 no conjunto comparativo; avaliar em mais consultas antes de interpretar variações como melhorias comprovadas.
 - Executar a versão 2.6.3 **no emulador Android sem rede**, confirmar que o script RRF e a opção de configurações carregam e que `NativeVector.embed` retorna vetor normalizado. Auditar o APK assinado.
+
+## Etapa 4 — acontecimentos, atores e sequência (v2.6.4)
+
+- O motor `event-frame-engine.js` deve usar um dicionário de ações genérico para **todas** as histórias. Proibido pontuar hinos pelo número ou criar exceções para personagens, histórias ou referências individuais.
+- Não confundir mera semelhança temática com narrativa: exigir múltiplas ações, ordem de ocorrência e evidência de personagem/cenário **dentro de um trecho da letra**, com citações textuais autênticas da letra importada.
+- Separar analogia em primeira pessoa de descrição direta do episódio e não promover frases negadas como acontecimento ocorrido.
+- Preservar `eventEvidence:false` para auditoria pareada com o motor desligado; defaults ativados só em busca contextual e narrativa.
+- O CI deve executar `tests/test-event-frames.js` e `tests/qa_event_ranking.js`, comparando Recall@10/20 e nDCG@5 em consultas reais, incluindo narrativas e referências. Os resultados devem ser registrados sem letras.
+- Dispositivo: inspecionar `EventFrameEngine` e controle `event-toggle` dentro da WebView Android offline e executar classificação de texto sintético antes da auditoria e publicação do APK.
