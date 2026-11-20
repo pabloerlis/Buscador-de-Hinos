@@ -32,3 +32,11 @@ A compilação `build_apk` depende de `sources`, `static`, `regressions` e `rele
 - A consulta gera o próprio vetor offline via ONNX Runtime Android. Uma consulta sem modelo continua com resultado lexical imediato; falhas do E5 não bloqueiam a busca.
 - O quinto agente de **pré-build** passa a validar SHA do modelo, procedência do índice, presença dos trechos e recuperação sobre várias histórias; o agente de **pós-build** verifica modelo, vocabulário e bibliotecas no APK específico.
 - O benchmark de recuperação vetorial isolada não substitui o teste híbrido nem prova desempenho global; manter relatórios de relevância e casos negativos.
+
+## Teste de execução obrigatória (v2.6.2+)
+
+Além de testes unitários, **o próprio APK candidato** é instalado no emulador Android x86_64 com as conexões sem fio desabilitadas. Um teste instrumentado abre a WebView real, verifica a tela Sobre e exige que `NativeVector.embed` execute o ONNX Runtime e devolva um vetor 384D finito e normalizado. A auditoria/públicação do APK depende da aprovação desse teste.
+
+O tokenizer Java de produção deve produzir os **mesmos IDs** de ao menos 20 consultas do tokenizer original do modelo Python, incluindo acentos, referências e pontuação, antes do build. A integração JS também deve testar importação, indexação, trecho recuperado, desligamento E5, número exato e repertório não aprendido.
+
+Nota: o emulador testa o APK x86_64; dispositivos reais arm64-v8a podem apresentar desempenho diferente. Um teste automatizado não substitui ensaio manual em aparelhos-alvo.
