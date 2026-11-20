@@ -1,95 +1,176 @@
 #!/usr/bin/env python3
-import base64,hashlib,html,json,re,struct,unicodedata,shutil
+"""Baixa E5-small int8, exporta vocabulário e índices vetoriais de hinos.
+Os textos de hinos NÃO são distribuídos: apenas vetores normalizados em int8.
+Uso: pip install huggingface_hub tokenizers onnxruntime numpy requests
+"""
+import base64
+import hashlib
+import html
+import json
+import os
+import re
+import struct
+import sys
+import unicodedata
 from html.parser import HTMLParser
 from pathlib import Path
-import numpy as np,onnxruntime as ort,requests
+
+import numpy as np
+import onnxruntime as ort
+import requests
 from huggingface_hub import hf_hub_download
 from tokenizers import Tokenizer
-ROOT=Path(__file__).resolve().parents[1];ASSETS=ROOT/'app/src/main/assets'
-REPO='Xenova/multilingual-e5-small';REV='761b726dd34fb83930e26aab4e9ac3899aa1fa78'
+
+ROOT=Path(__file__).resolve().parents[1]
+ASSETS=ROOT/'app/src/main/assets'
+ASSETS.mkdir(parents=True,exist_ok=True)
+# Fixa a revisão: garante modelo e tokenizer da mesma versão.
+REPO='Xenova/multilingual-e5-small'
+REVISION='761b726dd34fb83930e26aab4e9ac3899aa1fa78'
 SOURCE='https://raw.githubusercontent.com/italozaina/projection-html5-icm/master/data/data.json'
+
 class Markup(HTMLParser):
- def __init__(self):super().__init__(convert_charrefs=True);self.parts=[]
- def handle_starttag(self,tag,attrs):
-  if tag.lower()=='br':self.parts.append('\n')
- def handle_endtag(self,tag):
-  if tag.lower() in ('p','div','li','section','h1','h2','h3','h4','h5','h6'):self.parts.append('\n')
- def handle_data(self,data):self.parts.append(data)
+    def __init__(self): super().__init__(convert_charrefs=True);self.parts=[]
+    def handle_starttag(self,tag,attrs):
+        if tag.lower()=='br':self.parts.append('\n')
+    def handle_endtag(self,tag):
+        if tag.lower() in ('p','div','li','section','h1','h2','h3','h4','h5','h6'):self.parts.append('\n')
+    def handle_data(self,data):self.parts.append(data)
+
 def plain(s):
- p=Markup();p.feed(str(s or '').replace('\\n','\n'))
- return re.sub(r'\n{4,}','\n\n\n',re.sub(r'[ \t]+$','',(''.join(p.parts)).replace('\xa0',' '),flags=re.M)).strip()
-def norm(s):
- s=unicodedata.normalize('NFKD',str(s))
- return ' '.join(''.join(c for c in s if unicodedata.category(c)!='Mn').lower().split())
-def titleparse(s):
- t=plain(s).replace('\n',' ').strip()
- m=re.match(r'^\s*(?:(?:hino|louvor)\s+)?(\d{1,4})\s*(?:[-–—.:)]\s*|\s+)(.+)$',t,re.I)
- if m:return m.group(1).zfill(3),m.group(2).strip()
- m=re.match(r'^\s*(?:hino\s*)?(\d{1,4})\s*$',t,re.I)
- return (m.group(1).zfill(3) if m else None),t
+    s=str(s or '').replace('\\n','\n')
+    p=Markup();p.feed(s)
+    return re.sub(r'\n{4,}','\n\n\n',re.sub(r'[ \t]+$','',(''.join(p.parts)).replace('\xa0',' '),flags=re.M)).strip()
+def normalize(s):
+    s=unicodedata.normalize('NFKD',str(s))
+    s=''.join(c for c in s if unicodedata.category(c)!='Mn')
+    return ' '.join(s.lower().split())
+def titleparse(raw):
+    t=plain(raw).replace('\n',' ').strip()
+    m=re.match(r'^\s*(?:(?:hino|louvor)\s+)?(\d{1,4})\s*(?:[-–—.:)]\s*|\s+)(.+)$',t,re.I)
+    if m:return m.group(1).zfill(3),m.group(2).strip()
+    m=re.match(r'^\s*(?:hino\s*)?(\d{1,4})\s*$',t,re.I)
+    return (m.group(1).zfill(3) if m else None),t
+
+def fetch_hymns():
+    source=requests.get(SOURCE,timeout=120);source.raise_for_status()
+    data=source.json()
+    groups=data if isinstance(data,list) else data.get('collections',data.get('coletaneas',data.get('data',[data])))
+    if not isinstance(groups,list):groups=[groups]
+    # No índice v1.9 usamos apenas essas três edições brasileiras.
+    allowed={'Coletânea 2018':'principal','Avulsos 2018':'avulsos','CIA 2018':'cia'}
+    selected=[g for g in groups if isinstance(g,dict) and g.get('name') in allowed and isinstance(g.get('songs'),list)]
+    if len(selected)!=3:raise RuntimeError('As três coleções esperadas estão ausentes da origem')
+    selected.sort(key=lambda g:['Coletânea 2018','Avulsos 2018','CIA 2018'].index(g['name']))
+    hymns=[]; exact=set();counts={}; duplicates=0
+    for group in selected:
+        added=0
+        for h in group['songs']:
+            if not isinstance(h,dict):continue
+            num,title=titleparse(h.get('title',h.get('titulo','')))
+            lyrics=plain(h.get('content',h.get('letra','')))
+            if not title or not lyrics:continue
+            explicit=h.get('number',h.get('numero'))
+            if explicit is not None and str(explicit).isdigit(): num=str(explicit).zfill(3)
+            key=re.sub(r'[^a-z0-9]+',' ',normalize(lyrics)).strip()
+            if len(key)>=75 and key in exact:
+                duplicates+=1;continue
+            if len(key)>=75:exact.add(key)
+            digest=hashlib.sha256(normalize(title+'|'+lyrics).encode('utf-8')).hexdigest()[:24]
+            hymns.append({'id':len(hymns)+1,'number':num or '', 'title':title,'lyrics':lyrics,
+                          'fingerprint':digest,'collection':allowed[group['name']]})
+            added+=1
+        counts[group['name']]=added
+    if len(hymns)<1400:raise RuntimeError('Menos de 1400 hinos únicos; fonte inesperada')
+    print('Coleções integradas:',counts,'duplicatas exatas:',duplicates,flush=True)
+    return hymns,counts,hashlib.sha256(source.content).hexdigest()
+
+def generate_vocab(tokenizer_path):
+    data=json.loads(Path(tokenizer_path).read_text(encoding='utf-8'))
+    model=data['model']; typ=model.get('type','Unigram')
+    if typ!='Unigram':raise RuntimeError('Tokenizer incompatible (expected Unigram, got '+str(typ)+')')
+    vocab=model['vocab']
+    out=ASSETS/'e5-vocab.bin'
+    with out.open('wb') as f:
+        f.write(struct.pack('>I',len(vocab)))
+        for i,(piece,score) in enumerate(vocab):
+            word=piece.encode('utf8')
+            if len(word)>65535:raise ValueError('Oversized tokenizer piece')
+            f.write(struct.pack('>ifH',i,float(score),len(word)))
+            f.write(word)
+    print('Tokenizer:',typ,len(vocab),'entries',out.stat().st_size,'bytes',flush=True)
+    return data
+
+def encode(session,tok,texts,max_tokens=192):
+    enc=[tok.encode(s) for s in texts]
+    lens=[min(max_tokens,len(x.ids)) for x in enc]
+    max_len=max(lens)
+    ids=np.full((len(enc),max_len),1,dtype=np.int64)
+    mask=np.zeros_like(ids)
+    for i,e in enumerate(enc):
+        length=lens[i];ids[i,:length]=e.ids[:length];mask[i,:length]=1
+        # Quando truncado, deixar eos no final.
+        if length<len(e.ids):ids[i,length-1]=2
+    inputs={}
+    for name in session.get_inputs():
+        if name.name=='input_ids':inputs[name.name]=ids
+        elif name.name=='attention_mask':inputs[name.name]=mask
+        elif name.name=='token_type_ids':inputs[name.name]=np.zeros_like(ids)
+        else:raise RuntimeError('Unknown model input '+name.name)
+    result=session.run(None,inputs)[0]
+    if result.ndim!=3 or result.shape[-1]!=384:raise RuntimeError('E5 output shape unexpected '+str(result.shape))
+    v=(result*mask[:,:,None]).sum(axis=1)/np.maximum(mask.sum(axis=1)[:,None],1)
+    v=v/np.maximum(np.linalg.norm(v,axis=1,keepdims=True),1e-8)
+    return v
+
 def main():
- print('Baixando modelo E5 Small quantizado…',flush=True)
- model=hf_hub_download(repo_id=REPO,filename='onnx/model_int8.onnx',revision=REV)
- tokenizer=hf_hub_download(repo_id=REPO,filename='tokenizer.json',revision=REV)
- data=json.loads(Path(tokenizer).read_text(encoding='utf-8'))
- kind=data['model'].get('type','Unigram')
- if kind!='Unigram':raise RuntimeError('Tokenizer inesperado: '+str(kind))
- vocab=data['model']['vocab']
- with (ASSETS/'e5-vocab.bin').open('wb') as f:
-  f.write(struct.pack('>I',len(vocab)))
-  for i,(piece,score) in enumerate(vocab):
-   word=piece.encode('utf-8');f.write(struct.pack('>ifH',i,float(score),len(word)));f.write(word)
- shutil.copyfile(model,ASSETS/'e5-model.onnx')
- raw=requests.get(SOURCE,timeout=120);raw.raise_for_status();groups=raw.json()
- if isinstance(groups,dict):groups=groups.get('collections',groups.get('coletaneas',groups.get('data',[groups])))
- if not isinstance(groups,list):groups=[groups]
- groups=[g for g in groups if isinstance(g,dict) and isinstance(g.get('songs'),list)]
- groups.sort(key=lambda g:0 if 'coletanea 2018' in norm(g.get('name','')) else 1 if 'coletanea' in norm(g.get('name','')) else 2)
- if not groups:raise RuntimeError('JSON sem coleções')
- records=[]
- for s in groups[0]['songs']:
-  if not isinstance(s,dict):continue
-  n,t=titleparse(s.get('title',s.get('titulo','')));lyric=plain(s.get('content',s.get('letra','')))
-  if not t or not lyric:continue
-  explicit=s.get('number',s.get('numero'))
-  if explicit is not None and str(explicit).isdigit():n=str(explicit).zfill(3)
-  sig=hashlib.sha256(norm(t+'|'+lyric).encode('utf-8')).hexdigest()[:24]
-  records.append({'id':len(records)+1,'n':n or '', 't':norm(t),'f':sig,'title':t,'lyrics':lyric})
- if len(records)<100:raise RuntimeError('Fonte com poucos hinos')
- print('Hinos:',len(records),'Tokenizer:',len(vocab),flush=True)
- tok=Tokenizer.from_file(str(tokenizer))
- so=ort.SessionOptions();so.intra_op_num_threads=4;so.inter_op_num_threads=1
- session=ort.InferenceSession(str(ASSETS/'e5-model.onnx'),sess_options=so,providers=['CPUExecutionProvider'])
- print('ONNX inputs:',[x.name for x in session.get_inputs()],flush=True)
- passages=[]
- for s in records:
-  lines=[x.strip() for x in s['lyrics'].split('\n') if x.strip()]
-  passages.extend(['passage: '+s['title']+'. '+' '.join(lines[:12])[:800], 'passage: '+s['title']+'. '+' '.join(lines[-12:])[:800]])
- vectors=[]
- for start in range(0,len(passages),12):
-  batch=[tok.encode(x) for x in passages[start:start+12]]
-  lengths=[min(192,len(x.ids)) for x in batch]
-  w=max(lengths);ids=np.ones((len(batch),w),dtype=np.int64);mask=np.zeros_like(ids)
-  for i,item in enumerate(batch):
-   l=lengths[i];ids[i,:l]=item.ids[:l];mask[i,:l]=1
-   if l<len(item.ids):ids[i,l-1]=2
-  inputs={}
-  for item in session.get_inputs():
-   if item.name=='input_ids':inputs[item.name]=ids
-   elif item.name=='attention_mask':inputs[item.name]=mask
-   elif item.name=='token_type_ids':inputs[item.name]=np.zeros_like(ids)
-   else:raise RuntimeError('ONNX input desconhecida: '+item.name)
-  hidden=session.run(None,inputs)[0]
-  if hidden.ndim!=3 or hidden.shape[-1]!=384:raise RuntimeError('ONNX output inválido: '+str(hidden.shape))
-  v=(hidden*mask[:,:,None]).sum(1)/np.maximum(mask.sum(1)[:,None],1)
-  v=v/np.maximum(np.linalg.norm(v,axis=1,keepdims=True),1e-8)
-  vectors.extend(v)
-  if start%240==0:print('Embeddings:',min(start+12,len(passages)),'/',len(passages),flush=True)
- def pack(v):return base64.b64encode(np.clip(np.rint(v*127),-127,127).astype(np.int8).tobytes()).decode('ascii')
- payload={'version':1,'dimension':384,'count':len(records),'collection':groups[0].get('name',''),
-   'model':REPO+'/onnx/model_int8.onnx','source_sha256':hashlib.sha256(raw.content).hexdigest(),
-   'records':[{'id':r['id'],'n':r['n'],'t':r['t'],'f':r['f'],'v':[pack(vectors[2*i]),pack(vectors[2*i+1])]}
-     for i,r in enumerate(records)]}
- (ASSETS/'e5-index.json').write_text(json.dumps(payload,ensure_ascii=False,separators=(',',':')),encoding='utf8')
- print('Index pronto:',len(records),'hinos, tamanho',len((ASSETS/'e5-index.json').read_bytes()),flush=True)
+    print('Downloading quantized ONNX model...',flush=True)
+    model=Path(hf_hub_download(repo_id=REPO,filename='onnx/model_int8.onnx',revision=REVISION))
+    tokenizer=Path(hf_hub_download(repo_id=REPO,filename='tokenizer.json',revision=REVISION))
+    tok=Tokenizer.from_file(str(tokenizer))
+    data=generate_vocab(tokenizer)
+    print('Inputs tokenizer:',list(data.keys()), 'pre-tokenizer:',str(data.get('pre_tokenizer'))[:100],flush=True)
+    import shutil
+    target=ASSETS/'e5-model.onnx'
+    shutil.copyfile(model,target)
+    session=ort.InferenceSession(str(target),providers=['CPUExecutionProvider'],sess_options=opt())
+    print('Model:',target.stat().st_size,'bytes','inputs',[x.name for x in session.get_inputs()],'outputs',[x.name for x in session.get_outputs()],flush=True)
+    hymns,collections,source_digest=fetch_hymns()
+    print('Hymns:',len(hymns),'collections:',collections,flush=True)
+    # Até dois segmentos por hino, para capturar mensagens em estrofes diferentes.
+    passages=[]
+    for h in hymns:
+        lines=[s.strip() for s in h['lyrics'].split('\n') if s.strip()]
+        first=' '.join(lines[:12])[:800]
+        last=' '.join(lines[-12:])[:800]
+        passages.append('passage: '+h['title']+'. '+first)
+        passages.append('passage: '+h['title']+'. '+last)
+    vectors=[]
+    bs=12
+    for i in range(0,len(passages),bs):
+        output=encode(session,tok,passages[i:i+bs],max_tokens=192)
+        vectors.extend(output)
+        if i%240==0:print('Embedded',min(i+bs,len(passages)),'/',len(passages),flush=True)
+    records=[]
+    for i,h in enumerate(hymns):
+        def compress(x):return base64.b64encode(np.clip(np.rint(x*127),-127,127).astype(np.int8).tobytes()).decode('ascii')
+        records.append({'id':h['id'],'n':h['number'],'t':normalize(h['title']),'f':h['fingerprint'],'c':h['collection'],
+                        'v':[compress(vectors[2*i]),compress(vectors[2*i+1])]})
+    payload={'version':2,'model':'Xenova/multilingual-e5-small:onnx/model_int8.onnx','dimension':384,
+             'source_sha256':source_digest,'source_url':SOURCE,'collections':collections,'count':len(records),
+             'records':records,'score_note':'cosine is not probability'}
+    out=ASSETS/'e5-index.json';out.write_text(json.dumps(payload,separators=(',',':'),ensure_ascii=False),encoding='utf8')
+    assert len(records)==len(hymns) and all(len(x['v'][0])==512 for x in records)
+    print('Generated index',out.stat().st_size,'bytes, model',target.stat().st_size,'bytes',flush=True)
+    # Arquivo compacto de diagnóstico e teste das formas de tokenização.
+    test=['query: Filho Pródigo','query: Quero voltar para Deus','query: Salmo 23','passage: Voltei pra ti meu Pai']
+    expected={'tokenizer_type':'Unigram','test_cases':[{'text':s,'ids':tok.encode(s).ids} for s in test]}
+    (ROOT/'tests/e5-tokenizer-cases.json').write_text(json.dumps(expected,ensure_ascii=False,indent=2),encoding='utf8')
+    (ASSETS/'e5-source.txt').write_text('Modelo: https://huggingface.co/Xenova/multilingual-e5-small\nBase: https://huggingface.co/intfloat/multilingual-e5-small\nLicença: MIT; ver arquivos do projeto original\n\nEste APK redistribui apenas vetores codificados das três coleções 2018; as letras são importadas pelo usuário no dispositivo.\n',encoding='utf8')
+
+def opt():
+    o=ort.SessionOptions();o.intra_op_num_threads=4;o.inter_op_num_threads=1
+    o.graph_optimization_level=ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    return o
+
 if __name__=='__main__':main()

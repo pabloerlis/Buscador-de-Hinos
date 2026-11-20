@@ -1,3 +1,22 @@
+# Buscador de Hinos — Android v1.9
+
+## Novidade: três bibliotecas pesquisáveis
+
+- **Coletânea 2018**: 795 registros na fonte de 20/11/2026.
+- **Avulsos 2018**: 531 registros na mesma fonte.
+- **CIA 2018**: 241 registros na mesma fonte.
+- **Total bruto: 1.567 registros**. Dez letras idênticas foram encontradas na verificação inicial, com cerca de 1.557 registros únicos (a quantidade efetiva é recalculada no aparelho).
+- Origem: `https://raw.githubusercontent.com/italozaina/projection-html5-icm/master/data/data.json`; as três coleções são importadas a pedido do usuário e armazenadas no IndexedDB local do Android. Outros grupos presentes na fonte, como Coletânea Antiga, Test e Prova, são ignorados.
+- **Não se distribuem letras dessas coletâneas dentro do APK**; a importação exige conexão e os dados permanecem localmente. O aplicativo não é um serviço de streaming, catálogo oficial ou verificador de direitos autorais.
+- **Deduplicação por texto normalizado da letra:** mantém uma entrada por conteúdo idêntico, preservando todas as referências de número e coleção. Variações textuais não idênticas permanecem distintas para evitar falsos agrupamentos.
+- **Pesquisa e recomendações em cadeia:** filtros por coleção e resultados cruzados, inclusive com números homônimos.
+- **E5 Small:** na compilação Android, vetores são pré-calculados para as três fontes de 2018. O modelo roda no aparelho para consultas de pesquisa, sem geração GGUF; somente hinos com impressão digital correspondente ao índice usam essa camada, enquanto hinos de JSON pessoais continuam localmente pesquisáveis.
+- **Migração:** instalações anteriores com cache da coletânea principal são preservadas. Para adicionar Avulsos e CIA, acione `Adicionar Avulsos e CIA` na página principal.
+- **Compatibilidade:** ARM64-v8a, Android 7+, APK de depuração. Não há garantia de assinatura de atualização entre builds CI diferentes.
+- **Licenciamento:** o app não inclui os textos completos de hinos. A biblioteca Bíblia Livre é distribuída com atribuição CC BY; verificar permissões para qualquer redistribuição de letras.
+
+---
+
 # Buscador de Hinos — Android 1.6
 
 Aplicativo Android ARM64 com busca offline, ranking estimado e motor GGUF opcional (`llama.cpp`).
@@ -125,6 +144,47 @@ As pontuações são **heurísticas, não probabilidades de compatibilidade comp
 
 O arquivo `scripture-pt.json` é gerado pelo pipeline e não está no repositório para manter uma fonte de verdade única e versão auditável. É obrigatório para que o APK distribua o recurso bíblico offline.
 
+## v1.8 — Multilingual E5 Small / embeddings locais
 
-## v1.8 — embeddings offline E5 Small
-Modelo multilingual-e5-small (MIT) quantizado em ONNX. O build gera vetores normalizados dos hinos 2018, não distribui letras, e inclui o modelo no APK. A busca textual aparece primeiro; a camada E5 atualiza o ranking depois de calcular apenas o vetor da consulta. O primeiro uso copia o modelo para o armazenamento privado do Android. A correspondência entre vetores e hinos exige SHA-256 da letra, número e título. Configurações permitem desativar ou priorizar a camada vetorial. Os percentuais são heurísticos, não probabilidades calibradas. A execução real em smartphone precisa ser validada.
+A partir da v1.8 a pesquisa usa **busca híbrida real**: o mecanismo textual, os
+conceitos e a Bíblia continuam operando imediatamente; um modelo **multilingual-e5-small
+int8** (ONNX Runtime Android) gera apenas o vetor da consulta, sem produzir textos.
+Os hinos recebem vetores na compilação e não precisam passar pelo modelo no telefone.
+A lista é então atualizada com semelhança vetorial, mantendo o contexto original.
+
+- O APK contém os pesos do modelo e os índices vetoriais, portanto é substancialmente maior.
+  Ao primeiro uso, o ONNX é copiado uma única vez para o armazenamento do app.
+- Fonte de embeddings: `Xenova/multilingual-e5-small`, modelo `intfloat/multilingual-e5-small`
+  (MIT). Versão fixada no script de geração. O projeto não distribui letras.
+- Os vetores foram gerados com o `tokenizers` oficial e ONNX Runtime; no telefone,
+  um tokenizador SentencePiece Unigram em Java é usado. A equivalência exata de
+  tokenização com modelos particulares deverá ser medida no aparelho real.
+- Confere uma impressão digital SHA-256 por hino; se a letra diferir da fonte usada
+  para o índice, o recurso vetorial se desativa, sem misturar edições.
+- Cada hino tem dois embeddings `passage:` de trechos diferentes, normalizados e
+  quantizados em int8 para comparação rápida.
+- O modelo usa a entrada `query:` e seu vetor é combinado com regras textuais e
+  semânticas. O resultado imediato local não espera o modelo.
+- Em Configurações → *Modelo vetorial E5 Small*, escolha **Híbrida**, **Priorizar
+  significado** ou **Desativada**. A busca GGUF permanece experimental, separada.
+- Uma referência numérica exata não é reordenada pelo modelo vetorial. O modelo
+  nunca inventa hinos, só reordena registros realmente importados.
+- A pontuação percentual é heurística, não probabilidade calibrada. Os embeddings
+  são baseados em similaridade de significado, não validação doutrinária.
+
+### Preparação e compilação
+
+A compilação no GitHub Actions executa `scripts/build_e5_assets.py`, que baixa
+uma revisão fixa do modelo e gera `e5-model.onnx`, `e5-vocab.bin`, `e5-index.json`
+no diretório `assets`. O script `verify_e5_assets.py` valida os arquivos antes
+que o Gradle produza o APK. Requer conexão no runner do GitHub, mas **nenhuma
+conexão é exigida no Android após a instalação e importação da coletânea**.
+
+### Testes recomendados no aparelho
+
+1. Importar a coletânea 2018 e confirmar a indicação de hinos vetorizados.
+2. Pesquisar `Filho Pródigo`, `Quero voltar para Deus`, `Consolo na tristeza`;
+   verificar a atualização de ranking após a primeira lista aparecer.
+3. Pesquisar `Hino 125` e confirmar que a correspondência exata prevalece.
+4. Desativar E5 nas configurações e conferir que a busca textual permanece ativa.
+5. Trocar/alterar letras no JSON e confirmar a desativação dos vetores incompatíveis.

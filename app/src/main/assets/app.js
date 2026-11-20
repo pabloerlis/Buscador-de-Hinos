@@ -13,13 +13,20 @@ async function refreshStatus(){
   $('collection-label').textContent=result.ready?result.collection:'Coletânea não importada';
   $('data-count').textContent=result.ready?`${result.hymn_count} hinos disponíveis`:'Aguardando base';
   $('import-panel').classList.toggle('hidden',result.ready);
+  $('upgrade-panel').classList.toggle('hidden',!result.ready||((result.collections?.avulsos||0)>0&&(result.collections?.cia||0)>0));
   $('refine-mode').textContent=result.semantic_ready?'Busca semântica offline':'Busca contextual local';
   $('settings-collection').textContent=result.collection||'Não importada';
   $('settings-count').textContent=result.hymn_count;
+  $('settings-collection-counts').textContent=Object.entries(result.collections||{}).filter(([,count])=>count>0).map(([id,count])=>id+': '+count).join(' · ')||'Nenhuma';
+  for(const id of ['principal','avulsos','cia','pessoal']){
+    const count=(result.collections||{})[id]||0;
+    $('count-'+id).textContent='('+count+')';
+    $('quick-count-'+id).textContent=count||'';
+  }
   $('settings-vectors').textContent=result.semantic_ready?`${result.semantic_topics} temas locais`:'Não carregada';
   $('settings-stories').textContent=result.story_ready?`${result.story_count} narrativas locais`:'Não carregada';
   $('settings-scripture').textContent=result.scripture_ready?`${result.scripture_books} livros · Bíblia Livre`:'Indisponível';
-  $('settings-embeddings').textContent=result.vector_count?result.vector_count+' hinos · E5 Small':'Índice E5 indisponível';
+  $('settings-embeddings').textContent=result.vector_count?`${result.vector_count} hinos · E5 Small`:'Não disponível para esta coletânea';
   $('settings-bridge').textContent=result.bridge_ready?`${result.bridge_entries} associações`:'Indisponível';
   if(typeof GGUF!=='undefined')GGUF.info();
   return result;
@@ -31,12 +38,13 @@ function busySearch(value){
 }
 function resultCard(hymn){
   const number=hymn.number?`HINO ${escapeHTML(hymn.number)}`:'HINO SEM NÚMERO';
+  const collection=`<span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>`;
   const tags=(hymn.topics||[]).slice(0,3).map(t=>`<span class="small-tag">${escapeHTML(t)}</span>`).join('');
   const klass=hymn.relevance==='Muito relevante'?'':hymn.relevance==='Relevante'?'mid':'low';
   const scoreLabel=hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
   const score=Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
   return `<article class="result-card" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
-  <h3>${escapeHTML(hymn.title)}</h3><div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
+  <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
@@ -88,7 +96,7 @@ function relatedCard(hymn){
   const components=Number.isFinite(hymn.similarity_percent)?`<span>${Math.round(hymn.similarity_percent)}% com a letra</span>${Number.isFinite(hymn.query_percent)?`<span>${Math.round(hymn.query_percent)}% com a busca</span>`:''}`:'';
   return `<button class="related-card" type="button" data-related-id="${Number(hymn.id)}" aria-label="Abrir hino ${escapeHTML(hymn.number||'')} ${escapeHTML(hymn.title)}; ${percent}% de afinidade combinada">
     <span class="related-card-top"><span>HINO ${escapeHTML(hymn.number||'—')}</span><strong>${percent}% <small>compatível</small></strong></span>
-    <span class="related-card-title">${escapeHTML(hymn.title)}</span>
+    <span class="related-card-title">${escapeHTML(hymn.title)}</span><span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>
     <span class="score-track related-track"><span style="width:${percent}%"></span></span>
     ${components?`<span class="related-components">${components}</span>`:''}
     <span class="related-evidence">${escapeHTML(hymn.reason||'Associação temática encontrada nas letras.')}</span>
@@ -124,7 +132,7 @@ async function openHymn(id,{fromRelated=false,back=false}={}){
     if(hymn.topics?.length)hymn.topics.forEach(t=>{const s=document.createElement('span');s.className='small-tag';s.textContent=t;$('modal-topics').appendChild(s);});
     else $('modal-topics').textContent='Ainda não foram identificados temas automaticamente.';
     $('modal-references').textContent=hymn.references?.length?hymn.references.join(' · '):'Nenhuma referência explícita identificada.';
-    $('modal-edition').textContent=`${hymn.collection} · Edição ${hymn.edition}`;
+    $('modal-edition').textContent=(hymn.collectionRefs||[]).map(ref=>ref.name+(ref.number?' nº '+ref.number:'')).join(' · ') || `${hymn.collection} · Edição ${hymn.edition}`;
     $('modal-ai-output').classList.add('hidden');$('modal-ai-output').textContent='';
     if(state.activeModal!=='modal')openLayer('modal');
     else q('.modal-body')?.scrollTo({top:0,behavior:'instant'});
@@ -140,13 +148,13 @@ $('related-back').addEventListener('click',()=>{
 function openLayer(name){const el=$(name+'-layer');el.classList.remove('hidden');el.setAttribute('aria-hidden','false');state.activeModal=name;document.body.style.overflow='hidden';q('.icon-button[data-close]',el)?.focus();}
 function closeLayer(){if(!state.activeModal)return;const el=$(state.activeModal+'-layer');el.classList.add('hidden');el.setAttribute('aria-hidden','true');state.activeModal=null;document.body.style.overflow='';}
 async function importRemote(){
-  const buttons=[$('import-remote'),$('settings-import')];buttons.forEach(b=>{b.disabled=true;b.textContent='Importando…';});
-  try{const r=await jsonRequest('/api/import-remote',{});toast(`Importação concluída: ${r.count} hinos de ${r.collection}.`);await refreshStatus();closeLayer();}
+  const buttons=[$('import-remote'),$('settings-import'),$('upgrade-import')];buttons.forEach(b=>{b.disabled=true;b.textContent='Importando…';});
+  try{const r=await jsonRequest('/api/import-remote',{});toast(`Biblioteca atualizada: ${r.count} hinos únicos; ${r.added} novos; ${r.duplicates} registros duplicados.`);await refreshStatus();closeLayer();}
   catch(e){toast('Não foi possível baixar a coletânea. Use um JSON local ou confira a conexão. '+e.message);}
-  finally{buttons[0].disabled=false;buttons[0].textContent='Importar do GitHub';buttons[1].disabled=false;buttons[1].textContent='Atualizar do GitHub';}
+  finally{buttons[0].disabled=false;buttons[0].textContent='Importar as 3 coleções';buttons[1].disabled=false;buttons[1].textContent='Atualizar 3 coleções';buttons[2].disabled=false;buttons[2].textContent='Adicionar Avulsos e CIA';}
 }
 async function importFile(input){const file=input.files?.[0];if(!file)return;if(file.size>12_000_000){toast('O arquivo precisa ter até 12 MB.');return;}
-  try{const data=JSON.parse(await file.text());const response=await jsonRequest('/api/import',{data});toast(`Importados ${response.count} hinos: ${response.collection}.`);await refreshStatus();closeLayer();}
+  try{const data=JSON.parse(await file.text());const response=await jsonRequest('/api/import',{data});toast(`Biblioteca: ${response.count} hinos únicos (${response.added} novos).`);await refreshStatus();closeLayer();}
   catch(e){toast('Falha ao importar JSON: '+e.message);}finally{input.value='';}}
 $('search-form').addEventListener('submit',ev=>{ev.preventDefault();if(typeof GGUF!=='undefined')GGUF.cancelIfBusy();performSearch($('search-input').value.trim());});
 $('refine-form').addEventListener('submit',async ev=>{ev.preventDefault();if(typeof GGUF!=='undefined')GGUF.cancelIfBusy();const message=$('refine-input').value.trim();if(!message||state.busy)return;appendConversation('user',message);$('refine-input').value='';const success=await performSearch(message,{refine:true});appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados. Acrescente outra restrição se necessário.`:'Não consegui refinar a pesquisa.');});
@@ -155,7 +163,7 @@ $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('
 $('new-search').addEventListener('click',()=>{state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.searchEpoch++;$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').innerHTML='<div class="assistant-message">Precisa de algo mais específico? Descreva a mensagem ou ocasião desejada.</div>';});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;performSearch(b.dataset.suggestion);}));
 $('open-settings').addEventListener('click',()=>openLayer('settings'));$('ai-indicator').addEventListener('click',()=>openLayer('settings'));
-$('import-remote').addEventListener('click',importRemote);$('settings-import').addEventListener('click',importRemote);
+$('import-remote').addEventListener('click',importRemote);$('settings-import').addEventListener('click',importRemote);$('upgrade-import').addEventListener('click',importRemote);
 $('import-file').addEventListener('change',ev=>importFile(ev.target));$('settings-file').addEventListener('change',ev=>importFile(ev.target));
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeLayer));document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeLayer();});
 
@@ -166,7 +174,7 @@ const SearchPreferences=(()=>{
   const ids={vectorMode:'vector-mode',mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
     narratives:'story-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
     recWeight:'rec-weight',recCount:'rec-count',recContext:'rec-context',recAvoidVisited:'rec-visited',recBreakdown:'rec-breakdown'};
-  const defaults={vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
+  const defaults={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   let stories=[];
   function renderAliases(){
     const container=$('alias-list');container.replaceChildren();let count=0;
@@ -190,6 +198,10 @@ const SearchPreferences=(()=>{
       else input.value=String(cfg[key]);
     }
     $('rec-weight-value').textContent=cfg.recWeight+'%';$('semantic-power-value').textContent=cfg.strength+'%';$('min-affinity-value').textContent=cfg.minAffinity+'%';
+    for(const id of ['principal','avulsos','cia','pessoal']){
+      $('collection-'+id).checked=cfg.collections[id]!==false;
+      const quick=document.querySelector('[data-collection="'+id+'"]');if(quick)quick.checked=cfg.collections[id]!==false;
+    }
     renderAliases();
   }
   function readInputs(){
@@ -197,6 +209,7 @@ const SearchPreferences=(()=>{
     for(const [key,id] of Object.entries(ids)){
       const input=$(id);options[key]=input.type==='checkbox'?input.checked:input.type==='range'||key==='pageSize'?Number(input.value):input.value;
     }
+    options.collections=Object.fromEntries(['principal','avulsos','cia','pessoal'].map(id=>[id,$('collection-'+id).checked]));
     return OfflineAPI.searchOptions(options);
   }
   function save(){
@@ -211,6 +224,9 @@ const SearchPreferences=(()=>{
   $('semantic-power').oninput=()=>{$('semantic-power-value').textContent=$('semantic-power').value+'%';};
   $('min-affinity').oninput=()=>{$('min-affinity-value').textContent=$('min-affinity').value+'%';};
   $('settings-search-save').onclick=()=>{save();closeLayer();refreshSearch();toast('Preferências de busca aplicadas.');};
+  document.querySelectorAll('[data-collection]').forEach(input=>input.addEventListener('change',()=>{
+    const id=input.dataset.collection; $('collection-'+id).checked=input.checked;save();refreshSearch();
+  }));
   $('settings-search-reset').onclick=()=>{
     state.searchSettings=OfflineAPI.searchOptions(defaults);localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
     fill();toast('Configurações restauradas.');
@@ -235,38 +251,51 @@ const SearchPreferences=(()=>{
   return {fill};
 })();
 
+
+// E5 Small: apenas a consulta passa pela rede neural, no próprio Android.
+// Busca local aparece ANTES do embedding; erros não bloqueiam nenhuma pesquisa.
 const EmbeddingSearch=(()=>{
-  const pending=new Map();let seq=0;
-  function status(message){const a=$('vector-results-state'),b=$('vector-state');if(a)a.textContent=message;if(b)b.textContent=message;}
+  const pending=new Map();let sequence=0;
+  function status(message){
+    const target=$('vector-results-state');if(target)target.textContent=message;
+    const settings=$('vector-state');if(settings)settings.textContent=message;
+  }
   window.VectorNative={
-    progress(event){if(pending.has(String(event.id)))status(event.message||'Calculando significado…');},
-    complete(event){const task=pending.get(String(event.id));if(!task)return;pending.delete(String(event.id));clearTimeout(task.timeout);
-      if(event.ok&&Array.isArray(event.vector)&&event.vector.length===384)task.resolve(event);else task.reject(Error(event.error||'Modelo indisponível'));}
+    progress(event){if(pending.has(String(event.id)))status(event.message||'Calculando embeddings…');},
+    complete(event){const item=pending.get(String(event.id));if(!item)return;
+      pending.delete(String(event.id));clearTimeout(item.timeout);
+      if(event.ok&&Array.isArray(event.vector)&&event.vector.length===384)item.resolve(event);
+      else item.reject(Error(event.error||'Modelo de embeddings indisponível'));
+    }
   };
-  function request(query){return new Promise((resolve,reject)=>{
-    const id=String(++seq),timeout=setTimeout(()=>{pending.delete(id);reject(Error('Tempo excedido no E5 Small'));},120000);
-    pending.set(id,{resolve,reject,timeout});try{window.NativeVector.embed(id,query);}catch(e){pending.delete(id);clearTimeout(timeout);reject(e);}
+  function request(text){return new Promise((resolve,reject)=>{
+    const id=String(++sequence);const timeout=setTimeout(()=>{pending.delete(id);reject(Error('Tempo excedido ao calcular embeddings'));},120000);
+    pending.set(id,{resolve,reject,timeout});
+    try{window.NativeVector.embed(id,text);}catch(e){pending.delete(id);clearTimeout(timeout);reject(e);}
   });}
   async function maybeUpdate(query,epoch){
     if(state.searchSettings.vectorMode==='off'||!state.ready||!state.status?.vector_count)return;
-    if(!window.NativeVector||/^\s*(?:hino\s*)?\d{1,4}\s*$/i.test(query))return;
-    status('E5 Small: interpretando consulta no aparelho…');
-    try{const answer=await request(query);
-      if(epoch!==state.searchEpoch||state.searchSettings.vectorMode==='off')return;
+    if(!window.NativeVector||!/^(?!\s*(?:hino\s*)?\d{1,4}\s*$)/i.test(query))return;
+    status('E5 Small: interpretando a consulta no aparelho…');
+    try{
+      const answer=await request(query);
+      if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off')return;
       state.vectorQuery=answer.vector;
-      const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,exclude:state.exclude,
+      const result=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,exclude:state.exclude,
         semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings});
       if(epoch!==state.searchEpoch)return;
-      state.total=response.total;state.page=1;state.hasMore=response.has_more;state.lastResults=response.results.slice();
-      $('results-list').innerHTML=response.results.length?response.results.map(resultCard).join(''):'<div class="empty-results"><h3>Sem resultados</h3></div>';
-      $('load-more').classList.toggle('hidden',!response.has_more);
-      $('load-more').textContent='Carregar mais '+response.page_size+' hinos';
-      $('results-subtitle').textContent=response.total+' resultados · busca híbrida com E5 Small';
-      status('E5 Small: ranking atualizado em '+(answer.ms/1000).toFixed(1)+'s, sem internet.');
-    }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · E5: '+error.message);}
+      state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
+      $('results-list').innerHTML=result.results.length?result.results.map(resultCard).join(''):
+        '<div class="empty-results"><h3>Nenhum resultado</h3><p>Experimente ampliar o contexto.</p></div>';
+      $('load-more').classList.toggle('hidden',!result.has_more);
+      $('load-more').textContent='Carregar mais '+result.page_size+' hinos';
+      $('results-subtitle').textContent=`${result.total} resultados · busca híbrida com E5 Small`;
+      status('E5 Small: ranking vetorial atualizado em '+(answer.ms/1000).toFixed(1)+'s. Sem internet.');
+    }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · modelo E5: '+error.message);}
   }
   return {maybeUpdate};
 })();
+
 const GGUF=(()=>{
   const native=()=>window.NativeGGUF||null;
   const selectedState={ready:false,busy:false,task:null,lastResult:'',startTime:0,lastQuery:'',autoGeneration:false,lastError:'',timerId:null};

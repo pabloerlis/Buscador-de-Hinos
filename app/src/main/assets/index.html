@@ -27,7 +27,7 @@
         <span>Buscador<span class="brand-light"> de Hinos</span></span>
       </a>
       <div class="top-actions">
-        <span class="top-state" id="collection-label">Coletânea 2018</span><button id="ai-indicator" type="button" class="ai-indicator ai-off" aria-label="Ver estado da IA local">IA: inativa</button>
+        <span class="top-state" id="collection-label">Biblioteca de hinos</span><button id="ai-indicator" type="button" class="ai-indicator ai-off" aria-label="Ver estado da IA local">IA: inativa</button>
         <button id="open-settings" class="icon-button" title="Configurações e informações" aria-label="Configurações e informações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a1.9 1.9 0 0 0 .4 2.1l-2 2a1.9 1.9 0 0 0-2.1-.4 1.9 1.9 0 0 0-1.2 1.7h-2.9a1.9 1.9 0 0 0-1.2-1.7 1.9 1.9 0 0 0-2.1.4l-2-2A1.9 1.9 0 0 0 6.6 15a1.9 1.9 0 0 0-1.7-1.2v-2.9A1.9 1.9 0 0 0 6.6 9.7a1.9 1.9 0 0 0-.4-2.1l2-2a1.9 1.9 0 0 0 2.1.4 1.9 1.9 0 0 0 1.2-1.7h2.9A1.9 1.9 0 0 0 15.6 6a1.9 1.9 0 0 0 2.1-.4l2 2a1.9 1.9 0 0 0-.4 2.1 1.9 1.9 0 0 0 1.7 1.2v2.9a1.9 1.9 0 0 0-1.6 1.2z"/></svg></button>
       </div>
     </header>
@@ -43,6 +43,13 @@
             <input id="search-input" type="search" maxlength="500" autocomplete="off" placeholder="Tema, contexto ou passagem bíblica…" required>
             <button type="submit" id="search-button">Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           </form>
+          <div class="collection-quick" id="quick-collections" aria-label="Filtrar coleções">
+            <span>Pesquisar em:</span>
+            <label><input type="checkbox" data-collection="principal" checked> Coletânea 2018 <small id="quick-count-principal">—</small></label>
+            <label><input type="checkbox" data-collection="avulsos" checked> Avulsos <small id="quick-count-avulsos">—</small></label>
+            <label><input type="checkbox" data-collection="cia" checked> CIA <small id="quick-count-cia">—</small></label>
+            <label><input type="checkbox" data-collection="pessoal" checked> Pessoal <small id="quick-count-pessoal">—</small></label>
+          </div>
           <div class="suggestions"><span>Sugestões:</span>
             <button data-suggestion="Gratidão a Deus" type="button">Gratidão</button>
             <button data-suggestion="Consolo nos momentos difíceis" type="button">Consolo</button>
@@ -56,13 +63,21 @@
       </section>
 
       <section class="main-content" aria-label="Pesquisa e resultados">
+        <div id="upgrade-panel" class="import-panel hidden" role="region" aria-label="Ampliar biblioteca de hinos">
+          <div class="import-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></div>
+          <div class="import-content"><h2>Novas coletâneas disponíveis</h2>
+            <p>Complete sua biblioteca com os Avulsos 2018 e os louvores CIA 2018. Hinos já importados serão preservados e duplicados não serão repetidos.</p>
+            <div class="import-buttons"><button id="upgrade-import" class="primary-btn" type="button">Adicionar Avulsos e CIA</button></div>
+            <p class="import-note">Necessita internet apenas nesta importação. Depois a busca é offline.</p>
+          </div>
+        </div>
         <div id="import-panel" class="import-panel hidden">
           <div class="import-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></div>
           <div class="import-content">
-            <h2>Primeiro, carregue a coletânea</h2>
-            <p>O aplicativo importa a Coletânea ICM 2018 diretamente da fonte escolhida ou de um JSON do seu aparelho. A importação fica armazenada apenas neste dispositivo.</p>
+            <h2>Importe as três coletâneas</h2>
+            <p>O aplicativo importa Coletânea 2018, Avulsos 2018 e CIA 2018 diretamente do JSON público, ou de um JSON do seu aparelho. A importação fica armazenada apenas neste dispositivo.</p>
             <div class="import-buttons">
-              <button id="import-remote" class="primary-btn">Importar do GitHub</button>
+              <button id="import-remote" class="primary-btn">Importar as 3 coleções</button>
               <label class="secondary-btn file-upload">Escolher arquivo JSON<input id="import-file" type="file" accept=".json,application/json" hidden></label>
             </div>
             <p class="import-note">Depois de importar, a busca local funciona sem internet e sem servidor Python.</p>
@@ -83,7 +98,8 @@
             <div><span class="section-kicker">RESULTADOS DA PESQUISA</span><h2 id="results-title">Hinos encontrados</h2><p id="results-subtitle"></p></div>
             <button id="new-search" class="text-action" type="button">Nova pesquisa <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5M4 4v4h4"/></svg></button>
           </div>
-          <p class="score-method">Afinidade heurística textual e vetorial (E5 Small), quando disponível. Percentuais não são probabilidades.</p><p class="vector-live" id="vector-results-state" role="status">A lista local aparece primeiro; o E5 atualiza o ranking depois.</p>
+          <p class="score-method">Afinidade estimada por evidências da letra, relações semânticas e embeddings E5 Small, quando disponíveis. Percentuais não são probabilidades.</p>
+          <p id="vector-results-state" class="vector-live" role="status" aria-live="polite">A busca local aparece imediatamente; a comparação vetorial atualiza a lista em seguida.</p>
           <div class="results-layout">
             <div class="results-main">
               <div id="notice" class="notice hidden" role="status"></div>
@@ -110,7 +126,7 @@
         </div>
       </section>
     </main>
-    <footer><span>Buscador de Hinos <span class="footer-dot">·</span> Edição inicial 2018</span><span>Encontre pelo significado, confirme pela letra.</span></footer>
+    <footer><span>Buscador de Hinos <span class="footer-dot">·</span> Três coleções 2018</span><span>Encontre pelo significado, confirme pela letra.</span></footer>
   </div>
 
   <div id="modal-layer" class="modal-layer hidden" aria-hidden="true">
@@ -125,7 +141,7 @@
           <div id="related-list" class="related-list" aria-live="polite"></div>
           <p class="related-method">As porcentagens são índices de afinidade estimada, não probabilidades nem avaliação teológica oficial.</p>
         </section>
-        <div class="modal-section"><h3>Letra da coletânea</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
+        <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
       <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local. O GGUF é usado apenas para sugerir palavras da busca, não para analisar letras.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
       <div class="modal-bottom"><span id="modal-edition"></span><button class="secondary-btn" data-close="modal">Fechar</button></div>
     </section>
@@ -135,14 +151,28 @@
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Vetores E5 validados</span><strong id="settings-embeddings">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Vetores E5 validados</span><strong id="settings-embeddings">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      <section class="semantic-settings" aria-label="Coleções e importação">
+        <div class="setting-section-heading"><h3>Biblioteca unificada</h3><span class="local-badge">Offline</span></div>
+        <p class="subtle-note">Escolha onde pesquisar. Hinos idênticos em várias coleções aparecem uma única vez, preservando suas referências de origem.</p>
+        <label class="setting-check"><input id="collection-principal" type="checkbox" checked> Coletânea 2018 <small id="count-principal"></small></label>
+        <label class="setting-check"><input id="collection-avulsos" type="checkbox" checked> Avulsos 2018 <small id="count-avulsos"></small></label>
+        <label class="setting-check"><input id="collection-cia" type="checkbox" checked> Crianças, Intermediários e Adolescentes — CIA 2018 <small id="count-cia"></small></label>
+        <label class="setting-check"><input id="collection-pessoal" type="checkbox" checked> Outros JSON importados <small id="count-pessoal"></small></label>
+        <p class="subtle-note">No download são ignorados as coletâneas antigas e os grupos de teste do arquivo original. Os dados e a indexação ficam no telefone. E5 pré-calculado acompanha as três edições 2018; outras versões permanecem pesquisáveis pelo motor textual.</p>
+        <div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar 3 coleções</button><label class="secondary-btn file-upload">Importar JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div>
+      </section>
       <section class="semantic-settings" aria-label="Preferências de busca semântica">
         <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>
         <label for="search-mode">Prioridade da pesquisa</label>
         <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
         <label for="semantic-power">Força das relações semânticas <strong id="semantic-power-value">75%</strong></label>
         <input id="semantic-power" type="range" min="0" max="100" step="5" value="75">
-        <label for="vector-mode">Modelo vetorial E5 Small</label><select id="vector-mode"><option value="balanced">Busca híbrida (recomendada)</option><option value="strong">Maior peso ao significado</option><option value="off">Desativar vetores</option></select><p id="vector-state" class="subtle-note">Índice vetorial: verificando…</p><label class="setting-check"><input id="story-toggle" type="checkbox" checked>Reconhecer narrativas bíblicas (Filho Pródigo, Ovelha Perdida etc.)</label>
+        <label for="vector-mode">Modelo vetorial E5 Small (sem GGUF)</label>
+        <select id="vector-mode"><option value="balanced">Híbrida: textual + embeddings (recomendada)</option><option value="strong">Dar maior peso ao significado</option><option value="off">Desativada: somente busca por regras</option></select>
+        <p id="vector-state" class="subtle-note" role="status">Modelo vetorial: verificando índice local…</p>
+        <p class="subtle-note">A lista aparece imediatamente. Com a busca vetorial ativada, o ranking é aprimorado depois que o modelo calcula o significado da consulta. O primeiro uso pode exigir preparar cerca de 120 MB no armazenamento privado.</p>
+        <label class="setting-check"><input id="story-toggle" type="checkbox" checked>Reconhecer narrativas bíblicas (Filho Pródigo, Ovelha Perdida etc.)</label>
         <label class="setting-check"><input id="related-toggle" type="checkbox" checked>Considerar temas relacionados e sinônimos</label>
         <label class="setting-check"><input id="bridge-toggle" type="checkbox" checked>Reconhecer contextos com expressões do cotidiano</label>
         <label class="setting-check"><input id="scripture-toggle" type="checkbox" checked>Consultar texto da Bíblia Livre para referências bíblicas (offline)</label>
@@ -183,7 +213,7 @@
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
       </section></details>
       <p class="subtle-note">Fonte bíblica: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
-      <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p><div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar do GitHub</button><label class="secondary-btn file-upload">Importar outro JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div></div>
+      <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p></div>
     </section>
   </div>
   <div id="toast" role="status" class="toast hidden"></div>

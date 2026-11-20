@@ -90,6 +90,7 @@ const RecommendationEngine = (() => {
       const output=[];
       for(const other of docs){
         if(blocked.has(other.song.id))continue;
+        if(settings.allowed&&!((other.song.collections||[]).some(key=>settings.allowed[key]!==false)))continue;
         const s=similarity(anchor,other);
         const hasEvidence=s.commonStories.length>0||s.commonThemes.length>0||s.commonWords.length>=2;
         if(!hasEvidence||s.score<0.12)continue;
@@ -105,7 +106,7 @@ const RecommendationEngine = (() => {
         if(s.commonStories.length)why.push('Narrativa em comum: '+s.commonStories.join(', '));
         if(s.commonThemes.length)why.push('Temas em comum: '+s.commonThemes.slice(0,3).join(', '));
         if(s.commonWords.length>=2)why.push('Termos relevantes nas letras: '+s.commonWords.slice(0,3).join(', '));
-        output.push({id:other.song.id,number:other.song.number,title:other.song.title,
+        output.push({id:other.song.id,number:other.song.number,title:other.song.title,collection:other.song.collection,
           compatibility_percent:Math.round(combined*100),similarity_percent:Math.round(s.score*100),
           query_percent:q===null?null:Math.round(q*100),reason:why.join('. ')+'.',
           topics:s.commonThemes.slice(0,4),score:combined});
