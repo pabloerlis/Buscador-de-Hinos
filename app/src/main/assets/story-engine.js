@@ -76,12 +76,15 @@ const StoryEngine = (() => {
         const score=Math.min(18,phraseHits.length*7.5+
           (groups.length>=3?7:groups.length===2?3:0)+
           (localCoverage>=3?5:localCoverage===2?2:0)+Math.min(3,evidence.length)*0.45);
-        profile.push({id:s.id,label:s.label,score:+score.toFixed(2),
+        const eventTier=event?.tier===3?3:tier;
+        const eventScore=Math.min(24,score+Math.min(6,(event?.score||0)*.4));
+        profile.push({id:s.id,label:s.label,score:+eventScore.toFixed(2),
           evidence:evidence.slice(0,6),reference:s.reference,
-          kind:tier===2?'evidências independentes no mesmo trecho':
+          kind:eventTier===3?'papéis e ações da narrativa no mesmo trecho':
+            tier===2?'evidências independentes no mesmo trecho':
             tier===1?'evidências narrativas combinadas':
               phraseHits.length?'expressão específica':'conjunto de evidências',
-          tier,localCoverage});
+          tier:eventTier,localCoverage,eventEvidence:event?.cues||[],eventCoverage:event?.coverage||0});
       }
       return profile.sort((a,b)=>b.score-a.score).slice(0,18);
     }
@@ -106,8 +109,8 @@ const StoryEngine = (() => {
       const reasons=[],cues=[],matched=[];
       for(const narrative of intent.matches||[]){
         const p=lookup.get(narrative.id);if(!p)continue;
-        const strength=Math.max(0,Math.min(2,Number(p.tier)||0));
-        const points=Math.min(39,14+p.score*1.55)+(strength===2?10:strength===1?4:0);
+        const strength=Math.max(0,Math.min(3,Number(p.tier)||0));
+        const points=Math.min(39,14+p.score*1.55)+(strength===3?13:strength===2?10:strength===1?4:0);
         score+=points;tier=Math.max(tier,strength);
         reasons.push('Narrativa '+narrative.label+': '+p.kind+' na letra (“'+
           p.evidence.slice(0,3).join('”, “')+'”)');
