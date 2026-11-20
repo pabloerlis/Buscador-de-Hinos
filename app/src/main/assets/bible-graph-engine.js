@@ -171,7 +171,7 @@ const BibleGraphEngine=(()=>{
       const words=context.words.filter(x=>matches(text,x.word)).slice(0,8);
       // Passagens narrativas: recuperar acontecimentos localizados na letra
       // antes de premiar temas genéricos. Aplicado às 48 cenas, sem exceções.
-      if(context.narrative){
+      if(context.narrative&&totalDocs>0){
         const episode=episodeEvidence(song,context);
         const topicPoints=Math.min(8,direct.length*2.5+indirect.length*.5);
         const score=Math.min(50,topicPoints+episode.score);
