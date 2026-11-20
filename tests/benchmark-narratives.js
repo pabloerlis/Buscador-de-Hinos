@@ -35,7 +35,7 @@ const cases=[
   {query:'Lucas 15:11',expected:['Coletânea 2018:286']},
   {query:'Ovelha perdida',expected:['Avulsos 2018:ERAM CEM OVELHAS','Coletânea 2018:259']},
   {query:'Lázaro',expected:['Coletânea 2018:704']},
-  {query:'Tempestade',expected:['Coletânea 2018:310']}
+  {query:'Jesus acalma a tempestade',expected:['Coletânea 2018:310']}
 ];
 (async()=>{
   const imports=await api.request('/api/import',{data:groups});
