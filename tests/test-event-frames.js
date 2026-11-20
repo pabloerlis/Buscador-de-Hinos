@@ -27,8 +27,14 @@ const passages={
     'Voltou com a ovelha nos ombros, reunindo seu rebanho.'
   ]
 };
+const sceneAliases={
+  A:['filho voltou ao pai','pai recebeu o filho'],
+  B:['tempestade no barco','Mestre acalmou a tempestade'],
+  C:['mulher tocou o manto','cura de uma mulher'],
+  D:['pastor procurou a ovelha','ovelha perdida encontrada']
+};
 const stories=Object.entries(passages).map(([id])=>({
-  id,label:'História '+id,reference:id,aliases:['História do '+id]
+  id,label:'História '+id,reference:id,aliases:['História do '+id,...sceneAliases[id]]
 }));
 const scripture={lookup:ref=>({verses:(passages[ref]||[]).map(text=>({text}))})};
 const engine=Engine.create({narratives:stories},scripture);
