@@ -55,7 +55,8 @@ assert.match(app,/bibleGraph:'bible-graph-toggle'/);
 assert.match(app,/ScriptureIndex\.parse\(query\)/);
 const workflow=fs.readFileSync(path.join(__dirname,'../.github/workflows/android-apk.yml'),'utf8');
 assert.match(workflow,/scripts\/build_bible_graph\.py/);
-assert.match(workflow,/node tests\/test-v20\.js/);
+assert.ok(/node tests\/test-v20\.js/.test(workflow) || /for test in tests\/test-\*\.js/.test(workflow),
+  'O pipeline deve executar o teste v2.0 explicitamente ou descobrir todos os testes automaticamente.');
 const program=fs.readFileSync(path.join(__dirname,'../scripts/build_bible_graph.py'),'utf8');
 assert.match(program,/topics_read/);assert.match(program,/crossref_links/);
 console.log('v2.0: referências, narrativas, pontuação, falsos positivos, opções e build verificados (30+ assertivas).');
