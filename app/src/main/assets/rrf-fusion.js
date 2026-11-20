@@ -55,7 +55,7 @@ const FusionRRF=(()=>{
     return candidates.slice().sort((a,b)=>
       Number(b.match_type==='titulo_exato')-Number(a.match_type==='titulo_exato')||
       (narrativePrimary?(safeScore(b._narrativeTier)-safeScore(a._narrativeTier)):0)||
-      (totals.get(b.id)||0)-(totals.get(a.id)||0)||
+      ((totals.get(b.id)||0)*(b._fusionPenalty??1))-((totals.get(a.id)||0)*(a._fusionPenalty??1))||
       baselineOrder.get(a.id)-baselineOrder.get(b.id));
   }
   return {rank,positions,weights,K};
