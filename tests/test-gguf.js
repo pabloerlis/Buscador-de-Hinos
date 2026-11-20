@@ -57,7 +57,7 @@ assert.ok(!workflow.includes('ndk;27.2.12479018'));
 assert.ok(workflow.includes('scripts/build_e5_assets.py'));
 assert.ok(workflow.includes('scripts/qa_e5.py'));
 assert.ok(workflow.includes('assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true'));
-assert.ok(workflow.includes('br.com.buscadordehinos.app.E5DeviceSmokeTest'));
+assert.ok(workflow.includes('scripts/qa_android_emulator.sh'));
 assert.ok(workflow.includes('needs: [build_apk, device_smoke]'));
 assert.ok(!workflow.includes('-PenableLocalModels=true'));
 assert.ok(build.includes("gradleProperty('enableLocalEmbeddings')"));
