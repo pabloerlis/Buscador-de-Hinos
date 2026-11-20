@@ -11,6 +11,8 @@
   <link rel="stylesheet" href="style.css">
   <script src="semantic-engine.js" defer></script>
   <script src="story-engine.js" defer></script>
+  <script src="scripture-index.js" defer></script>
+  <script src="bridge-engine.js" defer></script>
   <script src="bible-context.js" defer></script>
   <script src="recommendation-engine.js" defer></script>
   <script src="offline-api.js" defer></script>
@@ -132,7 +134,7 @@
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong></div>
+      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
       <section class="semantic-settings" aria-label="Preferências de busca semântica">
         <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>
         <label for="search-mode">Prioridade da pesquisa</label>
@@ -141,6 +143,9 @@
         <input id="semantic-power" type="range" min="0" max="100" step="5" value="75">
         <label class="setting-check"><input id="story-toggle" type="checkbox" checked>Reconhecer narrativas bíblicas (Filho Pródigo, Ovelha Perdida etc.)</label>
         <label class="setting-check"><input id="related-toggle" type="checkbox" checked>Considerar temas relacionados e sinônimos</label>
+        <label class="setting-check"><input id="bridge-toggle" type="checkbox" checked>Reconhecer contextos com expressões do cotidiano</label>
+        <label class="setting-check"><input id="scripture-toggle" type="checkbox" checked>Consultar texto da Bíblia Livre para referências bíblicas (offline)</label>
+        <p class="subtle-note">Versículos são usados para identificar temas, nunca para alterar o texto dos hinos. Relevância é estimada por evidências da letra.</p>
         <label for="min-affinity">Afinidade mínima exibida <strong id="min-affinity-value">0%</strong></label>
         <input id="min-affinity" type="range" min="0" max="90" step="5" value="0">
         <label for="page-size">Resultados por página</label><select id="page-size"><option value="5">5 hinos</option><option value="10">10 hinos</option></select>
@@ -176,6 +181,7 @@
         <div class="settings-actions"><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div><div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
       </section></details>
+      <p class="subtle-note">Fonte bíblica: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
       <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p><div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar do GitHub</button><label class="secondary-btn file-upload">Importar outro JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div></div>
     </section>
   </div>

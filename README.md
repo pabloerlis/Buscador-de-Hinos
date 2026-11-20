@@ -104,3 +104,23 @@ As pontuações são **heurísticas, não probabilidades de compatibilidade comp
 ### Testes v1.6
 
 `node tests/test-v16.js` valida compatibilidade, cruzamento de hinos, conservação do contexto, porcentagens, deduplicação e preferências. Teste de navegação em navegador mobile também executado com letras sintéticas. A base completa real não foi validada.
+
+## Versão 1.7 — Conhecimento bíblico em português (offline)
+
+- **Bíblia Livre (Almeida 1819, revisão 2018)**: na compilação, o script `scripts/build_scripture_index.py` baixa uma revisão fixa do [Midvash Bible Data](https://github.com/midvash/bible-data), confere o SHA Git do arquivo, verifica 66 livros e cerca de 31 mil versículos, e gera o arquivo `scripture-pt.json` dentro do APK. **Não precisa baixar a Bíblia após instalar.**
+- **Referências bíblicas**: interpreta livro, capítulo, versículo e intervalo, por exemplo `Salmo 23`, `João 3:16`, `Lucas 15:11-32`, `1 Coríntios 13:4-7`. Extrai o texto da referência e determina até quatro temas por evidências de palavras na passagem. O texto da Bíblia não é apresentado como se fosse a letra de um hino.
+- **Ponte de expressões do cotidiano**: 26 grupos curados de frases, como `não consigo dormir` (paz/confiança/consolo) e `recomeço espiritual` (renovação/graça/perdão). O mecanismo só recomenda hinos cujas letras oferecem evidências desses temas. Não adiciona automaticamente relações de um dicionário genérico.
+- **Configurações**: o usuário pode ativar/desativar separadamente a interpretação de versículos e a ponte contextual. O ranking offline, as narrativas e a navegação de hinos relacionados continuam disponíveis sem a Bíblia.
+- **Transparência**: Configurações mostram o número de livros carregados e de grupos de associações. A interpretação da consulta indica quando houve uso de texto bíblico ou de uma associação contextual. Porcentagens continuam heurísticas e requerem validação na coletânea.
+
+### Fontes e direitos
+
+**Texto bíblico:** Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, http://sites.google.com/site/biblialivre/. Licença Creative Commons Atribuição 4.0 Brasil, http://creativecommons.org/licenses/by/4.0/br/. Fonte: https://github.com/midvash/bible-data , pasta `versions/pt/almeida-livre`, com licença própria no `metadata.json`. As modificações são somente de formato e compactação para indexação.
+
+**Base de temas bíblicos:** https://github.com/neuu-org/bible-topics-dataset (CC BY 4.0, 5.745 tópicos ingleses). Analisada, mas **não importada indiscriminadamente**: o inglês e a ausência de definições na camada `01_parsed` exigem tradução e validação, sob risco de falsos positivos. **OpenWordNet-PT** (CC BY 4.0) foi avaliada como fonte futura para sinônimos, mas não incorporada integralmente, pois sinônimos sem contexto podem alterar o sentido de um hino. A ponte lexical da versão 1.7 é uma curadoria local independente dessas duas bases.
+
+### Testes
+
+`node tests/test-v17.js` — referências bíblicas, associação lexical sem falsos positivos, compatibilidade com o mecanismo de recomendações e opção de desativar as novas camadas. A cobertura total dos hinos dependerá de validação posterior com a coletânea inteira.
+
+O arquivo `scripture-pt.json` é gerado pelo pipeline e não está no repositório para manter uma fonte de verdade única e versão auditável. É obrigatório para que o APK distribua o recurso bíblico offline.

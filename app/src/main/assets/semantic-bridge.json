@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "revision": "2026-11-20-curated-1",
+  "description": "Mapa curado de expressões cotidianas e conceitos de louvor. Relações são hipóteses semânticas, confirmadas por evidências das letras; não são declarações doutrinárias.",
+  "entries": [
+    {"phrases":["não consigo dormir","estou preocupado","minha mente não descansa","medo do futuro","muita ansiedade","estou ansioso","preocupação constante"],"topics":["paz","confianca","consolo"]},
+    {"phrases":["estou de luto","perdi alguém querido","saudade de quem partiu","coração partido","momento de perda","minha alma chora"],"topics":["consolo","esperanca","vida_eterna"]},
+    {"phrases":["quero voltar para deus","afastei me do senhor","quero recomeçar","errei e quero voltar","voltar a minha fé","voltar para casa do pai"],"topics":["arrependimento","perdao","renovacao"]},
+    {"phrases":["começar de novo","uma nova chance","restaurar minha vida","recomeço espiritual","vida restaurada"],"topics":["renovacao","graca","perdao"]},
+    {"phrases":["sem forças para continuar","estou desanimado","quase desistindo","não vou suportar","caminho muito difícil"],"topics":["perseveranca","consolo","esperanca"]},
+    {"phrases":["preciso tomar uma decisão","não sei qual caminho seguir","estou sem rumo","direção para minha vida","escolher meu caminho"],"topics":["direcao","confianca","oracao"]},
+    {"phrases":["sinto me sozinho","me sinto abandonado","ninguém me entende","na solidão","solidão e tristeza"],"topics":["consolo","amor","confianca"]},
+    {"phrases":["deus me encontrou","estava perdido","fui resgatado","ele veio me buscar","me achou perdido"],"topics":["salvacao","graca","perdao"]},
+    {"phrases":["me perdoe senhor","peço perdão","reconheço meus erros","confesso meu pecado","confissão sincera"],"topics":["arrependimento","perdao","humildade"]},
+    {"phrases":["maranata","aguardando o noivo","jesus em breve vem","a igreja espera","preparação para sua volta"],"topics":["volta_jesus","vigilancia","esperanca"]},
+    {"phrases":["me sinto grato","agradecer pelo que recebi","ação de graças","muito obrigado senhor","agradecimento pelas bençãos"],"topics":["gratidao","louvor","alegria"]},
+    {"phrases":["não tenho medo","deus está comigo","senhor me sustenta","forte abrigo","estou seguro em deus"],"topics":["confianca","protecao","paz"]},
+    {"phrases":["pregar para alguém","falar de jesus","alcançar vidas","compartilhar a fé","levar a boa nova"],"topics":["evangelizacao","missao","servico"]},
+    {"phrases":["quero adorar","na presença de deus","culto de louvor","louvor e reverência"],"topics":["adoracao","louvor","santificacao"]},
+    {"phrases":["depois da tempestade","atravessando o deserto","vales escuros","luta na caminhada","atravessar aflições"],"topics":["tribulacao","confianca","perseveranca"]},
+    {"phrases":["celebrar uma vitória","vencemos em cristo","deus fez um milagre","libertação e vitória"],"topics":["vitoria","gratidao","louvor"]},
+    {"phrases":["união entre irmãos","somos um só corpo","juntos na igreja","fraternidade cristã"],"topics":["comunhao","igreja","amor"]},
+    {"phrases":["sangue de jesus","sacrifício da cruz","cordeiro foi morto","a cruz do calvário"],"topics":["cruz","salvacao","graca"]},
+    {"phrases":["a tumba está vazia","cristo ressuscitou","ele venceu a morte","jesus vive"],"topics":["ressurreicao","vitoria","esperanca"]},
+    {"phrases":["uma oração por cura","enfermidade na família","doença e sofrimento","preciso de cura"],"topics":["cura","oracao","consolo"]},
+    {"phrases":["consagrar minha vida","renunciar ao pecado","andar em santidade","vida de obediência"],"topics":["santificacao","obediencia","humildade"]},
+    {"phrases":["tempo de batismo","descer às águas","nascer para cristo","novo nascimento"],"topics":["batismo","renovacao","salvacao"]},
+    {"phrases":["participar da ceia","partir o pão","memória do sacrifício","lembrança da cruz"],"topics":["ceia","comunhao","cruz"]},
+    {"phrases":["palavra viva","escrituras sagradas","meditar na bíblia","a palavra ilumina"],"topics":["biblia","direcao","fe"]},
+    {"phrases":["misericórdia do pai","me acolheu de volta","graça imerecida","amor que perdoa"],"topics":["graca","perdao","amor"]},
+    {"phrases":["ensinamento das crianças","louvor infantil","dedicar os filhos","abençoar as crianças"],"topics":["criancas","familia","amor"]}
+  ]
+}

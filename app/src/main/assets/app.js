@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,
-  searchSettings:{mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true}};
+  searchSettings:{mode:'balanced',strength:75,narratives:true,related:true,scripture:true,bridge:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true}};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 let toastTimer=null;
@@ -18,6 +18,8 @@ async function refreshStatus(){
   $('settings-count').textContent=result.hymn_count;
   $('settings-vectors').textContent=result.semantic_ready?`${result.semantic_topics} temas locais`:'Não carregada';
   $('settings-stories').textContent=result.story_ready?`${result.story_count} narrativas locais`:'Não carregada';
+  $('settings-scripture').textContent=result.scripture_ready?`${result.scripture_books} livros · Bíblia Livre`:'Indisponível';
+  $('settings-bridge').textContent=result.bridge_ready?`${result.bridge_entries} associações`:'Indisponível';
   if(typeof GGUF!=='undefined')GGUF.info();
   return result;
 }
@@ -160,7 +162,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 // Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
 const SearchPreferences=(()=>{
   const ids={mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
-    narratives:'story-toggle',related:'related-toggle',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
+    narratives:'story-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
     recWeight:'rec-weight',recCount:'rec-count',recContext:'rec-context',recAvoidVisited:'rec-visited',recBreakdown:'rec-breakdown'};
   const defaults={mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   let stories=[];

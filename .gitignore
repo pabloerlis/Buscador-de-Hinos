@@ -4,3 +4,5 @@ local.properties
 **/build/
 *.iml
 *.apk
+# Bíblia licenciada gerada durante o build, origem verificada no script
+app/src/main/assets/scripture-pt.json

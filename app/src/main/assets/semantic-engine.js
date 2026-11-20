@@ -87,7 +87,7 @@ const SemanticEngine = (() => {
       }
       return false;
     }
-    return {revision:database.revision,indexHymn,interpret,evaluate,excluded,topics:topics.length,labels:()=>topics.map(t=>t.label)};
+    return {revision:database.revision,indexHymn,interpret,evaluate,excluded,topics:topics.length,labels:()=>topics.map(t=>t.label),catalog:()=>topics.map(t=>({id:t.id,label:t.label}))};
   }
   return {create,normalize:norm,contains};
 })();

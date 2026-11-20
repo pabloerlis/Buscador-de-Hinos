@@ -24,8 +24,10 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
+      - name: Build licensed offline Bible index
+        run: python3 scripts/build_scripture_index.py
       - name: Run local-search tests
-        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js
+        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js
       - name: Build APK
         run: gradle --no-daemon --stacktrace assembleDebug
       - uses: actions/upload-artifact@v4
