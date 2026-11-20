@@ -46,7 +46,7 @@ public class E5DeviceSmokeTest {
             long limit=System.currentTimeMillis()+45_000;
             while(System.currentTimeMillis()<limit) {
                 String v=evaluate(web,
-                    "Boolean(window.OfflineAPI && window.NativeVector && " +
+                    "Boolean(typeof OfflineAPI!=='undefined' && window.NativeVector && " +
                     "window.VectorNative && document.getElementById('search-input') && " +
                     "document.getElementById('about-app'))");
                 if("true".equals(v)){ready=true;break;}
