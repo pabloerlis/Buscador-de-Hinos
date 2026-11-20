@@ -71,7 +71,8 @@ const StoryEngine = (() => {
         const tier=((localCoverage>=3&&actionCoverage>=2)||
           (strongPhrase&&localCoverage>=2))?2:
           (groups.length>=3&&localCoverage>=2)||(strongPhrase&&groups.length>=2)?1:0;
-        const evidence=[...new Set([...phraseHits,...localCues,...groups.flat()])];
+        const event=typeof EventAlignment!=='undefined'?EventAlignment.analyze(s,lyrics):null;
+        const evidence=[...new Set([...phraseHits,...(event?.cues||[]),...localCues,...groups.flat()])];
         const score=Math.min(18,phraseHits.length*7.5+
           (groups.length>=3?7:groups.length===2?3:0)+
           (localCoverage>=3?5:localCoverage===2?2:0)+Math.min(3,evidence.length)*0.45);
