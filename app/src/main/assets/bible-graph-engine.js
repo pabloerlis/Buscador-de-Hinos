@@ -51,12 +51,22 @@ const BibleGraphEngine=(()=>{
       }
       // A evidência tópica é derivada dos versos originais; referências cruzadas apenas complementam.
       for(const topic of selected?.topics||[])addTopic(topic,3,true);
-      const ordered=[...counts].sort((a,b)=>b[1]-a[1]);
+      const snippets=reading.verses.map(v=>v.text).join(' ');
+      // Cobertura para qualquer versículo, mesmo sem entrada nos tópicos de Nave/Torrey.
+      // É detecção lexical determinística do texto bíblico em português, não inferência de IA.
+      if(semantic){
+        const textNorm=norm(snippets);
+        for(const topic of semantic.indexHymn('',snippets).filter(x=>x.score>=0.9).slice(0,9)){
+          // 'Seu sangue' em uma narrativa de cura não prova o tema do Calvário.
+          if(topic.id==='cruz'&&!/(?:^| )(?:cruz|calvario|sacrificio|crucificado)(?:$| )/.test(textNorm))continue;
+          addTopic(topic.id,Math.min(2.5,topic.score*1.6),true);
+        }
+      }
+      const ordered=[...counts].filter(([id,weight])=>directTopicIds.has(id)||weight>=(depth===2?0.52:0.68)).sort((a,b)=>b[1]-a[1]);
       const max=depth===2?9:7;
       const concepts=ordered.slice(0,max).map(([id,weight])=>({id,label:topicLabels.get(id),weight:Math.round(weight*100)/100,kind:directTopicIds.has(id)?'direto':'indireto'}));
       // Evitar que uma palavra genérica como 'jesus' ou 'mulher' determine a classificação.
       const words=new Map();
-      const snippets=reading.verses.map(v=>v.text).join(' ');
       for(const raw of norm(snippets).split(' ')){
         if(raw.length<4||STOPS.has(raw)||/^\d+$/.test(raw))continue;
         words.set(raw,(words.get(raw)||0)+1);
