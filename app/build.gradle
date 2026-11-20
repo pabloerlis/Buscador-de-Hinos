@@ -1,5 +1,8 @@
 plugins { id 'com.android.application' }
 def enableLocalModels = providers.gradleProperty('enableLocalModels').map { it.toBoolean() }.orElse(false).get()
+// Valores incorporados ao APK: independentes de conexão e da biblioteca importada.
+def sourceRevision = (System.getenv('BUILD_SOURCE_SHA') ?: System.getenv('GITHUB_SHA') ?: 'local').replaceAll('[^a-zA-Z0-9]', '')
+def buildDateUtc = java.time.Instant.now().toString()
 android {
     namespace 'br.com.buscadordehinos.app'
     compileSdk 35
@@ -9,9 +12,11 @@ android {
         minSdk 24
         targetSdk 34
         ndk { abiFilters 'arm64-v8a' }
-        versionCode 18
-        versionName '2.5.0'
+        versionCode 19
+        versionName '2.6.0'
         buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
+        buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
+        buildConfigField 'String', 'BUILD_DATE_UTC', '"' + buildDateUtc + '"'
     }
     buildFeatures { buildConfig true }
     if (enableLocalModels) {
