@@ -73,3 +73,4 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 .concept-list{display:flex;flex-wrap:wrap;gap:7px}
 .concept-chip{display:inline-block;padding:6px 9px;border-radius:8px;background:#fff;border:1px solid #d7e8d9;color:#3d6851;font-size:11px}
 @media(max-width:560px){.semantic-settings{padding:13px}.setting-section-heading h3{font-size:15px}}
+.hero{overflow:clip}
