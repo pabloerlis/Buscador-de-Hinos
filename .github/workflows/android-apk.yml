@@ -39,6 +39,7 @@ jobs:
             'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
             --output /tmp/hinos-avaliacao.json
           node tests/benchmark-narratives.js /tmp/hinos-avaliacao.json
+          node tests/benchmark-biblical-passages.js /tmp/hinos-avaliacao.json
       - name: Build APK
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
