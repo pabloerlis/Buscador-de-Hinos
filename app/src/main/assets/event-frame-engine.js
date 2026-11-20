@@ -216,8 +216,12 @@ const EventFrameEngine=(()=>{
       // (talvez em estrofes distantes) em narrativa direta. As duas ações
       // precisam coexistir numa única janela local E ter cenário verificável.
       // Esta é uma regra universal para todos os episódios, não por título.
-      const coherent=matching.find(m=>m.actions.length>=2&&m.actors.length>=1&&
-        (m.actions.some(rare)||(m.actions.length>=3&&m.actors.some(a=>source.aliases.has(a)))));
+      // A Bíblia cita muitos substantivos genéricos; usar qualquer um deles
+      // como "ator" causa falsos positivos. Exigir ao menos uma pista que
+      // também esteja na DESCRIÇÃO do episódio, não só em seus 40+ versículos.
+      const coherent=matching.find(m=>m.actions.length>=2&&
+        m.actors.some(a=>source.aliases.has(a))&&
+        (m.actions.some(rare)||m.actions.length>=3));
       const best=coherent||matching[0];
       const actors=best?.actors||[];
       const actionCount=distinct.length;
