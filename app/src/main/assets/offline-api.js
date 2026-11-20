@@ -63,7 +63,7 @@ const OfflineAPI = (() => {
   let bibleGraph=null;
   let bridge=null;
   let queryRankingCache=new Map();
-  const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
+  const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',fusionMode:'rrf',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   function searchOptions(raw){
     const p=raw&&typeof raw==='object'?raw:{};
     const clamp=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;
@@ -75,7 +75,7 @@ const OfflineAPI = (() => {
       }
     }
     const collections=Object.fromEntries(COLLECTION_IDS.map(id=>[id,p.collections?.[id]!==false]));
-    return {collections,vectorMode:['balanced','strong','off'].includes(p.vectorMode)?p.vectorMode:DEFAULT_SEARCH.vectorMode,mode:['balanced','literal','context'].includes(p.mode)?p.mode:DEFAULT_SEARCH.mode,
+    return {collections,vectorMode:['balanced','strong','off'].includes(p.vectorMode)?p.vectorMode:DEFAULT_SEARCH.vectorMode,fusionMode:['rrf','legacy'].includes(p.fusionMode)?p.fusionMode:DEFAULT_SEARCH.fusionMode,mode:['balanced','literal','context'].includes(p.mode)?p.mode:DEFAULT_SEARCH.mode,
       strength:clamp(p.strength,0,100,75),narratives:p.narratives!==false,
       related:p.related!==false,minAffinity:clamp(p.minAffinity,0,90,0),
       pageSize:[5,10].includes(Number(p.pageSize))?Number(p.pageSize):5,
@@ -518,7 +518,8 @@ const OfflineAPI = (() => {
       if(excludedCriteria.some(matchesCriterion))continue;
       const namedCollection=numberMatch?.[1]?collectionId(numberMatch[1]):null;
       if(numberMatch&&!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2]) && (!namedCollection||ref.id===namedCollection) && opts.collections[ref.id]!==false))continue;
-      let score=0;const evidence=[],spelling=[];let semanticResult=null,storyResult=null,graphResult=null;
+      let score=0;let lexicalSignal=0,semanticSignal=0,biblicalSignal=0,narrativeSignal=0,vectorSignal=0;
+      const evidence=[],spelling=[];let semanticResult=null,storyResult=null,graphResult=null;
       if(numberMatch){
         if(!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2])))continue;
         score=100;evidence.push('número exato');
@@ -541,6 +542,8 @@ const OfflineAPI = (() => {
         }
         if(qTokens.length>1&&matched>1)score+=3*matched/qTokens.length;
         if(spelling.length)evidence.push('grafia próxima: '+[...new Set(spelling)].slice(0,2).join(', '));
+        lexicalSignal=score;
+        const beforeSemantic=score;
         if (semantic && intent){
           semanticResult=semantic.evaluate(song.semantic_profile||[],opts.related?intent:{direct:intent.direct,related:[]});
           score+=semanticResult.score*semanticWeight;
@@ -555,7 +558,9 @@ const OfflineAPI = (() => {
             score+=Math.min(3.5,count*.65)*semanticWeight;
           }
         }
+        semanticSignal=Math.max(0,score-beforeSemantic);
         const v=vectorScores.get(song.id);
+        vectorSignal=v!==undefined&&v>=0.72?v:0;
         if(v!==undefined && v>=0.72){
           const points=Math.min(24,Math.max(0,(v-.70)*110))*(opts.vectorMode==='strong'?1.4:1);
           score+=points;
@@ -563,11 +568,13 @@ const OfflineAPI = (() => {
         }
         if(graphCtx){
           graphResult=bibleGraph.evaluate(song,graphCtx);
+          biblicalSignal=Math.max(0,graphResult.score*semanticWeight);
           score+=graphResult.score*semanticWeight;
           if(graphResult.reasons.length)evidence.unshift(...graphResult.reasons.slice(0,2));
         }
         if(storyIntent?.matches.length){
           storyResult=narratives.evaluate(song.story_profile||[],storyIntent);
+          narrativeSignal=Math.max(0,storyResult.score*semanticWeight);
           score+=storyResult.score*semanticWeight;
           if(storyResult.reasons.length)evidence.unshift(...storyResult.reasons);
         }
@@ -576,6 +583,7 @@ const OfflineAPI = (() => {
       const sharedPassage=passageTopics.size>=2?findSharedPassage(song,indexedText,passageTopics):null;
       if(sharedPassage){
         score+=9*Math.min(semanticWeight,1);
+        semanticSignal+=9*Math.min(semanticWeight,1);
         evidence.unshift(sharedPassage.reason);
       }
       const lowered=numberMatch?[]:lowerCriteria.filter(matchesCriterion).map(criterion=>criterion.term);
@@ -593,6 +601,9 @@ const OfflineAPI = (() => {
         reason:opts.showReasons?reason+(lowered.length?' Menor prioridade por '+lowered.join(', ')+'.':''):'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
         _narrativeTier:storyResult?.tier||0,
+        _fusionSignals:{lexical:lexicalSignal,semantic:semanticSignal,biblical:biblicalSignal,
+          narrative:narrativeSignal,vector:vectorSignal},
+        _fusionPenalty:lowered.length?1-Math.min(.45,lowered.length*.25):1,
         _vectorRange:vectorRanges.get(song.id)||null,
         vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
         match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
@@ -604,6 +615,15 @@ const OfflineAPI = (() => {
     ranked.sort((a,b)=>Number(b.match_type==='titulo_exato')-Number(a.match_type==='titulo_exato')||
       (narrativePrimary?b._narrativeTier-a._narrativeTier:0)||
       b.relevance_score-a.relevance_score||Number(a.number||10000)-Number(b.number||10000)||a.id-b.id);
+    // Fusão de listas independentes somente quando há consulta E5 real.
+    // Na ausência do modelo, em buscas literais e em números/títulos inequívocos,
+    // o ranking tradicional fica INALTERADO.
+    const fusionEnabled=vectorEnabled&&opts.fusionMode==='rrf'&&!quoted.length&&
+      typeof FusionRRF!=='undefined';
+    if(fusionEnabled){
+      const ordered=FusionRRF.rank(ranked,{vectorMode:opts.vectorMode,narrativePrimary});
+      ranked.splice(0,ranked.length,...ordered);
+    }
     // O hino não aprendido continua no ranking e mantém sua afinidade.
     // Apenas a paginação principal fica reservada aos hinos disponíveis.
     const available=ranked.filter(h=>!RepertoireStore.isNotLearned(hymns[h.id-1]));
@@ -612,7 +632,7 @@ const OfflineAPI = (() => {
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
-    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_vectorRange,...hit})=>{
+    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_fusionSignals,_fusionPenalty,_vectorRange,...hit})=>{
       const hymn=hymns[hit.id-1];
       const vectorText=vectorEnabled&&hit.vector_similarity>=76&&!sharedPassage&&!numberMatch&&
         !quoted.length&&!required.length&&typeof VectorIndex.passageForSong==='function'?
@@ -623,6 +643,7 @@ const OfflineAPI = (() => {
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
     const interpretation=opts.showConcepts?[
       ...(vectorEnabled?['Embeddings E5: '+VectorIndex.status().count+' hinos / '+VectorIndex.status().passages+' trechos']:[]),
+      ...(fusionEnabled?['Fusão RRF: evidências lexicais, temáticas, narrativas, bíblicas e E5']:[]),
       ...reading.map(t=>'Narrativa: '+t),
       ...selectedTopics.slice(0,6).map(t=>'Tema: '+t),
       ...(scripture?['Bíblia Livre offline: '+scripture.reference+(scripture.partial?' (amostra do capítulo)':'')]:[]),
@@ -650,7 +671,7 @@ const OfflineAPI = (() => {
   }
   function queryRanking(query,opts){
     if(!query||!query.trim()||/^(?:hino\s*)?\d{1,4}$/i.test(query.trim()))return new Map();
-    const key=JSON.stringify([query,opts.mode,opts.strength,opts.narratives,opts.related,opts.customAliases,opts.collections,opts.vectorMode]);
+    const key=JSON.stringify([query,opts.mode,opts.strength,opts.narratives,opts.related,opts.customAliases,opts.collections,opts.vectorMode,opts.fusionMode]);
     if(queryRankingCache.has(key))return queryRankingCache.get(key);
     const ranked=search({query,page:1,parsed_query:true,settings:{...opts,minAffinity:0},_forRecommendations:true});
     const scores=new Map(ranked._fullRanked.map(x=>[x.id,x.relevance_percent]));
