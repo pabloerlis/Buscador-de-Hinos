@@ -42,6 +42,11 @@ for src in page.js:
     require(not src.startswith(("http:", "https:", "//")), "Script remoto na interface offline: " + src)
     require((ASSETS / src).is_file(), "Script HTML ausente: " + src)
 require("about.js" in page.js, "Tela Sobre sem script de metadados")
+require("rrf-fusion.js" in page.js, "Motor RRF não carregado na interface")
+require("fusion-mode" in page.ids, "Opção de comparação RRF/legado ausente")
+offline_api = (ASSETS / "offline-api.js").read_text(encoding="utf-8")
+require("FusionRRF.rank" in offline_api and "fusionMode" in offline_api,
+        "RRF não está integrado ao fluxo de pesquisa")
 require("about-app" in page.ids, "Configurações sem seção Sobre")
 for element in ("about-developer", "about-version", "about-code", "about-commit", "about-date"):
     require(element in page.ids, "Campo Sobre ausente: " + element)

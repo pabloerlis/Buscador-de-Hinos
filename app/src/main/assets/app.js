@@ -207,7 +207,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 
 // Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
 const SearchPreferences=(()=>{
-  const ids={vectorMode:'vector-mode',mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
+  const ids={vectorMode:'vector-mode',fusionMode:'fusion-mode',mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
     narratives:'story-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',bibleGraph:'bible-graph-toggle',bibleLinks:'bible-links-toggle',bibleDepth:'bible-depth',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
     recWeight:'rec-weight',recCount:'rec-count',recContext:'rec-context',recAvoidVisited:'rec-visited',recBreakdown:'rec-breakdown'};
   const defaults=OfflineAPI.searchOptions();

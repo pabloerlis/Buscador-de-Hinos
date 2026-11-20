@@ -1,3 +1,17 @@
+# Buscador de Hinos Android v2.6.3 — fusão de rankings por RRF
+
+Esta versão implementa **Reciprocal Rank Fusion (RRF, k=60)** para combinar rankings independentes: busca literal, temas, evidência bíblica, narrativas e similaridade vetorial E5. A classificação anterior somava pontuações de escalas diferentes; o RRF combina **posições** nas listas. Metodologia: https://learn.microsoft.com/pt-br/azure/search/hybrid-search-ranking .
+
+- **Funciona offline:** nenhum serviço remoto, treinamento ou mudança do modelo E5 é necessário.
+- **Ativação:** a fusão RRF é padrão em buscas com vetor E5 válido; em Configurações é possível trocar para "Pontuação anterior (comparação)". Fora do E5, ou em número/trecho literal, o comportamento permanece inalterado.
+- **Segurança do ranking:** filtros de coleção, exclusões, critérios obrigatórios, repertório não aprendido e correspondência de título exato são preservados. O RRF não trata similaridade vetorial como probabilidade.
+- **Transparência:** a interpretação mostra quando a fusão foi aplicada; os resultados continuam indicando evidências da letra, temas e passagem.
+- **QA:** testes matemáticos, integração da busca com E5, comparação na coletânea real **com E5 desativado, com pontuação anterior e com RRF**, teste no emulador Android sem conectividade e auditoria do APK. Bloqueio de publicação se Recall@20 ou nDCG@5 regredirem além das tolerâncias declaradas.
+
+**Versão:** 2.6.3 / `versionCode=22`. É uma etapa incremental; busca narrativa por agentes, ações e reclassificação neural contextual são trabalhos posteriores.
+
+---
+
 # Buscador de Hinos Android v2.6.2 — E5 por estrofe
 
 A versão **2.6.2 (build 21)** habilita embeddings semânticos reais no Android, offline e sem GGUF. O índice guarda até oito vetores por hino, cobrindo trechos distribuídos pela letra (não apenas início/fim). O aplicativo compara a consulta ao vetor de cada trecho e mostra a passagem encontrada na letra importada; a semelhança não representa certeza.

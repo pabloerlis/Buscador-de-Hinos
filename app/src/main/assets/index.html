@@ -17,6 +17,7 @@
   <script src="bible-context.js" defer></script>
   <script src="recommendation-engine.js" defer></script>
   <script src="vector-index.js" defer></script>
+  <script src="rrf-fusion.js" defer></script>
   <script src="repertoire-store.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="local-hymn-ai.js" defer></script>
@@ -209,6 +210,8 @@
         <input id="semantic-power" type="range" min="0" max="100" step="5" value="75">
         <label for="vector-mode" data-vector-ui>Modelo vetorial E5 Small</label>
         <select id="vector-mode" data-vector-ui><option value="off">Desativado</option><option value="balanced">Por palavras e vetores</option><option value="strong">Dar mais peso aos vetores</option></select>
+        <label for="fusion-mode" data-vector-ui>Combinação dos resultados</label>
+        <select id="fusion-mode" data-vector-ui><option value="rrf">Fusão RRF (recomendada)</option><option value="legacy">Pontuação anterior (comparação)</option></select>
         <p id="vector-state" data-vector-ui class="subtle-note" role="status">Verificando índice vetorial…</p>
         <p class="subtle-note">A lista aparece imediatamente. Com a busca vetorial ativada, o ranking é aprimorado depois que o modelo calcula o significado da consulta. O primeiro uso pode exigir preparar cerca de 120 MB no armazenamento privado.</p>
         <label class="setting-check"><input id="story-toggle" type="checkbox" checked>Reconhecer narrativas bíblicas (Filho Pródigo, Ovelha Perdida etc.)</label>
