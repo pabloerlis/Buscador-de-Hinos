@@ -188,7 +188,7 @@ jobs:
       - name: Compilar APK debug
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: gradle --no-daemon --stacktrace assembleDebug -PenableLocalEmbeddings=true
+        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true
       - name: Guardar candidato para auditoria (ainda nao aprovado)
         uses: actions/upload-artifact@v4
         with:
@@ -196,10 +196,56 @@ jobs:
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 1
           if-no-files-found: error
+      - name: Guardar APK dos testes instrumentados
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-instrumentation-qa
+          path: app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          retention-days: 1
+          if-no-files-found: error
+
+  device_smoke:
+    name: "Agente 6 | Android real: WebView, sobre e E5 ONNX"
+    needs: build_apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-candidate-qa
+          path: apk-candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-instrumentation-qa
+          path: apk-instrumentation
+      - name: Habilitar acesso à virtualização Android KVM
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Rodar E5 na interface Android do próprio APK aprovado
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          heap-size: 512M
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            adb install -r apk-candidate/app-debug.apk
+            adb install -r apk-instrumentation/app-debug-androidTest.apk
+            adb shell svc wifi disable
+            adb shell svc data disable
+            adb shell am instrument -w -r -e class br.com.buscadordehinos.app.E5DeviceSmokeTest br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner
 
   audit_apk:
-    name: "Agente 5 | Auditar assinatura e APK final"
-    needs: build_apk
+    name: "Agente 7 | Auditoria do APK validado em Android"
+    needs: [build_apk, device_smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
