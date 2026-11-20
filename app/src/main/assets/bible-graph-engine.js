@@ -27,7 +27,7 @@ const BibleGraphEngine=(()=>{
     return word;
   }
   function roots(raw){
-    return (norm(raw).match(/[a-z]{4,}/g)||[]).filter(x=>!CUE_STOP.has(x)).map(stem);
+    return (norm(raw).match(/[a-z]{3,}/g)||[]).filter(x=>!CUE_STOP.has(x)).map(stem);
   }
   function passageWindows(lyrics){
     const windows=[];
@@ -166,7 +166,7 @@ const BibleGraphEngine=(()=>{
       const passageRoots=[...new Set([...roots(snippets),...aliasRoots])].slice(0,180);
       const cueLabels={};
       for(const word of norm(snippets+' '+aliasText).split(' ')){
-        if(word.length<4||CUE_STOP.has(word))continue;
+        if(word.length<3||CUE_STOP.has(word))continue;
         cueLabels[stem(word)]=word;
       }
       return {reference:reading.reference,source:direct?'referência':'narrativa',narrative:selected?.label||null,
