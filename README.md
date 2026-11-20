@@ -124,3 +124,7 @@ As pontuações são **heurísticas, não probabilidades de compatibilidade comp
 `node tests/test-v17.js` — referências bíblicas, associação lexical sem falsos positivos, compatibilidade com o mecanismo de recomendações e opção de desativar as novas camadas. A cobertura total dos hinos dependerá de validação posterior com a coletânea inteira.
 
 O arquivo `scripture-pt.json` é gerado pelo pipeline e não está no repositório para manter uma fonte de verdade única e versão auditável. É obrigatório para que o APK distribua o recurso bíblico offline.
+
+
+## v1.8 — embeddings offline E5 Small
+Modelo multilingual-e5-small (MIT) quantizado em ONNX. O build gera vetores normalizados dos hinos 2018, não distribui letras, e inclui o modelo no APK. A busca textual aparece primeiro; a camada E5 atualiza o ranking depois de calcular apenas o vetor da consulta. O primeiro uso copia o modelo para o armazenamento privado do Android. A correspondência entre vetores e hinos exige SHA-256 da letra, número e título. Configurações permitem desativar ou priorizar a camada vetorial. Os percentuais são heurísticos, não probabilidades calibradas. A execução real em smartphone precisa ser validada.

@@ -43,6 +43,9 @@ public final class MainActivity extends Activity {
     private static final String PREFS = "hinos_local_llm";
     private static final String MODEL_URI_KEY = "model_uri";
     private final ExecutorService llmExecutor=Executors.newSingleThreadExecutor();
+    private final ExecutorService vectorExecutor=Executors.newSingleThreadExecutor();
+    private volatile String vectorState="Aguardando primeira pesquisa";
+    private E5Engine embeddingEngine;
     private volatile boolean modelLoaded=false;
     private volatile boolean llmBusy=false;
     private volatile String modelPhase="none";
@@ -113,8 +116,42 @@ public final class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new ImportBridge(), "NativeHinos");
         web.addJavascriptInterface(new ModelBridge(), "NativeGGUF");
+        web.addJavascriptInterface(new VectorBridge(), "NativeVector");
         web.loadUrl(HOST + "/assets/index.html");
     }
+    private final class VectorBridge {
+        @JavascriptInterface public String status(){
+            try{return new JSONObject().put("available",true).put("state",vectorState).toString();}
+            catch(Exception e){return "{}";}
+        }
+        @JavascriptInterface public void embed(String requestId,String query){
+            if(requestId==null||requestId.length()>64||query==null||query.length()>500)return;
+            vectorExecutor.execute(()->{
+                long start=System.currentTimeMillis();
+                try{
+                    if(embeddingEngine==null)embeddingEngine=new E5Engine(MainActivity.this);
+                    float[] v=embeddingEngine.embed(query,progress->{vectorState=progress;sendProgress(requestId,progress);});
+                    org.json.JSONArray arr=new org.json.JSONArray();
+                    for(float value:v)arr.put(value);
+                    vectorState="Modelo E5 pronto";
+                    sendResult(new JSONObject().put("id",requestId).put("ok",true).put("vector",arr).put("ms",System.currentTimeMillis()-start));
+                }catch(Throwable e){
+                    vectorState="Falha: "+e.getClass().getSimpleName();
+                    try{sendResult(new JSONObject().put("id",requestId).put("ok",false)
+                        .put("error",e.getClass().getSimpleName()+": "+e.getMessage()));}catch(Exception ignored){}
+                }
+            });
+        }
+        private void sendProgress(String id,String message){
+            try{JSONObject data=new JSONObject().put("id",id).put("message",message);
+                runOnUiThread(()->web.evaluateJavascript("window.VectorNative&&window.VectorNative.progress("+data.toString()+")",null));
+            }catch(Exception ignored){}
+        }
+        private void sendResult(JSONObject data){
+            runOnUiThread(()->web.evaluateJavascript("window.VectorNative&&window.VectorNative.complete("+data.toString()+")",null));
+        }
+    }
+
     private static WebResourceResponse forbidden(){
         return new WebResourceResponse("text/plain", "UTF-8", new java.io.ByteArrayInputStream(new byte[0]));
     }

@@ -5,6 +5,7 @@ on:
   workflow_dispatch:
 jobs:
   build:
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -26,8 +27,17 @@ jobs:
           gradle-version: '8.9'
       - name: Build licensed offline Bible index
         run: python3 scripts/build_scripture_index.py
+      - name: Install E5 indexing dependencies
+        run: python3 -m pip install --disable-pip-version-check 'huggingface_hub[hf_xet]>=0.34,<2' 'tokenizers>=0.20,<1' 'onnxruntime>=1.20,<2' 'numpy>=1.26,<3' 'requests>=2.32,<3'
+      - name: Generate E5 embeddings and model assets
+        env:
+          HF_HUB_DISABLE_TELEMETRY: '1'
+          HF_HUB_DOWNLOAD_TIMEOUT: '240'
+        run: python3 scripts/build_e5_assets.py
       - name: Run local-search tests
-        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js
+        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js
+      - name: Verify E5 assets
+        run: python3 scripts/verify_e5_assets.py
       - name: Build APK
         run: gradle --no-daemon --stacktrace assembleDebug
       - uses: actions/upload-artifact@v4
