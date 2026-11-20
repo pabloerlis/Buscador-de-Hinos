@@ -33,6 +33,12 @@ jobs:
         run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js && node tests/test-v21.js && node tests/test-narrative-events.js
       - name: Evaluate offline semantic ranking
         run: node tests/test-stanza-ranking.js
+      - name: Evaluate narrative ranking on full catalog (test only)
+        run: |
+          curl --fail --location --silent --show-error --retry 2 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output /tmp/hinos-avaliacao.json
+          node tests/benchmark-narratives.js /tmp/hinos-avaliacao.json
       - name: Build APK
         run: gradle --no-daemon --stacktrace assembleDebug
       - name: Verify model-free APK contents
