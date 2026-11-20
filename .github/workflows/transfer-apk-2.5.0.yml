@@ -1,0 +1,27 @@
+name: Transfer APK 2.5.0
+on:
+  push:
+    branches: [delivery/apk-2.5.0]
+permissions:
+  actions: read
+jobs:
+  transfer:
+    name: Part ${{ matrix.part }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        part: [0, 1, 2, 3, 4, 5, 6]
+    env:
+      GH_TOKEN: ${{ github.token }}
+      APK_PART: ${{ matrix.part }}
+    steps:
+      - name: Transfer verified archive fragment
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14658194591/zip" > archive.zip
+          test "$(wc -c < archive.zip)" -eq 2617863
+          echo "bacd9133bf269f32cfd11b8a1355ad5bc38dfe09f7592541d6ca20cd3bbc39c1  archive.zip" | sha256sum -c
+          dd if=archive.zip bs=393216 skip="$APK_PART" count=1 status=none | base64 -w 3000 | sed 's/^/APK25DATA /'
+          printf '\nAPK25END %s\n' "$APK_PART"
