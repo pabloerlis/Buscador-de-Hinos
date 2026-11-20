@@ -55,6 +55,11 @@ for field in ("VERSION_NAME", "VERSION_CODE", "SOURCE_REVISION", "BUILD_DATE_UTC
     require("BuildConfig." + field in activity, "Bridge sem metadado: " + field)
 require("public String buildInfo()" in activity, "Ponte Android/Sobre ausente")
 require("Pablo Erlis" in activity and "Pablo Erlis" in about, "Crédito do desenvolvedor ausente")
+source_revision = "da8e75932982123301affce688e45b4152c9e06e"
+for file in (ASSETS / "offline-api.js", ROOT / "scripts/build_e5_assets.py",
+             ROOT / "app/src/main/java/br/com/buscadordehinos/app/MainActivity.java"):
+    require(source_revision in file.read_text(encoding="utf-8"),
+            "Origem de hinos não corresponde à revisão vetorial pinada: " + str(file))
 require(re.search(r"\bversionCode\s+\d+\b", gradle), "versionCode inválido")
 require(re.search(r"\bversionName\s+'[\d.]+(?:-[a-z0-9.]+)?'", gradle), "versionName inválido")
 
