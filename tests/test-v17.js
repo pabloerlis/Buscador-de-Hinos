@@ -14,8 +14,10 @@ const bible={schema_version:1,version:'almeida-livre',revision:'fixture',source:
 const store=new Map();const idb={open(){const req={};setTimeout(()=>{req.result={objectStoreNames:{contains:()=>true},transaction(){const tx={objectStore(){return {get(key){const r={};setTimeout(()=>{r.result=store.get(key);r.onsuccess?.();},0);return r;},put(value,key){setTimeout(()=>{store.set(key,value);tx.oncomplete?.();},0);}};}};return tx;},close(){}};req.onsuccess?.();},0);return req;}};
 const document={createElement(){return {content:{textContent:''},set innerHTML(s){this.content.textContent=s.replace(/<[^>]+>/g,'');}};}};
 const fetch=async(url)=>({ok:true,json:async()=>String(url).includes('scripture-pt')?bible:String(url).includes('semantic-bridge')?bridge:String(url).includes('semantic-stories')?narratives:semantic});
-const ctx={window:{indexedDB:idb},indexedDB:idb,setTimeout,clearTimeout,console,document,fetch};vm.createContext(ctx);
-for(const name of ['semantic-engine.js','story-engine.js','scripture-index.js','bridge-engine.js','bible-context.js','recommendation-engine.js','offline-api.js'])vm.runInContext(read(name),ctx);
+const ctx={window:{indexedDB:idb},indexedDB:idb,setTimeout,clearTimeout,console,document,fetch};const repertoireMemory=new Map();
+ctx.localStorage={getItem:k=>repertoireMemory.get(k)||null,setItem:(k,v)=>repertoireMemory.set(k,String(v)),removeItem:k=>repertoireMemory.delete(k)};
+vm.createContext(ctx);
+for(const name of ['semantic-engine.js','story-engine.js','scripture-index.js','bridge-engine.js','bible-context.js','recommendation-engine.js','repertoire-store.js','offline-api.js'])vm.runInContext(read(name),ctx);
 const api=vm.runInContext('OfflineAPI',ctx);
 const scripture=vm.runInContext('ScriptureIndex',ctx).create(bible);
 assert.equal(scripture.lookup('Hinos para João 3:16').reference,'João 3:16');

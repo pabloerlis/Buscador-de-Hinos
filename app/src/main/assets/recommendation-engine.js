@@ -112,8 +112,13 @@ const RecommendationEngine = (() => {
           topics:s.commonThemes.slice(0,4),score:combined});
       }
       output.sort((a,b)=>b.score-a.score||b.similarity_percent-a.similarity_percent||a.id-b.id);
+      const unavailable=settings.notLearnedIds instanceof Set?settings.notLearnedIds:new Set();
+      const available=output.filter(song=>!unavailable.has(song.id));
+      const notLearned=output.filter(song=>unavailable.has(song.id));
       return {anchor_id:anchor.song.id,anchor_title:anchor.song.title,original_query:queryActive?originalQuery:'',
-        weight_percent:queryActive?Math.round(opts.weight*100):100,results:output.slice(0,opts.count),total:output.length,
+        weight_percent:queryActive?Math.round(opts.weight*100):100,
+        results:available.slice(0,opts.count),total:available.length,
+        not_learned_results:notLearned.slice(0,5),not_learned_total:notLearned.length,
         methodology:'Percentuais heurísticos: letras + temas + narrativas; busca original ponderada. Não são probabilidades.'};
     }
     return {recommend,docCount:docs.length};

@@ -17,6 +17,7 @@
   <script src="bible-context.js" defer></script>
   <script src="recommendation-engine.js" defer></script>
   <script src="vector-index.js" defer></script>
+  <script src="repertoire-store.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -116,6 +117,12 @@
                 <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare" class="secondary-btn" type="button">Comparar 5 (offline)</button></div></div>
         <div id="results-list" class="results-list" aria-live="polite"></div>
               <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+              <details id="not-learned-search" class="unlearned-drawer hidden">
+                <summary><span>Não aprendidos nesta pesquisa</span><strong id="not-learned-search-count">0</strong></summary>
+                <p class="subtle-note">Ficam fora das sugestões principais, mas continuam acessíveis e mantêm seus percentuais.</p>
+                <div id="not-learned-list" class="results-list"></div>
+                <button id="not-learned-more" class="secondary-btn hidden" type="button">Ver mais não aprendidos</button>
+              </details>
             </div>
             <aside class="refine-panel">
               <div class="refine-header"><span class="refine-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6 3 3M6 18l3-3m6-6 3-3"/></svg></span><div><h3>Refinar com contexto</h3><p id="refine-mode">Busca contextual</p></div></div>
@@ -135,11 +142,16 @@
     <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-top"><div><span class="modal-overline" id="modal-number">HINO</span><h2 id="modal-title">Detalhes do hino</h2></div><button class="icon-button" data-close="modal" aria-label="Fechar detalhes">×</button></div>
       <div class="modal-body">
+        <div class="modal-section repertoire-modal-status"><strong id="modal-repertoire-status">Disponível para indicação</strong><button id="modal-repertoire-toggle" class="secondary-btn" type="button">Marcar como não aprendido</button></div>
         <div class="related-heading"><button class="secondary-btn hidden" id="related-back" type="button">← Voltar ao hino anterior</button><span id="related-trail" class="related-trail"></span></div>
         <section class="modal-section related-section" id="related-section" aria-label="Recomendações de hinos semelhantes">
           <div class="related-top"><div><span class="section-kicker">DESCUBRA MAIS HINOS</span><h3>Hinos semelhantes a este</h3></div><span class="local-badge">100% offline</span></div>
           <p id="related-description" class="subtle-note">Letras comparadas por temas, narrativas e palavras relevantes.</p>
           <div id="related-list" class="related-list" aria-live="polite"></div>
+          <details id="related-unlearned" class="unlearned-drawer hidden"><summary><span>Relacionados ainda não aprendidos</span><strong id="related-unlearned-count">0</strong></summary>
+            <p class="subtle-note">Não entram nas sugestões principais, mas podem ser consultados ou reativados.</p>
+            <div id="related-unlearned-list" class="related-list"></div>
+          </details>
           <p class="related-method">As porcentagens são índices de afinidade estimada, não probabilidades nem avaliação teológica oficial.</p>
         </section>
         <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
@@ -162,6 +174,13 @@
         <label class="setting-check"><input id="collection-pessoal" type="checkbox" checked> Outros JSON importados <small id="count-pessoal"></small></label>
         <p class="subtle-note">No download são ignorados as coletâneas antigas e os grupos de teste do arquivo original. Os dados e a indexação ficam no telefone. E5 pré-calculado acompanha as três edições 2018; outras versões permanecem pesquisáveis pelo motor textual.</p>
         <div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar 3 coleções</button><label class="secondary-btn file-upload">Importar JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div>
+      </section>
+      <section class="semantic-settings" aria-label="Repertório conhecido da igreja">
+        <div class="setting-section-heading"><h3>Repertório da igreja</h3><span class="local-badge">Salvo no aparelho</span></div>
+        <p class="subtle-note">Marque os hinos que ainda não foram aprendidos. Eles não aparecem nas indicações principais, mas continuam disponíveis em uma seção recolhível nos resultados e nas recomendações.</p>
+        <strong id="knowledge-count">0 hinos não aprendidos</strong>
+        <div id="knowledge-list" class="knowledge-list" aria-live="polite"></div>
+        <p class="subtle-note">A lista não altera as letras nem os índices. Ela permanece nas atualizações normais do aplicativo; desinstalar ou limpar os dados pode apagá-la.</p>
       </section>
       <section class="semantic-settings" aria-label="Preferências de busca semântica">
         <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>

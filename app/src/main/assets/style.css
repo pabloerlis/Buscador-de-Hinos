@@ -108,3 +108,31 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 .collection-quick small,.setting-check small{font-size:.75rem;color:#577469;font-weight:500}
 .library-tag{display:inline-block;font-size:.74rem;letter-spacing:.01em;color:#356458;background:#e3f3e9;border-radius:5px;padding:3px 7px;margin-top:4px}
 @media(max-width:600px){.collection-quick{gap:6px}.collection-quick label{padding:5px 8px;font-size:.75rem}}
+
+/* v2.1: repertório da igreja; resultados indisponíveis só em gavetas recolhíveis. */
+.repertoire-action{font-size:11px;font-weight:700;border:1px solid #acc5b7;background:#f5faf6;color:#285e43;border-radius:8px;padding:8px 10px;white-space:normal;text-align:center}
+.repertoire-action:hover{background:#e5f4e8}
+.repertoire-action.undo{border-color:#dccbaa;background:#fff9ec;color:#725d2f}
+.result-card.is-unlearned{background:#fafaf8;border-style:dashed;border-color:#c6c9bf;opacity:.87}
+.result-card.is-unlearned .score-track span{background:#9da99d}
+.result-card .result-bottom{gap:9px;flex-wrap:wrap}
+.unlearned-drawer{border:1px solid #dde0d8;border-radius:13px;background:#fafaf8;padding:0 13px 14px;margin:18px 0}
+.unlearned-drawer>summary{cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:15px 4px;color:#4a5e52;font-weight:750;font-size:13px}
+.unlearned-drawer>summary::-webkit-details-marker{display:none}
+.unlearned-drawer>summary:before{content:'▸';font-size:13px;color:#6e7c71;margin-right:3px}
+.unlearned-drawer[open]>summary:before{content:'▾'}
+.unlearned-drawer>summary span{flex:1}
+.unlearned-drawer>summary strong{padding:3px 9px;border-radius:20px;background:#e8eee8;color:#52675a;font-variant-numeric:tabular-nums}
+.unlearned-drawer .subtle-note{margin:0 0 14px}
+.unlearned-drawer .results-list{margin:10px 0}
+.related-entry{display:flex;flex-direction:column;gap:5px}
+.related-entry>.repertoire-action{align-self:flex-end;margin:0 3px 4px}
+.related-entry.is-unlearned .related-card{background:#f7f7f5;border-style:dashed;opacity:.9}
+.repertoire-modal-status{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:#f2f7f3;border-radius:10px;padding:12px!important}
+.repertoire-modal-status>strong{font-size:13px;color:#3f604a}
+.knowledge-list{display:flex;flex-direction:column;gap:7px;max-height:330px;overflow:auto}
+.knowledge-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px;border:1px solid #d9e4da;border-radius:9px;background:#fff}
+.knowledge-row span{font-size:12px;line-height:1.45;color:#294c37}
+.knowledge-row small{display:block;color:#687f70}
+.knowledge-empty{font-size:12px;color:#617769;margin:5px 0}
+@media(max-width:560px){.repertoire-modal-status{align-items:stretch}.repertoire-modal-status .repertoire-action{width:100%}.result-card .result-bottom{align-items:stretch}}

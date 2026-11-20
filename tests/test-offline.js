@@ -16,9 +16,12 @@ const document={createElement(tag){assert.equal(tag,'template');return {content:
 const dbPath=path.join(__dirname,'../app/src/main/assets/semantic-db.json');
 const db=JSON.parse(fs.readFileSync(dbPath,'utf8'));
 const ctx={window,document,indexedDB:fakeIndexedDB,setTimeout,clearTimeout,console,fetch:async(url)=>{if(String(url).endsWith('semantic-db.json'))return {ok:true,json:async()=>db};throw Error('No network in tests');}};
+const repertoireMemory=new Map();
+ctx.localStorage={getItem:k=>repertoireMemory.get(k)||null,setItem:(k,v)=>repertoireMemory.set(k,String(v)),removeItem:k=>repertoireMemory.delete(k)};
 vm.createContext(ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/semantic-engine.js'),'utf8')+'\nthis.engine=SemanticEngine;',ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/bible-context.js'),'utf8')+'\nthis.bible=BibleContext;',ctx);
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/repertoire-store.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/offline-api.js'),'utf8')+'\nthis.api=OfflineAPI;',ctx);
 const api=ctx.api;
 const samples=[

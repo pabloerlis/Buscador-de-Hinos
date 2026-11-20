@@ -17,6 +17,7 @@ async function refreshStatus(){
   $('refine-mode').textContent=result.semantic_ready?'Busca semântica offline':'Busca contextual local';
   $('settings-collection').textContent=result.collection||'Não importada';
   $('settings-count').textContent=result.hymn_count;
+  RepertoireUI.renderManagement().catch(error=>console.warn('Repertório:',error.message));
   $('settings-collection-counts').textContent=Object.entries(result.collections||{}).filter(([,count])=>count>0).map(([id,count])=>id+': '+count).join(' · ')||'Nenhuma';
   for(const id of ['principal','avulsos','cia','pessoal']){
     const count=(result.collections||{})[id]||0;
@@ -37,18 +38,18 @@ function busySearch(value){
   $('search-button').textContent=value?'Buscando…':'Buscar';
   if(!value)$('search-button').innerHTML='Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
 }
-function resultCard(hymn){
+function resultCard(hymn,{unlearned=false}={}){
   const number=hymn.number?`HINO ${escapeHTML(hymn.number)}`:'HINO SEM NÚMERO';
   const collection=`<span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>`;
   const tags=(hymn.topics||[]).slice(0,3).map(t=>`<span class="small-tag">${escapeHTML(t)}</span>`).join('');
   const klass=hymn.relevance==='Muito relevante'?'':hymn.relevance==='Relevante'?'mid':'low';
   const scoreLabel=hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
   const score=Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
-  return `<article class="result-card" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
+  return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
   <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
-  <div class="result-bottom"><div class="tag-row">${tags}</div><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
+  <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
 }
 function showResults(){$('welcome-panel').classList.add('hidden');$('results-panel').classList.remove('hidden');$('results-panel').scrollIntoView({behavior:'smooth',block:'start'});}
 async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,retainRoot=false}={}){
@@ -80,8 +81,9 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     }else state.lastResults.push(...data.results);
     state.page=data.page;state.total=data.total;state.hasMore=data.has_more;
     if(data.results.length)$('results-list').insertAdjacentHTML('beforeend',data.results.map(resultCard).join(''));
-    else if(page===1)$('results-list').innerHTML='<div class="empty-results"><h3>Nenhum hino encontrado</h3><p>Experimente termos mais gerais, outro tema ou uma frase da letra. Não apresentamos sugestões sem evidência mínima.</p></div>';
+    else if(page===1)$('results-list').innerHTML=data.not_learned_total?'<div class="empty-results"><h3>Sem hinos disponíveis para indicação</h3><p>Os hinos relacionados estão na seção «Não aprendidos» abaixo.</p></div>':'<div class="empty-results"><h3>Nenhum hino encontrado</h3><p>Experimente termos mais gerais, outro tema ou uma frase da letra. Não apresentamos sugestões sem evidência mínima.</p></div>';
     $('load-more').classList.toggle('hidden',!data.has_more);
+    if(page===1)RepertoireUI.renderSearch(data);
     $('load-more').textContent='Carregar mais '+data.page_size+' hinos';
     succeeded=true;
   }catch(error){
@@ -93,17 +95,17 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   return succeeded;
 }
 function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;}
-function relatedCard(hymn){
+function relatedCard(hymn,{unlearned=false}={}){
   const percent=Math.min(100,Math.max(0,Number(hymn.compatibility_percent)||0));
   const components=Number.isFinite(hymn.similarity_percent)?`<span>${Math.round(hymn.similarity_percent)}% com a letra</span>${Number.isFinite(hymn.query_percent)?`<span>${Math.round(hymn.query_percent)}% com a busca</span>`:''}`:'';
-  return `<button class="related-card" type="button" data-related-id="${Number(hymn.id)}" aria-label="Abrir hino ${escapeHTML(hymn.number||'')} ${escapeHTML(hymn.title)}; ${percent}% de afinidade combinada">
+  return `<div class="related-entry ${unlearned?'is-unlearned':''}"><button class="related-card" type="button" data-related-id="${Number(hymn.id)}" aria-label="Abrir hino ${escapeHTML(hymn.number||'')} ${escapeHTML(hymn.title)}; ${percent}% de afinidade combinada">
     <span class="related-card-top"><span>HINO ${escapeHTML(hymn.number||'—')}</span><strong>${percent}% <small>compatível</small></strong></span>
     <span class="related-card-title">${escapeHTML(hymn.title)}</span><span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>
     <span class="score-track related-track"><span style="width:${percent}%"></span></span>
     ${components?`<span class="related-components">${components}</span>`:''}
     <span class="related-evidence">${escapeHTML(hymn.reason||'Associação temática encontrada nas letras.')}</span>
     <span class="related-open">Ver hino e novas sugestões ›</span>
-  </button>`;
+  </button><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button></div>`;
 }
 async function renderRecommendations(hymn){
   const seq=state.modalSequence;
@@ -117,6 +119,7 @@ async function renderRecommendations(hymn){
     $('related-description').textContent=response.original_query
       ?`Afinidade combinada: ${response.weight_percent}% com o hino aberto e ${100-response.weight_percent}% com a busca inicial “${response.original_query}”.`
       :'Afinidade calculada somente com a letra, os temas e as narrativas do hino aberto.';
+    RepertoireUI.renderRelated(response);
     $('related-list').innerHTML=response.results.length?response.results.map(relatedCard).join(''):
       '<p class="subtle-note">Não encontrei outros hinos suficientemente relacionados. Experimente reduzir o filtro de já visitados nas Configurações.</p>';
   }catch(error){if(seq===state.modalSequence)$('related-list').textContent='Não foi possível calcular as recomendações: '+error.message;}
@@ -136,12 +139,14 @@ async function openHymn(id,{fromRelated=false,back=false}={}){
     $('modal-references').textContent=hymn.references?.length?hymn.references.join(' · '):'Nenhuma referência explícita identificada.';
     $('modal-edition').textContent=(hymn.collectionRefs||[]).map(ref=>ref.name+(ref.number?' nº '+ref.number:'')).join(' · ') || `${hymn.collection} · Edição ${hymn.edition}`;
     $('modal-ai-output').classList.add('hidden');$('modal-ai-output').textContent='';
+    RepertoireUI.renderModal(hymn);
     if(state.activeModal!=='modal')openLayer('modal');
     else q('.modal-body')?.scrollTo({top:0,behavior:'instant'});
     GGUF.info();await renderRecommendations(hymn);
   }catch(e){toast(e.message);}
 }
 $('related-list').addEventListener('click',event=>{
+  if(event.target.closest('[data-repertoire-id]'))return;
   const b=event.target.closest('[data-related-id]');if(b)openHymn(Number(b.dataset.relatedId),{fromRelated:true});
 });
 $('related-back').addEventListener('click',()=>{
@@ -254,6 +259,98 @@ const SearchPreferences=(()=>{
 })();
 
 
+// v2.1: repertório conhecido; dados separados das letras e da busca.
+const RepertoireUI=(()=>{
+  let hiddenPage=1;
+  let operation=false;
+  function renderSearch(result){
+    const drawer=$('not-learned-search');
+    const count=Math.max(0,Number(result.not_learned_total)||0);
+    drawer.classList.toggle('hidden',count===0);
+    $('not-learned-search-count').textContent=String(count);
+    hiddenPage=Number(result.not_learned_page)||1;
+    $('not-learned-list').innerHTML=(result.not_learned_results||[]).map(h=>resultCard(h,{unlearned:true})).join('');
+    $('not-learned-more').classList.toggle('hidden',!result.not_learned_has_more);
+  }
+  function renderRelated(result){
+    const count=Math.max(0,Number(result.not_learned_total)||0);
+    $('related-unlearned').classList.toggle('hidden',count===0);
+    $('related-unlearned-count').textContent=String(count);
+    $('related-unlearned-list').innerHTML=(result.not_learned_results||[]).map(h=>relatedCard(h,{unlearned:true})).join('');
+  }
+  function renderModal(hymn){
+    const unlearned=RepertoireStore.isNotLearned(hymn);
+    $('modal-repertoire-status').textContent=unlearned?'Não aprendido pela igreja · fora das indicações principais':'Disponível para indicação';
+    const button=$('modal-repertoire-toggle');
+    button.textContent=unlearned?'Marcar como aprendido':'Marcar como não aprendido';
+    button.dataset.repertoireId=String(hymn.id);
+    button.dataset.notLearned=unlearned?'false':'true';
+    button.classList.toggle('undo',unlearned);
+  }
+  async function renderManagement(){
+    const data=await jsonRequest('/api/repertoire');
+    $('knowledge-count').textContent=`${data.count} hino${data.count===1?'':'s'} não aprendido${data.count===1?'':'s'}`;
+    const list=$('knowledge-list');
+    list.innerHTML=data.not_learned.length?data.not_learned.map(song=>
+      `<div class="knowledge-row"><span><strong>${escapeHTML(song.number||'—')} · ${escapeHTML(song.title)}</strong><small>${escapeHTML(song.collection)}</small></span><button class="repertoire-action undo" type="button" data-repertoire-id="${Number(song.id)}" data-not-learned="false">Aprendido</button></div>`).join(''):
+      '<p class="knowledge-empty">Nenhum hino marcado. Todos permanecem disponíveis até serem classificados.</p>';
+  }
+  async function update(id,flag){
+    if(operation)return;
+    operation=true;
+    try{
+      const result=await jsonRequest('/api/repertoire/mark',{hymn_id:Number(id),not_learned:flag});
+      toast(flag?'Hino marcado como não aprendido. Continua disponível na seção separada.':'Hino devolvido às indicações principais.');
+      state.searchEpoch++; // invalida qualquer atualização vetorial anterior à marcação
+      if(state.ready&&state.effectiveQuery){
+        const epoch=state.searchEpoch;
+        const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,exclude:state.exclude,
+          semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+        if(epoch===state.searchEpoch){
+          state.page=1;state.total=response.total;state.hasMore=response.has_more;state.lastResults=response.results.slice();
+          $('results-list').innerHTML=response.results.length?response.results.map(resultCard).join(''):
+            response.not_learned_total?'<div class="empty-results"><h3>Todos os hinos relacionados estão em Não aprendidos</h3></div>':'<div class="empty-results"><h3>Nenhum hino encontrado</h3></div>';
+          $('load-more').classList.toggle('hidden',!response.has_more);
+          $('results-subtitle').textContent=`${response.total} hinos disponíveis para indicação · ${response.not_learned_total} não aprendidos relacionados`;
+          renderSearch(response);
+        }
+      }
+      if(state.currentHymn){
+        if(Number(state.currentHymn.id)===Number(id))renderModal(state.currentHymn);
+        if(state.activeModal==='modal')await renderRecommendations(state.currentHymn);
+      }
+      await renderManagement();
+      return result;
+    }catch(error){toast('Não foi possível salvar a classificação: '+error.message);}
+    finally{operation=false;}
+  }
+  // Delegação também atende cartões inseridos depois de novas pesquisas.
+  document.addEventListener('click',event=>{
+    const b=event.target.closest('[data-repertoire-id]');if(!b)return;
+    event.preventDefault();event.stopPropagation();
+    update(b.dataset.repertoireId,b.dataset.notLearned==='true');
+  },true);
+  $('not-learned-more').addEventListener('click',async()=>{
+    if(operation||!state.effectiveQuery)return;
+    operation=true;const next=hiddenPage+1;
+    try{
+      const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,not_learned_page:next,
+        exclude:state.exclude,semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+      hiddenPage=next;
+      $('not-learned-list').insertAdjacentHTML('beforeend',response.not_learned_results.map(h=>resultCard(h,{unlearned:true})).join(''));
+      $('not-learned-more').classList.toggle('hidden',!response.not_learned_has_more);
+    }catch(error){toast(error.message);}finally{operation=false;}
+  });
+  $('not-learned-list').addEventListener('click',event=>{
+    const b=event.target.closest('[data-hymn-id]');if(b)openHymn(b.dataset.hymnId);
+  });
+  $('related-unlearned-list').addEventListener('click',event=>{
+    const b=event.target.closest('[data-related-id]');if(b)openHymn(Number(b.dataset.relatedId),{fromRelated:true});
+  });
+  return {renderSearch,renderRelated,renderModal,renderManagement,update};
+})();
+
+
 // E5 Small: apenas a consulta passa pela rede neural, no próprio Android.
 // Busca local aparece ANTES do embedding; erros não bloqueiam nenhuma pesquisa.
 const EmbeddingSearch=(()=>{
@@ -289,7 +386,8 @@ const EmbeddingSearch=(()=>{
       if(epoch!==state.searchEpoch)return;
       state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
       $('results-list').innerHTML=result.results.length?result.results.map(resultCard).join(''):
-        '<div class="empty-results"><h3>Nenhum resultado</h3><p>Experimente ampliar o contexto.</p></div>';
+        result.not_learned_total?'<div class="empty-results"><h3>Somente hinos ainda não aprendidos</h3><p>Veja a seção separada abaixo.</p></div>':'<div class="empty-results"><h3>Nenhum resultado</h3><p>Experimente ampliar o contexto.</p></div>';
+      RepertoireUI.renderSearch(result);
       $('load-more').classList.toggle('hidden',!result.has_more);
       $('load-more').textContent='Carregar mais '+result.page_size+' hinos';
       $('results-subtitle').textContent=`${result.total} resultados · busca híbrida com E5 Small`;

@@ -1,3 +1,7 @@
+# Buscador de Hinos Android v2.1
+
+Novidade: repertório da igreja. Qualquer hino pode ser marcado como **não aprendido**, ficando fora das sugestões principais e preservado em gavetas recolhíveis nos resultados e nas recomendações. A marcação é independente da importação e permanece armazenada localmente entre atualizações normais. Não desinstalar/limpar dados sem backup.
+
 # Buscador de Hinos v2.0 — Índice bíblico offline
 
 - Pesquisa por livros, capítulos e intervalos de versículos (ex.: `Marcos 5:25-34`).

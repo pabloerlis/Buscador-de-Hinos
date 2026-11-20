@@ -47,7 +47,7 @@ assert.match(cpp,/llama_decode/);
 assert.match(cpp,/llama_sampler_sample/);
 assert.match(cmake,/ggml-org\/llama.cpp/);
 assert.match(cmake,/GIT_TAG b8201/);
-assert.match(build,/versionName '2\.0\.0'/);
+assert.match(build,/versionName '2\.1\.0'/);
 assert.match(build,/abiFilters 'arm64-v8a'/);
 assert.match(workflow,/ndk;27\.2\.12479018/);
 assert.match(js,/MAX_AI_MS=16000/);

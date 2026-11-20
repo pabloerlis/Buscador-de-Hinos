@@ -38,7 +38,7 @@ jobs:
           HF_HUB_ETAG_TIMEOUT: '30'
         run: python3 scripts/build_e5_assets.py
       - name: Run local-search tests
-        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js
+        run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js && node tests/test-v21.js
       - name: Validate generated vector assets
         run: python3 scripts/verify_e5_assets.py
       - name: Build APK

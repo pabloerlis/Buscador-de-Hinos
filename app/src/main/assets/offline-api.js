@@ -412,6 +412,13 @@ const OfflineAPI = (() => {
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     ranked.sort((a,b)=>b.relevance_score-a.relevance_score||(a.number||'9999').localeCompare(b.number||'9999')||a.id-b.id);
+    // O hino não aprendido continua no ranking e mantém sua afinidade.
+    // Apenas a paginação principal fica reservada aos hinos disponíveis.
+    const available=ranked.filter(h=>!RepertoireStore.isNotLearned(hymns[h.id-1]));
+    const notLearned=ranked.filter(h=>RepertoireStore.isNotLearned(hymns[h.id-1]));
+    const hiddenPage=Math.max(1,Math.min(100,Number(payload?.not_learned_page)||1));
+    const hiddenSize=5;
+    const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
     const interpretation=opts.showConcepts?[
@@ -425,8 +432,12 @@ const OfflineAPI = (() => {
       ...(bridgeIntent?.aliases||[]).map(t=>'Associação lexical: '+t),
       ...(storyIntent?.matches.length&&storyIntent.residual&&tokens(storyIntent.residual).length?['Outros termos: '+tokens(storyIntent.residual).join(', ')]:[])
     ]:[];
-    return {page,page_size:opts.pageSize,total:ranked.length,has_more:from+opts.pageSize<ranked.length,
-      results:ranked.slice(from,from+opts.pageSize),topics:selectedTopics,story_matches:reading,
+    return {page,page_size:opts.pageSize,total:available.length,has_more:from+opts.pageSize<available.length,
+      results:available.slice(from,from+opts.pageSize),
+      not_learned_total:notLearned.length,not_learned_page:hiddenPage,
+      not_learned_results:notLearned.slice(hiddenFrom,hiddenFrom+hiddenSize),
+      not_learned_has_more:hiddenFrom+hiddenSize<notLearned.length,
+      topics:selectedTopics,story_matches:reading,
       interpretation,effective_query:query,excluded,used_ai:hints.length>0,applied_hints:hints,
       _fullRanked:payload?._forRecommendations===true?ranked:undefined,
       summary:graphCtx?'Busca por contexto bíblico offline: '+graphCtx.reference+'. Resultados baseados nas evidências das letras.':scripture?'Texto da Bíblia Livre consultado offline: '+scripture.reference+'.':bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef&&!storyIntent?.matches.length?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',
@@ -448,9 +459,10 @@ const OfflineAPI = (() => {
     const rootScores=root?queryRanking(root,opts):new Map();
     const activeScores=root&&active&&active!==root?queryRanking(active,opts):rootScores;
     const visited=Array.isArray(payload?.visited)?payload.visited.filter(x=>Number.isInteger(Number(x))).slice(-60):[];
+    const notLearnedIds=new Set(RepertoireStore.marked(hymns).map(h=>h.id));
     const results=recommender.recommend({id:Number(payload?.hymn_id),originalRanks:rootScores,
       activeRanks:activeScores,originalQuery:root,visited,
-      settings:{weight:opts.recWeight,count:opts.recCount,keepContext:opts.recContext,skipVisited:opts.recAvoidVisited,allowed:opts.collections}});
+      settings:{weight:opts.recWeight,count:opts.recCount,keepContext:opts.recContext,skipVisited:opts.recAvoidVisited,allowed:opts.collections,notLearnedIds}});
     for(const item of results.results){
       const song=hymns[item.id-1];
       const ref=song?.collectionRefs?.find(r=>opts.collections[r.id]!==false);
@@ -463,7 +475,7 @@ const OfflineAPI = (() => {
       blocked.add(Number(payload?.hymn_id));
       for(const item of vectorHits){
         if(blocked.has(item.id)||item.similarity<0.76)continue;
-        const candidate=hymns[item.id-1];if(!candidate||candidate.id!==item.id||!collectionEnabled(candidate,opts))continue;
+        const candidate=hymns[item.id-1];if(!candidate||candidate.id!==item.id||!collectionEnabled(candidate,opts)||notLearnedIds.has(item.id))continue;
         const vectorPercent=VectorIndex.percent(item.similarity);
         if(vectorPercent<15)continue;
         const base=byId.get(item.id);
@@ -516,6 +528,14 @@ const OfflineAPI = (() => {
       bridge_ready:!!bridge,bridge_entries:bridge?.entries||0,collections:libraryCounts(),
       collection:metadata.collection,edition:metadata.edition,ai_configured:false,source_url:SOURCE,chat_mode:narratives?'Narrativas bíblicas + temas offline':'Busca contextual local'};
     if(url==='/api/stories')return {stories:narratives?.list()||[]};
+    if(url==='/api/repertoire')return {count:RepertoireStore.marked(hymns).length,
+      not_learned:RepertoireStore.marked(hymns).map(song=>({id:song.id,title:song.title,number:song.number,collection:song.collection}))};
+    if(url==='/api/repertoire/mark'){
+      const song=hymns.find(h=>h.id===Number(payload?.hymn_id));
+      if(!song)throw Error('Hino não encontrado para classificação.');
+      const result=RepertoireStore.mark(song,payload?.not_learned===true);
+      return {ok:true,id:song.id,...result,count:RepertoireStore.marked(hymns).length};
+    }
     if(url==='/api/import')return importJson(payload.data);
     if(url==='/api/import-remote')return downloadRemote();
     if(url==='/api/search')return search(payload);

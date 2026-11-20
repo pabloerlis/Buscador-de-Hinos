@@ -7,7 +7,9 @@ const storage={open(){const r={};setTimeout(()=>{r.result={objectStoreNames:{con
 const ctx={window:{indexedDB:storage},indexedDB:storage,console,setTimeout,clearTimeout,
  document:{createElement(){return {content:{textContent:''},set innerHTML(html){this.content.textContent=html.replace(/<br\s*\/?>/gi,'\n').replace(/<[^>]*>/g,'');}};}},
  fetch:async url=>({ok:true,json:async()=>String(url).includes('semantic-stories')?stories:themes})};
-vm.createContext(ctx);for(const name of ['semantic-engine.js','story-engine.js','bible-context.js','recommendation-engine.js','offline-api.js'])vm.runInContext(file(name),ctx);
+const repertoireMemory=new Map();
+ctx.localStorage={getItem:k=>repertoireMemory.get(k)||null,setItem:(k,v)=>repertoireMemory.set(k,String(v)),removeItem:k=>repertoireMemory.delete(k)};
+vm.createContext(ctx);for(const name of ['semantic-engine.js','story-engine.js','bible-context.js','recommendation-engine.js','repertoire-store.js','offline-api.js'])vm.runInContext(file(name),ctx);
 const api=vm.runInContext('OfflineAPI',ctx);
 const sample=[
  {title:'001 - Voltei pra ti meu pai',content:'Estive longe de ti, mas regressei. Voltei pra ti meu Pai, perdoa-me e acolhe o coração perdido.'},

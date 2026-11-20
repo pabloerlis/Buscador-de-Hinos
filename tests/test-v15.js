@@ -7,8 +7,10 @@ const idb={open(){const request={};setTimeout(()=>{request.result={objectStoreNa
   transaction(){const tx={objectStore(){return {get(key){const rq={};setTimeout(()=>{rq.result=db.get(key);rq.onsuccess?.();},0);return rq;},put(obj,key){setTimeout(()=>{db.set(key,obj);tx.oncomplete?.();},0);}};}};return tx;},close(){}};request.onsuccess?.();},0);return request;}};
 const doc={createElement(){return {content:{textContent:''},set innerHTML(html){this.content.textContent=html.replace(/<br\s*\/?\s*>/gi,'\n').replace(/<[^>]+>/g,'');}};}};
 const ctx={window:{indexedDB:idb},indexedDB:idb,setTimeout,clearTimeout,console,document:doc,fetch:async url=>({ok:true,json:async()=>String(url).includes('semantic-stories')?stories:semantic})};
+const repertoireMemory=new Map();
+ctx.localStorage={getItem:k=>repertoireMemory.get(k)||null,setItem:(k,v)=>repertoireMemory.set(k,String(v)),removeItem:k=>repertoireMemory.delete(k)};
 vm.createContext(ctx);
-for(const file of ['semantic-engine.js','story-engine.js','bible-context.js','offline-api.js'])vm.runInContext(content(file),ctx);
+for(const file of ['semantic-engine.js','story-engine.js','bible-context.js','repertoire-store.js','offline-api.js'])vm.runInContext(content(file),ctx);
 const api=vm.runInContext('OfflineAPI',ctx);const engine=vm.runInContext('StoryEngine',ctx).create(stories);
 (async()=>{
  assert.ok(engine.stories>=12);

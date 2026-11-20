@@ -6,8 +6,10 @@ const db=JSON.parse(source('semantic-db.json'));
 const memory=new Map();
 const idb={open(){const req={};setTimeout(()=>{req.result={objectStoreNames:{contains:()=>true},transaction(){const tx={objectStore(){return {get(key){const q={};setTimeout(()=>{q.result=memory.get(key);q.onsuccess?.();},0);return q;},put(obj,key){setTimeout(()=>{memory.set(key,obj);tx.oncomplete?.();},0);}};}};return tx;},close(){}};req.onsuccess?.();},0);return req;}};
 const context={window:{indexedDB:idb},indexedDB:idb,setTimeout,console,fetch:async u=>({ok:true,json:async()=>db}),document:{createElement:()=>({content:{textContent:''},set innerHTML(v){this.content.textContent=v.replace(/<[^>]*>/g,'');}})}};
+const repertoireMemory=new Map();
+context.localStorage={getItem:k=>repertoireMemory.get(k)||null,setItem:(k,v)=>repertoireMemory.set(k,String(v)),removeItem:k=>repertoireMemory.delete(k)};
 vm.createContext(context);
-for(const f of ['semantic-engine.js','bible-context.js','offline-api.js'])vm.runInContext(source(f),context);
+for(const f of ['semantic-engine.js','bible-context.js','repertoire-store.js','offline-api.js'])vm.runInContext(source(f),context);
 const api=vm.runInContext('OfflineAPI',context);
 (async()=>{
  const data=[{name:'Coletânea 2018',songs:[
