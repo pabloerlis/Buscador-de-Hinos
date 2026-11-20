@@ -1,8 +1,8 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,
-  searchSettings:{mode:'balanced',strength:75,narratives:true,related:true,scripture:true,bridge:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true}};
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
+  searchSettings:{vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,scripture:true,bridge:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true}};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 let toastTimer=null;
@@ -19,6 +19,7 @@ async function refreshStatus(){
   $('settings-vectors').textContent=result.semantic_ready?`${result.semantic_topics} temas locais`:'Não carregada';
   $('settings-stories').textContent=result.story_ready?`${result.story_count} narrativas locais`:'Não carregada';
   $('settings-scripture').textContent=result.scripture_ready?`${result.scripture_books} livros · Bíblia Livre`:'Indisponível';
+  $('settings-embeddings').textContent=result.vector_count?result.vector_count+' hinos · E5 Small':'Índice E5 indisponível';
   $('settings-bridge').textContent=result.bridge_ready?`${result.bridge_entries} associações`:'Indisponível';
   if(typeof GGUF!=='undefined')GGUF.info();
   return result;
@@ -32,7 +33,7 @@ function resultCard(hymn){
   const number=hymn.number?`HINO ${escapeHTML(hymn.number)}`:'HINO SEM NÚMERO';
   const tags=(hymn.topics||[]).slice(0,3).map(t=>`<span class="small-tag">${escapeHTML(t)}</span>`).join('');
   const klass=hymn.relevance==='Muito relevante'?'':hymn.relevance==='Relevante'?'mid':'low';
-  const scoreLabel=hymn.match_type==='numero'?'número exato':'afinidade estimada';
+  const scoreLabel=hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
   const score=Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
   return `<article class="result-card" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
   <h3>${escapeHTML(hymn.title)}</h3><div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
@@ -45,11 +46,11 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   if(state.busy)return false;
   if(!state.ready){toast('Importe a coletânea para começar.');$('import-panel').scrollIntoView({behavior:'smooth',block:'center'});return false;}
   if(!String(query).trim())return false;
-  if(page===1){if(!refine&&!retainRoot)state.searchRootQuery=query;state.originalQuery=query;state.hymnTrail=[];showResults();$('results-list').innerHTML=Array.from({length:3},()=>'<div class="loading-skeleton"></div>').join('');$('load-more').classList.add('hidden');}
+  if(page===1){state.searchEpoch++;state.vectorQuery=null;if(!refine&&!retainRoot)state.searchRootQuery=query;state.originalQuery=query;state.hymnTrail=[];showResults();$('results-list').innerHTML=Array.from({length:3},()=>'<div class="loading-skeleton"></div>').join('');$('load-more').classList.add('hidden');}
   busySearch(true);let succeeded=false;
   try {
     let data;
-    if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,exclude:state.exclude,semantic_hints:state.semanticHints,settings:state.searchSettings});
+    if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,exclude:state.exclude,semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
     else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',exclude:refine?state.exclude:[],semantic_hints:semanticHints,settings:state.searchSettings});
     if(page===1){
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.semanticHints=semanticHints;
@@ -77,6 +78,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     if(page===1)$('results-list').innerHTML='<div class="empty-results"><h3>Falha na pesquisa</h3><p>Verifique a coletânea e tente novamente.</p></div>';
     toast(error.message);
   }finally{busySearch(false);}
+  if(succeeded&&page===1)EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
   if(succeeded && page===1 && autoAI && !semanticHints.length && typeof GGUF!=='undefined') GGUF.maybeAuto(query);
   return succeeded;
 }
@@ -150,7 +152,7 @@ $('search-form').addEventListener('submit',ev=>{ev.preventDefault();if(typeof GG
 $('refine-form').addEventListener('submit',async ev=>{ev.preventDefault();if(typeof GGUF!=='undefined')GGUF.cancelIfBusy();const message=$('refine-input').value.trim();if(!message||state.busy)return;appendConversation('user',message);$('refine-input').value='';const success=await performSearch(message,{refine:true});appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados. Acrescente outra restrição se necessário.`:'Não consegui refinar a pesquisa.');});
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.semanticHints=[];state.lastResults=[];$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').innerHTML='<div class="assistant-message">Precisa de algo mais específico? Descreva a mensagem ou ocasião desejada.</div>';});
+$('new-search').addEventListener('click',()=>{state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.searchEpoch++;$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').innerHTML='<div class="assistant-message">Precisa de algo mais específico? Descreva a mensagem ou ocasião desejada.</div>';});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;performSearch(b.dataset.suggestion);}));
 $('open-settings').addEventListener('click',()=>openLayer('settings'));$('ai-indicator').addEventListener('click',()=>openLayer('settings'));
 $('import-remote').addEventListener('click',importRemote);$('settings-import').addEventListener('click',importRemote);
@@ -161,10 +163,10 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 
 // Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
 const SearchPreferences=(()=>{
-  const ids={mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
+  const ids={vectorMode:'vector-mode',mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
     narratives:'story-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
     recWeight:'rec-weight',recCount:'rec-count',recContext:'rec-context',recAvoidVisited:'rec-visited',recBreakdown:'rec-breakdown'};
-  const defaults={mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
+  const defaults={vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   let stories=[];
   function renderAliases(){
     const container=$('alias-list');container.replaceChildren();let count=0;
@@ -233,6 +235,38 @@ const SearchPreferences=(()=>{
   return {fill};
 })();
 
+const EmbeddingSearch=(()=>{
+  const pending=new Map();let seq=0;
+  function status(message){const a=$('vector-results-state'),b=$('vector-state');if(a)a.textContent=message;if(b)b.textContent=message;}
+  window.VectorNative={
+    progress(event){if(pending.has(String(event.id)))status(event.message||'Calculando significado…');},
+    complete(event){const task=pending.get(String(event.id));if(!task)return;pending.delete(String(event.id));clearTimeout(task.timeout);
+      if(event.ok&&Array.isArray(event.vector)&&event.vector.length===384)task.resolve(event);else task.reject(Error(event.error||'Modelo indisponível'));}
+  };
+  function request(query){return new Promise((resolve,reject)=>{
+    const id=String(++seq),timeout=setTimeout(()=>{pending.delete(id);reject(Error('Tempo excedido no E5 Small'));},120000);
+    pending.set(id,{resolve,reject,timeout});try{window.NativeVector.embed(id,query);}catch(e){pending.delete(id);clearTimeout(timeout);reject(e);}
+  });}
+  async function maybeUpdate(query,epoch){
+    if(state.searchSettings.vectorMode==='off'||!state.ready||!state.status?.vector_count)return;
+    if(!window.NativeVector||/^\s*(?:hino\s*)?\d{1,4}\s*$/i.test(query))return;
+    status('E5 Small: interpretando consulta no aparelho…');
+    try{const answer=await request(query);
+      if(epoch!==state.searchEpoch||state.searchSettings.vectorMode==='off')return;
+      state.vectorQuery=answer.vector;
+      const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,exclude:state.exclude,
+        semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings});
+      if(epoch!==state.searchEpoch)return;
+      state.total=response.total;state.page=1;state.hasMore=response.has_more;state.lastResults=response.results.slice();
+      $('results-list').innerHTML=response.results.length?response.results.map(resultCard).join(''):'<div class="empty-results"><h3>Sem resultados</h3></div>';
+      $('load-more').classList.toggle('hidden',!response.has_more);
+      $('load-more').textContent='Carregar mais '+response.page_size+' hinos';
+      $('results-subtitle').textContent=response.total+' resultados · busca híbrida com E5 Small';
+      status('E5 Small: ranking atualizado em '+(answer.ms/1000).toFixed(1)+'s, sem internet.');
+    }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · E5: '+error.message);}
+  }
+  return {maybeUpdate};
+})();
 const GGUF=(()=>{
   const native=()=>window.NativeGGUF||null;
   const selectedState={ready:false,busy:false,task:null,lastResult:'',startTime:0,lastQuery:'',autoGeneration:false,lastError:'',timerId:null};

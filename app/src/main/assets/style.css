@@ -97,3 +97,5 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 .related-method{font-size:10px;color:#6c8071;line-height:1.6;margin:12px 0 0}
 .setting-divider{height:1px;background:#dbe6dd;margin:13px 0}
 @media(max-width:560px){.related-section{padding:12px}.related-card{padding:12px}.related-top h3{font-size:18px}}
+
+.vector-live{font-size:.83rem;color:#40645b;background:#eef5f1;border:1px solid #d8e7df;border-radius:9px;padding:9px 12px;margin:10px 0 16px;}

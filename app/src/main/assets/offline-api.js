@@ -44,7 +44,7 @@ const OfflineAPI = (() => {
   let scriptureIndex=null;
   let bridge=null;
   let queryRankingCache=new Map();
-  const DEFAULT_SEARCH={mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
+  const DEFAULT_SEARCH={vectorMode:'balanced',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   function searchOptions(raw){
     const p=raw&&typeof raw==='object'?raw:{};
     const clamp=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;
@@ -55,7 +55,7 @@ const OfflineAPI = (() => {
         aliases[id]=[...new Set(terms.filter(t=>typeof t==='string'&&t.length>3&&t.length<=90).slice(0,15))];
       }
     }
-    return {mode:['balanced','literal','context'].includes(p.mode)?p.mode:DEFAULT_SEARCH.mode,
+    return {vectorMode:['balanced','strong','off'].includes(p.vectorMode)?p.vectorMode:'balanced',mode:['balanced','literal','context'].includes(p.mode)?p.mode:DEFAULT_SEARCH.mode,
       strength:clamp(p.strength,0,100,75),narratives:p.narratives!==false,
       related:p.related!==false,minAffinity:clamp(p.minAffinity,0,90,0),
       pageSize:[5,10].includes(Number(p.pageSize))?Number(p.pageSize):5,
@@ -89,9 +89,10 @@ const OfflineAPI = (() => {
     recommender=typeof RecommendationEngine!=='undefined'?RecommendationEngine.create(hymns):null;
     queryRankingCache.clear();
   }
-  function candidateSongs(numberMatch,queryTokens,intent,storyIntent){
+  function candidateSongs(numberMatch,queryTokens,intent,storyIntent,vectorMatches=[]){
     if(numberMatch){const match=numberIndex.get(Number(numberMatch[1]));return match?[match]:[];}
     const ids=new Set();
+    for(const item of vectorMatches)ids.add(item.id);
     for(const word of queryTokens)for(const id of (wordIndex.get(word)||[]))ids.add(id);
     if(intent)for(const topic of [...intent.direct,...intent.related])for(const id of (topicIndex.get(topic.id)||[]))ids.add(id);
     if(storyIntent)for(const match of storyIntent.matches)for(const id of (storyIndex.get(match.id)||[]))ids.add(id);
@@ -175,7 +176,7 @@ const OfflineAPI = (() => {
         if(i&&i%100===0)await yieldThread();
       }
       await writeCache({hymns,metadata,semantic_revision:semantic?.revision||null,story_revision:narratives?.revision||null});
-    }rebuildIndexes();} })().catch(e=>{initialized=null;throw e;});
+    }rebuildIndexes();if(typeof VectorIndex!=='undefined')await VectorIndex.configure(hymns);} })().catch(e=>{initialized=null;throw e;});
     return initialized;
   }
   async function importJson(data){
@@ -202,6 +203,7 @@ const OfflineAPI = (() => {
     const newMeta={collection,edition,hymn_count:next.length};
     await writeCache({hymns:next,metadata:newMeta,semantic_revision:semantic?.revision||null,story_revision:narratives?.revision||null});
     hymns=next;metadata=newMeta;rebuildIndexes();
+    if(typeof VectorIndex!=='undefined')await VectorIndex.configure(hymns);
     return {ok:true,collection,edition,count:hymns.length};
   }
   function makeSnippet(song,qTokens,selectedTopics,semanticCues=[]){
@@ -263,8 +265,11 @@ const OfflineAPI = (() => {
     const selectedTopics=intent?intent.direct.map(t=>t.label):opts.mode==='literal'?[]:themes(analysisText),qTokens=tokens(analysisText);
     const semanticWeight=opts.mode==='literal'?0:(opts.strength/75)*(opts.mode==='context'?1.3:1);
     const excludedNorm=excluded.map(normalize);
+    const vectorEnabled=opts.vectorMode!=='off' && !numberMatch && typeof VectorIndex!=='undefined' && VectorIndex.status().ready && VectorIndex.checkQuery(payload?.vector_query);
+    const vectorHits=vectorEnabled?VectorIndex.topForQuery(payload.vector_query,100):[];
+    const vectorScores=new Map(vectorHits.map(h=>[h.id,h.similarity]));
     const ranked=[];
-    for(const song of candidateSongs(numberMatch,qTokens,intent,storyIntent)){
+    for(const song of candidateSongs(numberMatch,qTokens,intent,storyIntent,vectorHits)){
       let score=0;const evidence=[];let semanticResult=null,storyResult=null;
       if(numberMatch){
         if(!song.number||Number(song.number)!==Number(numberMatch[1]))continue;
@@ -295,6 +300,8 @@ const OfflineAPI = (() => {
             score+=Math.min(3.5,count*.65)*semanticWeight;
           }
         }
+        const v=vectorScores.get(song.id);
+        if(v!==undefined&&v>=.72){const points=Math.min(24,Math.max(0,(v-.70)*110))*(opts.vectorMode==='strong'?1.4:1);score+=points;if(points>=4)evidence.push('significado próximo da consulta (modelo E5)');}
         if(storyIntent?.matches.length){
           storyResult=narratives.evaluate(song.story_profile||[],storyIntent);
           score+=storyResult.score*semanticWeight;
@@ -303,7 +310,7 @@ const OfflineAPI = (() => {
       }
       if(excludedNorm.some(t=>t&&(hasWord(song.searchable,t)||song.topics.some(topic=>normalize(topic)===t))))continue;
       if(semantic&&semantic.excluded(song.semantic_profile||[],excluded))continue;
-      if(score<(semanticResult?.score>0||storyResult?.score>0?4.7:7))continue;
+      if(score<(semanticResult?.score>0||storyResult?.score>0||vectorScores.get(song.id)>.76?4.7:7))continue;
       const matchedTokens=qTokens.filter(x=>song.searchable.includes(x));
       const reason=numberMatch?'Número exato do hino.':evidence.length?evidence.slice(0,2).join('. ')+'.':matchedTokens.length?'A letra contém termos relacionados: '+matchedTokens.slice(0,3).join(', ')+'.':'Possível relação temática; confira a letra antes de utilizar.';
       const percent=percentage(score,!!numberMatch);
@@ -314,13 +321,15 @@ const OfflineAPI = (() => {
         snippet:makeSnippet(song,qTokens,selectedTopics,[...(storyResult?.cues||[]),...(semanticResult?.cues||[])]),
         reason:opts.showReasons?reason:'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
-        match_type:numberMatch?'numero':storyResult?.score>0?'narrativa':'contexto',
+        vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
+        match_type:numberMatch?'numero':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>.74?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     ranked.sort((a,b)=>b.relevance_score-a.relevance_score||(a.number||'9999').localeCompare(b.number||'9999')||a.id-b.id);
     const from=(page-1)*opts.pageSize;
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
     const interpretation=opts.showConcepts?[
+      ...(vectorEnabled?['Embeddings E5: '+VectorIndex.status().count+' hinos indexados']:[]),
       ...reading.map(t=>'Narrativa: '+t),
       ...selectedTopics.slice(0,6).map(t=>'Tema: '+t),
       ...(scripture?['Bíblia Livre offline: '+scripture.reference+(scripture.partial?' (amostra do capítulo)':'')]:[]),
@@ -353,6 +362,21 @@ const OfflineAPI = (() => {
     const results=recommender.recommend({id:Number(payload?.hymn_id),originalRanks:rootScores,
       activeRanks:activeScores,originalQuery:root,visited,
       settings:{weight:opts.recWeight,count:opts.recCount,keepContext:opts.recContext,skipVisited:opts.recAvoidVisited}});
+    if(opts.vectorMode!=='off'&&typeof VectorIndex!=='undefined'&&VectorIndex.status().ready){
+      const hits=VectorIndex.topForHymn(Number(payload?.hymn_id),45);
+      const byId=new Map(results.results.map(x=>[x.id,x]));
+      const blocked=new Set(opts.recAvoidVisited?visited.map(Number):[]);blocked.add(Number(payload?.hymn_id));
+      for(const item of hits){
+        if(blocked.has(item.id)||item.similarity<.76)continue;
+        const song=hymns[item.id-1];if(!song||song.id!==item.id)continue;
+        const vp=VectorIndex.percent(item.similarity);if(vp<15)continue;
+        const existing=byId.get(item.id);
+        if(existing){existing.similarity_percent=Math.round(.63*existing.similarity_percent+.37*vp);existing.compatibility_percent=Math.round(.67*existing.compatibility_percent+.33*vp);}
+        else{const qp=rootScores.get(item.id)||0;const total=Math.round(opts.recContext&&root.trim()?(opts.recWeight/100*vp+(1-opts.recWeight/100)*qp):vp);if(total<20)continue;
+          byId.set(item.id,{id:song.id,number:song.number,title:song.title,compatibility_percent:total,similarity_percent:vp,query_percent:root.trim()?qp:null,reason:'Similaridade vetorial estimada pelo E5 Small; confira a letra.',topics:[],score:total/100});}
+      }
+      results.results=[...byId.values()].sort((a,b)=>b.compatibility_percent-a.compatibility_percent).slice(0,opts.recCount);results.total=byId.size;
+    }
     if(!opts.recBreakdown)for(const h of results.results){delete h.query_percent;delete h.similarity_percent;}
     return results;
   }
@@ -378,7 +402,7 @@ const OfflineAPI = (() => {
   }
   async function request(url,payload){
     await init();
-    if(url==='/api/status')return {ready:hymns.length>0,hymn_count:hymns.length,vector_count:0,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,
+    if(url==='/api/status')return {ready:hymns.length>0,hymn_count:hymns.length,vector_count:typeof VectorIndex!=='undefined'?VectorIndex.status().count:0,vector_status:typeof VectorIndex!=='undefined'?VectorIndex.status():null,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,
       story_ready:!!narratives,story_count:narratives?.stories||0,story_revision:narratives?.revision||null,
       scripture_ready:!!scriptureIndex,scripture_books:scriptureIndex?.bookCount||0,
       bridge_ready:!!bridge,bridge_entries:bridge?.entries||0,

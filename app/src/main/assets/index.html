@@ -15,6 +15,7 @@
   <script src="bridge-engine.js" defer></script>
   <script src="bible-context.js" defer></script>
   <script src="recommendation-engine.js" defer></script>
+  <script src="vector-index.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -82,7 +83,7 @@
             <div><span class="section-kicker">RESULTADOS DA PESQUISA</span><h2 id="results-title">Hinos encontrados</h2><p id="results-subtitle"></p></div>
             <button id="new-search" class="text-action" type="button">Nova pesquisa <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5M4 4v4h4"/></svg></button>
           </div>
-          <p class="score-method">Afinidade estimada por evidências da letra e relações semânticas. Os percentuais não são probabilidades.</p>
+          <p class="score-method">Afinidade heurística textual e vetorial (E5 Small), quando disponível. Percentuais não são probabilidades.</p><p class="vector-live" id="vector-results-state" role="status">A lista local aparece primeiro; o E5 atualiza o ranking depois.</p>
           <div class="results-layout">
             <div class="results-main">
               <div id="notice" class="notice hidden" role="status"></div>
@@ -134,14 +135,14 @@
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Coletânea</span><strong id="settings-collection">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Vetores E5 validados</span><strong id="settings-embeddings">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
       <section class="semantic-settings" aria-label="Preferências de busca semântica">
         <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>
         <label for="search-mode">Prioridade da pesquisa</label>
         <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
         <label for="semantic-power">Força das relações semânticas <strong id="semantic-power-value">75%</strong></label>
         <input id="semantic-power" type="range" min="0" max="100" step="5" value="75">
-        <label class="setting-check"><input id="story-toggle" type="checkbox" checked>Reconhecer narrativas bíblicas (Filho Pródigo, Ovelha Perdida etc.)</label>
+        <label for="vector-mode">Modelo vetorial E5 Small</label><select id="vector-mode"><option value="balanced">Busca híbrida (recomendada)</option><option value="strong">Maior peso ao significado</option><option value="off">Desativar vetores</option></select><p id="vector-state" class="subtle-note">Índice vetorial: verificando…</p><label class="setting-check"><input id="story-toggle" type="checkbox" checked>Reconhecer narrativas bíblicas (Filho Pródigo, Ovelha Perdida etc.)</label>
         <label class="setting-check"><input id="related-toggle" type="checkbox" checked>Considerar temas relacionados e sinônimos</label>
         <label class="setting-check"><input id="bridge-toggle" type="checkbox" checked>Reconhecer contextos com expressões do cotidiano</label>
         <label class="setting-check"><input id="scripture-toggle" type="checkbox" checked>Consultar texto da Bíblia Livre para referências bíblicas (offline)</label>
