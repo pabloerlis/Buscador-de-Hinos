@@ -1,3 +1,13 @@
+# Buscador de Hinos Android v2.6.0 (experimental)
+
+A partir da versão 2.6.0, **Configurações → Sobre** mostra nome do aplicativo, desenvolvedor (**Pablo Erlis**), versão, código da versão, tipo de compilação, commit e data UTC. Esses valores são obtidos do APK instalado por meio de uma interface Android, sem internet ou informação digitada manualmente na tela. Fora do aplicativo Android, os campos de compilação são marcados como indisponíveis.
+
+Para builds de pull request, o workflow registra o SHA da revisão de origem por `BUILD_SOURCE_SHA`. Builds locais sem SHA conhecido exibem `local`. A versão 2.6.0 usa `versionCode 19`. O recurso é coberto por `node tests/test-about.js`.
+
+A classificação de narrativas foi ampliada, com testes em letras sintéticas e avaliação separada usando 1.557 hinos da coletânea pública apenas durante o CI; as letras não são distribuídas no APK. Esta versão permanece experimental até a revisão da qualidade do ranking.
+
+---
+
 # Buscador de Hinos Android v2.5.0
 
 A busca e a comparação funcionam offline depois de importar a coletânea. O app consulta títulos, letras, temas, narrativas e referências bíblicas locais. A comparação reúne até cinco resultados com os trechos e a afinidade estimada.
