@@ -44,6 +44,14 @@ const BibleGraphEngine=(()=>{
     const topicLabels=new Map((semantic?.catalog()||[]).map(s=>[s.id,s.label]));
     const narratives=db.narratives.map(n=>({...n,aliasNorm:n.aliases.map(norm).filter(x=>x.length>=5)}));
     const knownRefs=narratives.map(n=>({...n,parsed:scripture.lookup(n.reference,1)}));
+    // Frequência de cada pista em outras histórias: distingue o que descreve
+    // ESTA cena de verbos genéricos presentes em muitas passagens.
+    const episodeDf=new Map();
+    for(const n of narratives){
+      const passage=scripture.lookup(n.reference,32);
+      const unique=new Set(roots((passage?.text||'')+' '+n.label+' '+n.aliases.join(' ')));
+      for(const token of unique)episodeDf.set(token,(episodeDf.get(token)||0)+1);
+    }
     let docFreq=new Map(),totalDocs=0;
     const corpus=new Map();
     function setCorpus(hymns){
@@ -69,7 +77,8 @@ const BibleGraphEngine=(()=>{
         // já catalogados para TODAS as histórias. Verbos comuns da passagem
         // isolados não devem dominar a busca.
         const anchor=aliases.has(root)&&frequency<=Math.max(4,totalDocs*.20);
-        return {root,idf,anchor,weight:idf*(anchor?2.2:.48)};
+        const uniqueEpisode=(episodeDf.get(root)||0)<=Math.max(3,Math.floor(narratives.length*.10));
+        return {root,idf,anchor,uniqueEpisode,weight:idf*(anchor?2.2:.48)};
       });
       let best={score:0,hits:[],anchors:0};
       for(const window of doc.windows){
@@ -77,11 +86,12 @@ const BibleGraphEngine=(()=>{
         if(!hits.length)continue;
         const anchored=hits.filter(x=>x.anchor),anchors=anchored.length;
         const weight=hits.reduce((sum,item)=>sum+item.weight,0);
-        // Recuperação orientada a cenas: exigir pelo menos uma âncora
-        // específica + outra pista no mesmo trecho de quatro versos.
-        // O teste é idêntico para as 48 narrativas.
+        // Pares de pistas também contam quando uma delas não é um alias:
+        // só há bônus forte se a outra pista for distintiva entre as 48 cenas.
+        const uniqueOther=hits.some(item=>!item.anchor&&item.uniqueEpisode);
+        const pairBonus=anchors>=1&&uniqueOther?20:0;
         const score=anchors>=1&&hits.length>=2?
-          Math.min(46,weight*1.7+(anchors>=2?6:0)+Math.min(6,hits.length)) :
+          Math.min(46,weight*1.7+(anchors>=2?6:0)+pairBonus+Math.min(6,hits.length)) :
           Math.min(3,weight*.25);
         if(score>best.score)best={score,hits,anchors};
       }
