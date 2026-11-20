@@ -1,4 +1,19 @@
-# Buscador de Hinos Android v2.3
+# Buscador de Hinos Android v2.4
+
+A busca e a comparação funcionam offline depois de importar a coletânea. O app consulta títulos, letras, temas, narrativas e referências bíblicas locais. A comparação reúne até cinco resultados com os trechos e a afinidade estimada.
+
+| Consulta | Comportamento |
+| --- | --- |
+| `gratidão sem alegria` | Exclui hinos que contêm a palavra ou têm associação direta com o tema da alegria. |
+| `gratidão sem foco em alegria` | Reduz a pontuação dos hinos associados à alegria e mantém os que atendem aos critérios. |
+| `"canto sem medo"` | Busca a sequência de palavras no título ou na letra. |
+| `nova busca por esperança` no refinamento | Limpa a consulta anterior e seus filtros. |
+
+O ranking prioriza o título exato, consulta a frequência das palavras na coletânea e admite um erro simples de grafia nos modos Equilibrada e Contextual. No modo Literal, a busca usa correspondências de texto.
+
+O APK padrão desativa GGUF e E5. O GitHub Actions compila com `gradle assembleDebug` e verifica o conteúdo do APK gerado. Para desenvolvimento com os modelos locais, a compilação usa `gradle assembleDebug -PenableLocalModels=true`, NDK 27.2.12479018 e CMake 3.22.1. O E5 também exige os dados locais gerados pelo script em `scripts/build_e5_assets.py`.
+
+## v2.3 - Busca complementar com GGUF
 
 - O GGUF pode pedir uma busca complementar por termos em português ao usar **Comparar com IA** ou **Buscar hinos com IA**. O app permite uma consulta por comparação, mantém os filtros ativos e mostra os termos usados. Mesmo sem resultado inicial, o modelo pode buscar candidatos no índice local.
 - As sugestões de temas usam uma lista estruturada com os nomes do catálogo. Pesquisas por número exato e pesquisas em modo literal ficam fora dessa expansão.
@@ -212,11 +227,9 @@ A lista é então atualizada com semelhança vetorial, mantendo o contexto origi
 
 ### Preparação e compilação
 
-A compilação no GitHub Actions executa `scripts/build_e5_assets.py`, que baixa
-uma revisão fixa do modelo e gera `e5-model.onnx`, `e5-vocab.bin`, `e5-index.json`
-no diretório `assets`. O script `verify_e5_assets.py` valida os arquivos antes
-que o Gradle produza o APK. Requer conexão no runner do GitHub, mas **nenhuma
-conexão é exigida no Android após a instalação e importação da coletânea**.
+Em compilações com o E5 habilitado, `scripts/build_e5_assets.py` baixa uma revisão
+fixa do modelo e gera `e5-model.onnx`, `e5-vocab.bin` e `e5-index.json` no diretório
+`assets`. O script `verify_e5_assets.py` valida os arquivos antes da compilação.
 
 ### Testes recomendados no aparelho
 

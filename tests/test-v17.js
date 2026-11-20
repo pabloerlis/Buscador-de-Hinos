@@ -48,6 +48,10 @@ const sample=[
  assert.ok(!r.results.some(x=>x.number==='004'),'O tema não pode ser inventado por causa de Pai/Filho');
  r=await api.request('/api/search',{query:'Filho Pródigo'});
  assert.equal(r.results[0].number,'002');assert.ok(!r.results.some(x=>x.number==='004'));
+ r=await api.request('/api/search',{query:'Voltar para Deus'});
+ assert.equal(r.results[0].number,'002');
+ assert.ok(r.interpretation.some(x=>x==='Associação lexical: voltar para deus'));
+ assert.equal(r.used_ai,false);
  r=await api.request('/api/search',{query:'João 3:16'});
  assert.ok(r.results.some(x=>x.number==='003'));
  assert.equal(r.bible_reference,'João 3:16');assert.equal(r.bible_verses,1);

@@ -58,9 +58,11 @@ public final class MainActivity extends Activity {
     private volatile int copyProgress=0;
     private static final boolean NATIVE_AVAILABLE;
     static {
-        boolean available;
-        try { System.loadLibrary("hinosllm"); available=true; }
-        catch(Throwable error) { available=false; }
+        boolean available=false;
+        if(BuildConfig.ENABLE_LOCAL_MODELS){
+            try { System.loadLibrary("hinosllm"); available=true; }
+            catch(Throwable error) { available=false; }
+        }
         NATIVE_AVAILABLE=available;
     }
     private static native String nativeLoad(String path);
@@ -119,8 +121,10 @@ public final class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new ImportBridge(), "NativeHinos");
-        web.addJavascriptInterface(new ModelBridge(), "NativeGGUF");
-        web.addJavascriptInterface(new VectorBridge(), "NativeVector");
+        if(BuildConfig.ENABLE_LOCAL_MODELS){
+            web.addJavascriptInterface(new ModelBridge(), "NativeGGUF");
+            web.addJavascriptInterface(new VectorBridge(), "NativeVector");
+        }
         web.loadUrl(HOST + "/assets/index.html");
     }
     private final class VectorBridge {

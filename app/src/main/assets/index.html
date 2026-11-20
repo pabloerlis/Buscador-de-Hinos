@@ -30,7 +30,7 @@
         <span>Buscador<span class="brand-light"> de Hinos</span></span>
       </a>
       <div class="top-actions">
-        <span class="top-state" id="collection-label">Biblioteca de hinos</span><button id="ai-indicator" type="button" class="ai-indicator ai-off" aria-label="Ver estado da IA local">IA: inativa</button>
+        <span class="top-state" id="collection-label">Biblioteca de hinos</span><button id="ai-indicator" data-gguf-ui type="button" class="ai-indicator ai-off" aria-label="Ver estado da IA local">IA: inativa</button>
         <button id="open-settings" class="icon-button" title="Configurações e informações" aria-label="Configurações e informações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a1.9 1.9 0 0 0 .4 2.1l-2 2a1.9 1.9 0 0 0-2.1-.4 1.9 1.9 0 0 0-1.2 1.7h-2.9a1.9 1.9 0 0 0-1.2-1.7 1.9 1.9 0 0 0-2.1.4l-2-2A1.9 1.9 0 0 0 6.6 15a1.9 1.9 0 0 0-1.7-1.2v-2.9A1.9 1.9 0 0 0 6.6 9.7a1.9 1.9 0 0 0-.4-2.1l2-2a1.9 1.9 0 0 0 2.1.4 1.9 1.9 0 0 0 1.2-1.7h2.9A1.9 1.9 0 0 0 15.6 6a1.9 1.9 0 0 0 2.1-.4l2 2a1.9 1.9 0 0 0-.4 2.1 1.9 1.9 0 0 0 1.7 1.2v2.9a1.9 1.9 0 0 0-1.6 1.2z"/></svg></button>
       </div>
     </header>
@@ -102,20 +102,20 @@
             <button id="new-search" class="text-action" type="button">Nova pesquisa <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5M4 4v4h4"/></svg></button>
           </div>
           <p class="score-method">Afinidade estimada por evidências da letra, relações semânticas e embeddings E5 Small, quando disponíveis. Percentuais não são probabilidades.</p>
-          <p id="vector-results-state" class="vector-live" role="status" aria-live="polite">A busca local aparece imediatamente; a comparação vetorial atualiza a lista em seguida.</p>
+          <p id="vector-results-state" data-vector-ui class="vector-live" role="status" aria-live="polite"></p>
           <div class="results-layout">
             <div class="results-main">
               <div id="notice" class="notice hidden" role="status"></div>
               <div id="search-diagnostics" class="semantic-interpret hidden"><strong>Como o índice interpretou a busca</strong><div id="search-concepts" class="concept-list"></div></div>
-              <div id="ai-workspace" class="ai-workspace" aria-live="polite">
+              <div id="ai-workspace" data-gguf-ui class="ai-workspace hidden" aria-live="polite">
                 <div class="ai-workspace-head"><strong id="ai-state-badge" class="ai-stage">IA não carregada</strong><span id="ai-timer" class="ai-timer"></span></div>
                 <div id="ai-task" class="ai-task">Busca local disponível.</div>
                 <p id="ai-detail" class="ai-detail">O GGUF pode sugerir temas, comparar trechos e pedir uma busca complementar na coletânea.</p>
                 <button id="ai-cancel" class="secondary-btn hidden" type="button">Interromper IA</button><div id="ai-activity" class="ai-activity hidden"><span class="ai-spinner"></span><span id="ai-progress">Preparando...</span></div>
                 <p id="ai-last" class="ai-last"></p>
               </div>
-              <div id="gguf-banner" class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
-                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar com IA</button><button id="gguf-compare" class="secondary-btn" type="button">Comparar 5 (offline)</button></div></div>
+              <div id="gguf-banner" data-gguf-ui class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
+                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar com IA</button></div></div>
               <div id="gguf-comparison" class="ai-interpretation hidden"><div id="gguf-comparison-text" role="status" aria-live="polite"></div><div id="gguf-comparison-actions" class="ai-buttons"></div></div>
         <div id="results-list" class="results-list" aria-live="polite"></div>
               <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
@@ -128,9 +128,10 @@
             </div>
             <aside class="refine-panel">
               <div class="refine-header"><span class="refine-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6 3 3M6 18l3-3m6-6 3-3"/></svg></span><div><h3>Refinar com contexto</h3><p id="refine-mode">Busca contextual</p></div></div>
-              <div id="conversation" class="conversation" aria-live="polite"><div class="assistant-message">Precisa de algo mais específico? Descreva a mensagem ou ocasião desejada.</div></div>
+              <button id="gguf-compare" class="secondary-btn compare-offline" type="button" disabled>Comparar resultados</button>
+              <div id="conversation" class="conversation" aria-live="polite"></div>
               <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
-              <p class="privacy-note">A busca local sempre funciona. Um GGUF carregado pode sugerir temas para refinar a consulta; o texto não sai do aparelho. Percentuais são estimativas de relevância, não certezas.</p>
+              <p class="privacy-note">Use “sem alegria” para excluir, “sem foco em alegria” para reduzir a prioridade ou “nova busca por esperança” para limpar o contexto.</p>
             </aside>
           </div>
         </div>
@@ -166,7 +167,7 @@
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
       <div class="modal-top"><div><span class="modal-overline">SOBRE O PROJETO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea. Ajuste a abrangência do índice; a IA é opcional.</p><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Modelo GGUF</span><strong id="settings-ai">Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span>Vetores E5 validados</span><strong id="settings-embeddings">—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea.</p><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span data-gguf-ui>Modelo GGUF</span><strong id="settings-ai" data-gguf-ui>Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
       <section class="semantic-settings" aria-label="Coleções e importação">
         <div class="setting-section-heading"><h3>Biblioteca unificada</h3><span class="local-badge">Offline</span></div>
         <p class="subtle-note">Escolha onde pesquisar. Hinos idênticos em várias coleções aparecem uma única vez, preservando suas referências de origem.</p>
@@ -190,9 +191,9 @@
         <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
         <label for="semantic-power">Força das relações semânticas <strong id="semantic-power-value">75%</strong></label>
         <input id="semantic-power" type="range" min="0" max="100" step="5" value="75">
-        <label for="vector-mode">Modelo vetorial E5 Small (sem GGUF)</label>
-        <select id="vector-mode"><option value="balanced">Híbrida: textual + embeddings (recomendada)</option><option value="strong">Dar maior peso ao significado</option><option value="off">Desativada: somente busca por regras</option></select>
-        <p id="vector-state" class="subtle-note" role="status">Modelo vetorial: verificando índice local…</p>
+        <label for="vector-mode" data-vector-ui>Modelo vetorial E5 Small</label>
+        <select id="vector-mode" data-vector-ui><option value="off">Desativado</option><option value="balanced">Por palavras e vetores</option><option value="strong">Dar mais peso aos vetores</option></select>
+        <p id="vector-state" data-vector-ui class="subtle-note" role="status">Verificando índice vetorial…</p>
         <p class="subtle-note">A lista aparece imediatamente. Com a busca vetorial ativada, o ranking é aprimorado depois que o modelo calcula o significado da consulta. O primeiro uso pode exigir preparar cerca de 120 MB no armazenamento privado.</p>
         <label class="setting-check"><input id="story-toggle" type="checkbox" checked>Reconhecer narrativas bíblicas (Filho Pródigo, Ovelha Perdida etc.)</label>
         <label class="setting-check"><input id="related-toggle" type="checkbox" checked>Considerar temas relacionados e sinônimos</label>
@@ -228,7 +229,7 @@
         <div class="settings-actions"><button id="alias-add" class="secondary-btn" type="button">Adicionar associação</button></div>
         <div id="alias-list" class="alias-list" aria-live="polite"></div>
       </section>
-      <details class="advanced-settings"><summary>IA local experimental (GGUF) — opcional</summary><section class="gguf-box" aria-label="Modelo de IA local">
+      <details class="advanced-settings" data-gguf-ui><summary>IA local experimental (GGUF)</summary><section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (GGUF)</h3>
         <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. O modelo pode sugerir temas, comparar até cinco trechos e solicitar uma busca complementar na coletânea. Use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
         <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>

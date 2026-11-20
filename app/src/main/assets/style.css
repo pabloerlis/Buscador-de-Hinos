@@ -136,3 +136,7 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 .knowledge-row small{display:block;color:#687f70}
 .knowledge-empty{font-size:12px;color:#617769;margin:5px 0}
 @media(max-width:560px){.repertoire-modal-status{align-items:stretch}.repertoire-modal-status .repertoire-action{width:100%}.result-card .result-bottom{align-items:stretch}}
+html:not(.with-gguf) [data-gguf-ui],html:not(.with-vector) [data-vector-ui]{display:none!important}
+.compare-offline{margin:14px 0 10px}
+.conversation:empty{display:none}
+.assistant-message{white-space:pre-line}

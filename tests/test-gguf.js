@@ -48,9 +48,12 @@ assert.match(cpp,/llama_decode/);
 assert.match(cpp,/llama_sampler_sample/);
 assert.match(cmake,/ggml-org\/llama.cpp/);
 assert.match(cmake,/GIT_TAG b8201/);
-assert.match(build,/versionName '2\.3\.0'/);
+assert.match(build,/versionName '2\.4\.0'/);
 assert.match(build,/abiFilters 'arm64-v8a'/);
-assert.match(workflow,/ndk;27\.2\.12479018/);
+assert.match(build,/ndkVersion '27\.2\.12479018'/);
+assert.match(build,/gradleProperty\('enableLocalModels'\).*orElse\(false\)/);
+assert.match(java,/if\(BuildConfig\.ENABLE_LOCAL_MODELS\)\{\s*web\.addJavascriptInterface\(new ModelBridge/);
+assert.doesNotMatch(workflow,/build_e5_assets|ndk;27\.2\.12479018/);
 assert.match(js,/MAX_AI_MS=16000/);
 assert.match(js,/OfflineAPI\.validateHints/);
 assert.match(cpp,/nativeCancel/);
@@ -105,8 +108,8 @@ assert.equal(merged.hymns.at(-1).id,6);
 
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
-function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false}={}){
-  const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[];
+function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true}={}){
+  const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];
   let now=0;
   const $=id=>{
     if(!elements.has(id)){
@@ -116,21 +119,21 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
     }
     return elements.get(id);
   };
-  const window={NativeGGUF:{status:()=>JSON.stringify({available:true,loaded:true,phase:'ready'}),
-    generate:(...args)=>calls.push(args),cancel:id=>cancelled.push(id)}};
+  const window=nativeModel?{NativeGGUF:{status:()=>JSON.stringify({available:true,loaded:true,phase:'ready'}),
+    generate:(...args)=>calls.push(args),cancel:id=>cancelled.push(id)}}:{};
   const vector=Array(384).fill(0.1);
-  const settings={mode:'balanced',collections:{principal:true,avulsos:false}};
+  const settings={mode:'balanced',vectorMode:nativeModel?'balanced':'off',collections:{principal:true,avulsos:false}};
   const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector};
-  const gguf=vm.runInNewContext(aiSource+searchSource+ggufSource+'\nGGUF',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation(){},showResults(){},
+  const {gguf,search}=vm.runInNewContext(aiSource+searchSource+ggufSource+'\n({gguf:GGUF,search:performSearch})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>messages.push(text),showResults(){},
     document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
     OfflineAPI:{normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
     jsonRequest:async(url,payload)=>{
       requests.push(payload);
       if(additionalSearch&&payload.settings.pageSize===10)return additionalSearch();
-      return {results:hymns,effective_query:payload.query,excluded:payload.exclude,ai_context:context,total:hymns.length,page:1};
+      return {results:hymns,effective_query:payload.query,excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
     },
     busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>embeddings.push(args)}});
-  return {calls,cancelled,$,state,requests,embeddings,opened,vector,gguf,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
+  return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
 }
 
 async function checkBridge(){
@@ -238,6 +241,18 @@ async function checkBridge(){
   literal.gguf.maybeAuto(literal.state.effectiveQuery);
   literal.$('gguf-improve').click();
   assert.equal(literal.calls.length,0);
+  const offline=setup({auto:true,nativeModel:false,initialResults:[]});
+  assert.equal(await offline.search('Gratidão sem foco em tristeza'),true);
+  assert.match(offline.$('notice').textContent,/Menor prioridade para tristeza/);
+  assert.equal(offline.$('gguf-compare').disabled,false);
+  offline.$('gguf-compare').click();
+  assert.match(offline.messages[0],/Hino de teste 1.*\n“Deus acolhe quem volta de coração/);
+  await offline.search(offline.state.effectiveQuery,{page:2});
+  assert.deepEqual(offline.requests.at(-1).deprioritize,['tristeza']);
+  assert.equal(offline.requests.at(-1).parsed_query,true);
+  await offline.search('com esperança',{refine:true});
+  assert.deepEqual(offline.requests.at(-1).deprioritize,['tristeza']);
+  assert.equal(offline.calls.length+offline.embeddings.length,0);
   console.log('GGUF: diagnóstico, consulta complementar, filtragem, validação, cancelamento e temas estruturados aprovados.');
 }
 

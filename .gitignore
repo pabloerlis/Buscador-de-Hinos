@@ -8,3 +8,7 @@ local.properties
 app/src/main/assets/scripture-pt.json
 # Grafo bíblico gerado a partir das fontes públicas fixadas
 app/src/main/assets/bible-graph.json
+app/src/main/assets/e5-model.onnx
+app/src/main/assets/e5-index.json
+app/src/main/assets/e5-vocab.bin
+app/src/main/assets/e5-source.txt
