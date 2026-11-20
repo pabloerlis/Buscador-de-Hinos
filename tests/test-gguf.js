@@ -71,6 +71,15 @@ assert.equal(request.candidates.size,5);
 assert.match(request.prompt,/Lucas 15:20.*seu pai o viu.*Hino de teste 5/);
 assert.doesNotMatch(request.prompt,/Hino de teste 6/);
 assert.match(request.prompt,/tristeza/);
+const longText='fé e confiança na adversidade '.repeat(30);
+const noisyInput=('a'+String.fromCharCode(0xD800)).repeat(300);
+const manyLongHymns=Array.from({length:5},(_,i)=>({id:Number.MAX_SAFE_INTEGER-i,title:noisyInput,snippet:longText}));
+const longContext={reference:longText,passage:longText,topics:Array(4).fill(longText)};
+for(const lookup of [null,{term:'a'.repeat(64),added:2}]){
+  const bounded=ai.prepareComparison(noisyInput,Array(4).fill(longText),manyLongHymns,longContext,lookup);
+  assert.ok(bounded.prompt.length<=2400,'A entrada da IA respeita o limite da ponte Android.');
+  assert.match(bounded.prompt,/trecho/);
+}
 assert.match(request.grammar,/hymn-id ::= "1" \| "2" \| "3" \| "4" \| "5"/);
 const withoutCandidates=ai.prepareComparison('Voltar para Deus',[],[],null);
 assert.equal(withoutCandidates.candidates.size,0);

@@ -8,7 +8,7 @@ const LocalHymnAI = (() => {
   const LOOKUP_CHARACTERS = 'A-Za-zÀ-ÖØ-öø-ÿ ';
   const invalidLookupCharacter = new RegExp(`[^${LOOKUP_CHARACTERS}]`);
   const clip = (value, limit) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
-  const promptText = (value, limit) => clip(value, limit).replace(/["\\\u0000-\u001f]/g, ' ');
+  const promptText = (value, limit) => clip(value, limit).replace(/["\\\u0000-\u001f\uD800-\uDFFF]/gu, ' ');
   const diagnostic = {
     prompt: 'Responda apenas OK.',
     grammar: 'root ::= "OK"',
@@ -34,15 +34,15 @@ const LocalHymnAI = (() => {
 
     const canLookup = lookup === null;
     const input = {
-      pedido: promptText(query, 230),
+      pedido: promptText(query, 200),
       exclusões: exclusions.slice(0, 4).map(value => promptText(value, 40)),
-      temas: (context?.topics || []).slice(0, 4).map(value => promptText(value, 28)),
+      temas: (context?.topics || []).slice(0, 4).map(value => promptText(value, 24)),
       ...(context?.reference && context.passage ? {
         referência: promptText(context.reference, 50),
-        passagem: promptText(context.passage, 220)
+        passagem: promptText(context.passage, 160)
       } : {}),
       ...(lookup ? { busca_complementar: { termos: lookup.term, novos_hinos: lookup.added } } : {}),
-      hinos: [...candidates.values()].map(({ id, title, excerpt }) => ({ id, título: promptText(title, 60), trecho: promptText(excerpt, 140) }))
+      hinos: [...candidates.values()].map(({ id, title, excerpt }) => ({ id, título: promptText(title, 55), trecho: promptText(excerpt, 140) }))
     };
     const instructions = 'Escolha até dois hinos do mais adequado ao menos adequado ao pedido. Responda com uma lista JSON de objetos id e motivo. Use IDs distintos e um motivo curto em português, sustentado pelo trecho. Use [] se não houver evidência.';
     const tool = 'Se os trechos forem insuficientes, você pode chamar a busca local uma vez com {"buscar_hinos":"palavras alternativas"}. Use de 3 a 64 letras e espaços.';
