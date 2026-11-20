@@ -33,6 +33,8 @@ async function refreshStatus(){
   $('settings-stories').textContent=result.story_ready?`${result.story_count} narrativas locais`:'Não carregada';
   $('settings-scripture').textContent=result.scripture_ready?`${result.scripture_books} livros · Bíblia Livre`:'Indisponível';
   $('settings-bible-graph').textContent=result.bible_graph_ready?`${result.bible_graph_stats?.verse_topics||0} versículos com temas · ${result.bible_graph_narratives} narrativas`:'Indisponível';
+  const eventStatus=result.event_stats;
+  if(eventStatus) $('settings-bible-graph').textContent+=` · ${eventStatus.actionFamilies} grupos de ações`;
   $('settings-embeddings').textContent=result.vector_count?`${result.vector_count} hinos · ${result.vector_status?.passages||0} trechos · E5 Small`:'Não disponível para esta coletânea';
   $('settings-bridge').textContent=result.bridge_ready?`${result.bridge_entries} associações`:'Indisponível';
   if(typeof GGUF!=='undefined')GGUF.info();
@@ -208,7 +210,7 @@ document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',
 // Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
 const SearchPreferences=(()=>{
   const ids={vectorMode:'vector-mode',fusionMode:'fusion-mode',mode:'search-mode',strength:'semantic-power',minAffinity:'min-affinity',pageSize:'page-size',
-    narratives:'story-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',bibleGraph:'bible-graph-toggle',bibleLinks:'bible-links-toggle',bibleDepth:'bible-depth',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
+    narratives:'story-toggle',eventEvidence:'event-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',bibleGraph:'bible-graph-toggle',bibleLinks:'bible-links-toggle',bibleDepth:'bible-depth',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
     recWeight:'rec-weight',recCount:'rec-count',recContext:'rec-context',recAvoidVisited:'rec-visited',recBreakdown:'rec-breakdown'};
   const defaults=OfflineAPI.searchOptions();
   let stories=[];
