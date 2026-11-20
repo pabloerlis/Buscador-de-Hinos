@@ -121,6 +121,9 @@ const OfflineAPI = (() => {
   }
   function candidateSongs(numberMatch,queryTokens,intent,storyIntent,vectorMatches=[],exactTitles=[]){
     if(numberMatch){const ids=numberIndex.get(Number(numberMatch[2]))||new Set();return hymns.filter(h=>ids.has(h.id));}
+    // A coletânea é pequena: em consultas narrativas, avaliar todo o catálogo
+    // evita perder hinos que não entraram no índice por vocabulário diferente.
+    if(storyIntent?.matches?.length)return hymns;
     const ids=new Set(exactTitles);
     for(const item of vectorMatches)ids.add(item.id);
     for(const word of queryTokens)for(const id of (wordIndex.get(word)||[]))ids.add(id);
@@ -585,11 +588,13 @@ const OfflineAPI = (() => {
           ...(graphResult?.cues||[]),...(storyResult?.cues||[]),...(semanticResult?.cues||[])],
         reason:opts.showReasons?reason+(lowered.length?' Menor prioridade por '+lowered.join(', ')+'.':''):'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
+        _narrativeTier:storyResult?.tier||0,
         vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
         match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     ranked.sort((a,b)=>Number(b.match_type==='titulo_exato')-Number(a.match_type==='titulo_exato')||
+      b._narrativeTier-a._narrativeTier||
       b.relevance_score-a.relevance_score||Number(a.number||10000)-Number(b.number||10000)||a.id-b.id);
     // O hino não aprendido continua no ranking e mantém sua afinidade.
     // Apenas a paginação principal fica reservada aos hinos disponíveis.
@@ -599,7 +604,7 @@ const OfflineAPI = (() => {
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
-    const withSnippet=({spelling,sharedPassage,cues,...hit})=>({...hit,
+    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,...hit})=>({...hit,
       snippet:sharedPassage?.text||makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
     const interpretation=opts.showConcepts?[
