@@ -70,7 +70,12 @@ require("needs: [sources, static, regressions, relevance, embeddings]" in workfl
         "Compilação não depende de todos os agentes de pré-build")
 require("needs: [build_apk, device_smoke]" in workflow,
         "APK deve depender dos testes instrumentados Android antes da auditoria")
-require("E5DeviceSmokeTest" in workflow, "Verificação real do encoder E5 no Android ausente")
+require("scripts/qa_android_emulator.sh" in workflow,
+        "Workflow sem executor de teste Android nativo")
+runner_script = (ROOT / "scripts/qa_android_emulator.sh").read_text(encoding="utf-8")
+require("E5DeviceSmokeTest" in runner_script and "FAILURES!!!" in runner_script and
+        "INSTRUMENTATION_STATUS_CODE: 0" in runner_script,
+        "Testes Android não verificam explicitamente o resultado da instrumentação")
 require("node tests/qa-metrics.js" in workflow, "Avaliação quantitativa não está no CI")
 require("scripts/qa_e5.py" in workflow, "Agente de embeddings E5 ausente")
 require("continue-on-error: true" not in workflow, "Um dos agentes ignora falhas")
