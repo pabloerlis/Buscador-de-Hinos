@@ -615,7 +615,9 @@ const OfflineAPI = (() => {
           ...(graphResult?.cues||[]),...(storyResult?.cues||[]),...(semanticResult?.cues||[])],
         reason:opts.showReasons?reason+(lowered.length?' Menor prioridade por '+lowered.join(', ')+'.':''):'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
-        _narrativeTier:Math.max(storyResult?.tier||0,eventResult?.tier||0),
+        _narrativeTier:storyResult?.tier||0,
+        // Evita que o tier preliminar de eventos suplante a evidência narrativa
+        // já validada; eventos influem no score, mas não criam prioridade rígida.
         _eventSnippet:eventResult?.tier>=1?eventResult.snippet:'',
         _fusionSignals:{lexical:lexicalSignal,semantic:semanticSignal,biblical:biblicalSignal,
           narrative:narrativeSignal,vector:vectorSignal},
