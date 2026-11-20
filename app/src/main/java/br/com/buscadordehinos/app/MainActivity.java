@@ -123,6 +123,8 @@ public final class MainActivity extends Activity {
         web.addJavascriptInterface(new ImportBridge(), "NativeHinos");
         if(BuildConfig.ENABLE_LOCAL_MODELS){
             web.addJavascriptInterface(new ModelBridge(), "NativeGGUF");
+        }
+        if(BuildConfig.ENABLE_LOCAL_EMBEDDINGS||BuildConfig.ENABLE_LOCAL_MODELS){
             web.addJavascriptInterface(new VectorBridge(), "NativeVector");
         }
         web.loadUrl(HOST + "/assets/index.html");
