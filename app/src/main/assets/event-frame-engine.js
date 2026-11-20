@@ -210,29 +210,32 @@ const EventFrameEngine=(()=>{
           strength:localActions.length*2+aligned.length});
       }
       matching.sort((a,b)=>b.strength-a.strength||a.frame.start-b.frame.start);
-      const best=matching[0];
+      const ordered=sequence>=2;
+      const rare=action=>(episodeDf.get(action)||0)<=Math.max(8,Math.floor(sourceFrames.length*.26));
+      // Não transformar a coincidência de A em um verso e B em outro
+      // (talvez em estrofes distantes) em narrativa direta. As duas ações
+      // precisam coexistir numa única janela local E ter cenário verificável.
+      // Esta é uma regra universal para todos os episódios, não por título.
+      const coherent=matching.find(m=>m.actions.length>=2&&m.actors.length>=1&&
+        (m.actions.some(rare)||(m.actions.length>=3&&m.actors.some(a=>source.aliases.has(a)))));
+      const best=coherent||matching[0];
       const actors=best?.actors||[];
       const actionCount=distinct.length;
-      const ordered=sequence>=2;
-      const hasScene=actors.length>0;
-      // Evidência de acontecimento: duas ações distintas e pelo menos uma
-      // ligação verificável com personagem/cenário bíblico no mesmo trecho.
-      // Só ações ou nomes soltos podem representar uma analogia, não relato direto.
-      const narrative=actionCount>=2&&ordered&&hasScene;
-      const analogy=actionCount>=2&&ordered&&!hasScene&&
-        distinct.some(x=>(episodeDf.get(x)||0)<=Math.max(8,Math.floor(sourceFrames.length*.24)));
+      const narrative=Boolean(coherent)&&ordered;
+      const analogy=!narrative&&actionCount>=3&&ordered&&distinct.some(rare);
       let tier=0,score=0,kind='tema relacionado';
       if(narrative){
-        tier=actionCount>=3&&actors.length>=2?2:1;
-        const actionPoints=Math.min(14,actionCount*3.3);
-        const scenePoints=Math.min(9,actors.length*4);
-        const orderPoints=Math.min(6,Math.max(0,sequence-1)*3);
-        score=Math.min(25,actionPoints+scenePoints+orderPoints);
+        const alias=coherent.actors.some(a=>source.aliases.has(a));
+        tier=coherent.actions.length>=3&&alias?2:1;
+        const actionPoints=Math.min(10,coherent.actions.length*3);
+        const scenePoints=alias?4:Math.min(3,coherent.actors.length*1.5);
+        const orderPoints=Math.min(3,Math.max(0,sequence-1));
+        score=Math.min(17,actionPoints+scenePoints+orderPoints);
         kind='ações e cenário na mesma estrofe';
       }else if(analogy){
         tier=0;
-        score=Math.min(8,actionCount*2+Math.min(3,sequence));
-        kind='sequência análoga de ações';
+        score=Math.min(5,Math.max(0,actionCount-1)*1.4+Math.min(2,sequence-1));
+        kind='sequência análoga de ações, sem personagem confirmado';
       }
       const reason=score>=5?'Acontecimentos da passagem: '+distinct.slice(0,3).join(', ')+
         (actors.length?' · contexto: '+actors.slice(0,3).join(', '):' · perspectiva semelhante'):'';
