@@ -56,7 +56,10 @@ assert.match(java,/if\(BuildConfig\.ENABLE_LOCAL_MODELS\)\{\s*web\.addJavascript
 assert.ok(!workflow.includes('ndk;27.2.12479018'));
 assert.ok(workflow.includes('scripts/build_e5_assets.py'));
 assert.ok(workflow.includes('scripts/qa_e5.py'));
-assert.ok(workflow.includes('assembleDebug -PenableLocalEmbeddings=true'));
+assert.ok(workflow.includes('assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true'));
+assert.ok(workflow.includes('br.com.buscadordehinos.app.E5DeviceSmokeTest'));
+assert.ok(workflow.includes('needs: [build_apk, device_smoke]'));
+assert.ok(!workflow.includes('-PenableLocalModels=true'));
 assert.ok(build.includes("gradleProperty('enableLocalEmbeddings')"));
 assert.match(js,/MAX_AI_MS=16000/);
 assert.match(js,/OfflineAPI\.validateHints/);
