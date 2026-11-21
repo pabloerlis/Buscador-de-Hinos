@@ -95,7 +95,7 @@ function metrics(rows,key){
     eventEvidence:true,mode:'balanced',strength:75,vectorMode:'off',fusionMode:'rrf',pageSize:10}});
   const negativeRank=rank(neg,['principal','010']);
   assert.ok(negativeRank===null||negativeRank>10,'Falso positivo narrativo top10');
-  const exact=await api.request('/api/search',{query:'hino 261',
+  const exact=await api.request('/api/search',{query:'hino 261',_forRecommendations:true,
     settings:{mode:'balanced',strength:75,vectorMode:'off',fusionMode:'rrf',pageSize:10}});
   assert.equal(rank(exact,['principal','261']),1,'Número exato regrediu');
   const without=metrics(rows,'rank_without_e5'),with_e5=metrics(rows,'rank_with_e5');
