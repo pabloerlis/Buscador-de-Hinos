@@ -93,7 +93,7 @@ assert.deepEqual(manifest.queries,paraphrases.map(p=>p.query),'Paráfrases de QA
 assert.equal(generated.schema_version,1);
 assert.equal(generated.source_kind,'actual_e5_onnx_inference');
 assert.equal(generated.human_review_status,'pending');
-assert.equal(generated.model_sha256,'4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c');
+assert.equal(generated.model_sha256,'ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1');
 assert.equal(generated.queries.length,12,'Faltam embeddings reais para paráfrases');
 for(let i=0;i<paraphrases.length;i++){
   const row=generated.queries[i], expected=paraphrases[i];
