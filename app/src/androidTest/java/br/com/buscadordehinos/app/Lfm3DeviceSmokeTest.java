@@ -58,30 +58,39 @@ public class Lfm3DeviceSmokeTest {
                 +(SystemClock.elapsedRealtime()-simpleStarted)+" setup_ms="+metrics[0]
                 +" prefill_ms="+metrics[1]+" first_token_ms="+metrics[2]
                 +" generated="+metrics[3]);
-            String narrative="Contexto: Lucas 15:11-32. O filho abandona a casa, sofre, arrepende-se e volta ao pai. "
-                +"Compare CINCO candidatos pela narrativa, não somente por palavras. "
-                +"1 Um dia eu quis te deixar: no começo há fuga; NO FIM o filho retorna arrependido e o pai o acolhe. "
-                +"2 Noite de paz: trata do nascimento de Jesus. "
-                +"3 No mar: descreve uma tempestade e socorro. "
-                +"4 Manhã gloriosa: descreve a ressurreição. "
-                +"5 Gratidão: expressa agradecimento geral. "
-                +"Responda JSON com id do hino mais correspondente e motivo curto em letras minúsculas sem acentos.";
-            String gbnf="root ::= \"{\\\"id\\\":\" (\"1\" | \"2\" | \"3\" | \"4\" | \"5\") \",\\\"motivo\\\":\\\"\" [a-z ]{8,48} \"\\\"\"\n";
+
+            // Cinco candidatos em posições distintas. A resposta correta depende da
+            // sequência narrativa completa, não da simples palavra "filho".
+            String narrative="TAREFA: escolher UM hino que CONTA A HISTÓRIA de Lucas 15:11-32, o filho pródigo. "
+                +"Critério: a mesma sequência de eventos: deixar o pai, arrepender-se, voltar e ser acolhido pelo pai. "
+                +"Gratidão genérica não é a história; palavras religiosas isoladas não bastam. "
+                +"Hinos candidatos: "
+                +"1: Noite de Paz — descreve o nascimento de Jesus, manjedoura e anjos. "
+                +"2: Gratidão — canta louvor e agradecimento geral, sem retorno do filho ao pai. "
+                +"3: Um dia eu quis te deixar — primeira estrofe, o filho deixa o lar e se afasta; "
+                +"ÚLTIMA ESTROFE, ele se arrepende, retorna ao pai, que o acolhe e perdoa. "
+                +"4: No Mar — tempestade e socorro durante uma viagem. "
+                +"5: Manhã Gloriosa — ressurreição e esperança na vida eterna. "
+                +"Qual candidato tem a narrativa INTEIRA? Responda APENAS um JSON válido "
+                +"com id e motivo de 8 a 24 letras minúsculas, sem acentos.";
+            String gbnf="root ::= \"{\\\"id\\\":\" (\"1\" | \"2\" | \"3\" | \"4\" | \"5\") \",\\\"motivo\\\":\\\"\" [a-z ]{8,24} \"\\\"}\"\n";
             long[] compareMetrics=new long[4];
             long start=SystemClock.elapsedRealtime();
             byte[] compare=(byte[])generate.invoke(null,new Object[]{
                 narrative.getBytes(StandardCharsets.UTF_8),
-                gbnf.getBytes(StandardCharsets.UTF_8),72,180_000,compareMetrics
+                gbnf.getBytes(StandardCharsets.UTF_8),120,180_000,compareMetrics
             });
             long wall=SystemClock.elapsedRealtime()-start;
             assertNotNull("Sem resultado de cinco hinos",compare);
-            JSONObject resultJson=new JSONObject(new String(compare,StandardCharsets.UTF_8));
-            assertEquals("Reranking errou a narrativa do filho pródigo",1,resultJson.getInt("id"));
-            assertTrue("Justificativa curta ausente",resultJson.getString("motivo").trim().length()>=8);
-            assertTrue("Não houve geração real",compareMetrics[3]>0);
+            // Registrar velocidade mesmo que a resposta seja inválida; nunca aprovar por isso.
             android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=compare-five total_ms="+wall
                 +" setup_ms="+compareMetrics[0]+" prefill_ms="+compareMetrics[1]
                 +" first_token_ms="+compareMetrics[2]+" generated="+compareMetrics[3]);
+            JSONObject resultJson=new JSONObject(new String(compare,StandardCharsets.UTF_8));
+            assertEquals("Reranking errou a narrativa do filho pródigo",3,resultJson.getInt("id"));
+            assertTrue("Justificativa curta ausente",resultJson.getString("motivo").trim().length()>=8);
+            assertTrue("Não houve geração real",compareMetrics[3]>0);
+
             android.util.Log.i("LFM3_SMOKE_SUCCESS","official QAD Q4_0, tokens="
                 +metrics[3]+", prefill_ms="+metrics[1]+", first_token_ms="+metrics[2]);
         } finally {
