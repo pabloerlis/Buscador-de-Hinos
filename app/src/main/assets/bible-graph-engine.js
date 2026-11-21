@@ -7,6 +7,19 @@ const BibleGraphEngine=(()=>{
   const norm=value=>String(value||'').normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
   const esc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const matches=(text,phrase)=>new RegExp('(?:^| )'+esc(norm(phrase)).replace(/\s+/g,'\\s+')+'(?=$| )').test(text);
+  // Cenas narrativas discriminativas: os termos precisam coexistir na
+  // letra completa, e não somente em um versículo isolado ou no título.
+  const SCENE_CUES={
+    mulher_do_fluxo_de_sangue:{
+      groups:[
+        ['multidão','multidao','multidão te oprime','muitos ao redor'],
+        ['tocou','tocar','toque','tocou-me','vestes','manto','virtude'],
+        ['mulher','enferma','filha','doze anos'],
+        ['fé','salvou','cura','curou','sarou']
+      ],required:[0,1],minGroups:3
+    }
+  };
+
   const STOPS=new Set(('a o as os e de do da dos das no na nos nas ao aos que por para com em um uma uns umas me se eu ele ela eles elas nos vos '
     +'tua teu suas seus minha meu seu sua si te nos lhe lhei dele dela deste desta desse dessa ha ate quando como onde porque qual quais '
     +'foi era eram sera serao sendo havia havia sido isso isto aquele aquela assim sobre ainda ja somente apenas todo toda todos todas '
@@ -23,7 +36,8 @@ const BibleGraphEngine=(()=>{
       const direct=scripture.lookup(original,64);
       const q=norm(original);
       const names=narratives.map(n=>({entry:n,match:n.aliasNorm.filter(a=>matches(q,a)).sort((a,b)=>b.length-a.length)[0]})).filter(n=>n.match).sort((a,b)=>b.match.length-a.match.length);
-      const selected=names[0]?.entry||null;
+      // Também identifica a cena quando o usuário digita a referência exata.
+      const selected=names[0]?.entry||(direct?narratives.find(n=>norm(n.reference)===norm(direct.reference)):null)||null;
       const reading=direct|| (selected?scripture.lookup(selected.reference,64):null);
       if(!reading)return null;
       // Abrange o intervalo solicitado, inclusive o versículo final; sem atravessar capítulos arbitrariamente.
@@ -74,6 +88,7 @@ const BibleGraphEngine=(()=>{
       const lexical=[...words].sort((a,b)=>b[1]-a[1]||b[0].length-a[0].length).slice(0,26).map(([word,n])=>({word,weight:Math.min(1.7,1+n/7)}));
       const residual=direct?reading.residual:q.replace(names[0]?.match||'',' ').replace(/\s+/g,' ').trim();
       return {reference:reading.reference,source:direct?'referência':'narrativa',narrative:selected?.label||null,
+        narrativeId:selected?.id||null,
         directReference:!!direct,verses:verseIds.length,verseIds,sourceText:snippets,concepts,
         directConceptIds:[...directTopicIds],words:lexical,relatedCount:relatives.size,
         relatedRefs:[...relatives].sort((a,b)=>b[1]-a[1]).slice(0,5).map(x=>x[0]),residual};
@@ -96,10 +111,25 @@ const BibleGraphEngine=(()=>{
       if(!direct.length && words.length<2)score=Math.min(score,2.5);
       if(direct.length===1 && !words.length)score=Math.min(score,6.5);
       const reasons=[];
+      const scene=SCENE_CUES[context.narrativeId];
+      let sceneCues=[];
+      if(scene){
+        const groups=scene.groups.map(group=>group.filter(term=>matches(text,term)));
+        const coverage=groups.filter(group=>group.length).length;
+        if(coverage>=scene.minGroups&&scene.required.every(i=>groups[i].length)){
+          // A menção genérica a "sangue" não prova que o hino aborda
+          // a mulher que tocou Jesus. Exigimos multidão e toque,
+          // juntamente com outra evidência do episódio.
+          sceneCues=groups.flatMap(group=>group.slice(0,1));
+          score=Math.min(38,score)+(coverage===4?30:23);
+          reasons.push('Cena bíblica reconhecida na letra completa ('+sceneCues.join(', ')+')');
+        }
+      }
       if(direct.length)reasons.push('Passagem '+context.reference+': temas presentes na letra — '+direct.slice(0,3).map(x=>x.label).join(', '));
       if(words.length>=2)reasons.push('Expressões da passagem relacionadas à letra: '+words.slice(0,4).map(x=>x.word).join(', '));
       if(indirect.length&&direct.length)reasons.push('Tema complementar das referências cruzadas: '+indirect.slice(0,2).map(x=>x.label).join(', '));
-      return {score:Math.min(38,score),reasons,matched:direct.map(x=>x.label),cues:words.slice(0,4).map(x=>x.word)};
+      return {score:Math.min(72,score),reasons,matched:direct.map(x=>x.label),
+        cues:[...sceneCues,...words.slice(0,4).map(x=>x.word)]};
     }
     return {revision:db.revision,stats:db.stats||{},narrativeCount:narratives.length,resolve,evaluate};
   }
