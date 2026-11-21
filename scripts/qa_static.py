@@ -79,9 +79,9 @@ require(re.search(r"\bversionCode\s+\d+\b", gradle), "versionCode inválido")
 require(re.search(r"\bversionName\s+'[\d.]+(?:-[a-z0-9.]+)?'", gradle), "versionName inválido")
 
 workflow = (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8")
-for gate in ("sources", "static", "regressions", "relevance", "embeddings", "semantic_search_qa", "build_apk", "device_smoke", "audit_apk", "independent_review", "publish_apk"):
+for gate in ("sources", "static", "regressions", "relevance", "embeddings", "semantic_search_qa", "semantic_crossversion_qa", "build_apk", "device_smoke", "audit_apk", "independent_review", "publish_apk"):
     require(re.search(r"^  " + gate + r":", workflow, re.M), "Agente ou etapa obrigatória ausente: " + gate)
-require("needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa]" in workflow,
+require("needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
         "Compilação não depende de todos os agentes de pré-build")
 require("needs: [build_apk, device_smoke]" in workflow,
         "APK deve depender dos testes instrumentados Android antes da auditoria")
@@ -90,7 +90,7 @@ require(re.search(r"^  independent_review:", workflow, re.M),
         "Agente 8 de teste e análise independente não está no workflow")
 require(re.search(r"^  publish_apk:", workflow, re.M),
         "Job de entrega condicionada não está no workflow")
-require("needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa]" in workflow,
+require("needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
         "Agente 8 deve esperar relatórios de relevância, E5, Android e auditoria")
 require("needs: [audit_apk, independent_review]" in workflow,
         "O APK final deve depender da aprovação do agente 8")
@@ -128,12 +128,19 @@ require("actions/cache/restore@v4" not in workflow,
         "Índice E5 pode ser reaproveitado sem provar estabilidade entre compilações")
 require("tests/qa_semantic_search_agent.js" in workflow and "semantic-search-agent-qa" in workflow,
         "Agente 9 sem testes reais ou sem relatório")
-require(workflow.index("  semantic_search_qa:") < workflow.index("  build_apk:"),
+require(workflow.index("  semantic_search_qa:") < workflow.index("  semantic_crossversion_qa:") < workflow.index("  build_apk:"),
         "Testes semânticos devem bloquear a compilação")
 require("scripts/qa_paraphrase_e5.py" in workflow and "qa-report/e5-paraphrase-vectors.json" in workflow,
         "Paráfrases sem inferência E5 real ou evidência no artefato")
 require((ROOT/"qa/semantic-paraphrase-queries.json").is_file(),
         "Lista auditável de consultas de paráfrase ausente")
+require("tests/qa_semantic_crossversion_agent.js" in workflow and
+        "tests/test-semantic-crossversion-gate.js" in workflow and
+        "semantic-crossversion-agent-qa" in workflow,
+        "Agente 10 sem teste negativo, parecer ou gate")
+cross_baseline = json.loads((ROOT / "qa/semantic-crossversion-baseline.json").read_text(encoding="utf-8"))
+require(cross_baseline.get("status")=="locked" and len(cross_baseline.get("rows",[]))==12,
+        "Baseline cross-version ausente ou nao travada")
 require("continue-on-error: true" not in workflow, "Um dos agentes ignora falhas")
 require("retention-days: 1" in workflow, "Artefatos intermediários sem prazo curto")
 
