@@ -47,7 +47,7 @@ assert.match(cpp,/llama_chat_apply_template/);
 assert.match(cpp,/llama_decode/);
 assert.match(cpp,/llama_sampler_sample/);
 assert.match(cmake,/ggml-org\/llama.cpp/);
-assert.match(cmake,/GIT_TAG b11960/);
+assert.match(cmake,/GIT_TAG b12088/);
 assert.doesNotMatch(cmake,/GIT_TAG b8201/);
 assert.match(build,/versionName '\d+\.\d+\.\d+'/);
 assert.match(build,/abiFilters 'arm64-v8a'/);
