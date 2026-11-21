@@ -88,6 +88,27 @@ async function run(catalogFile){
     const exact=await api.request('/api/search',{query:'Hino 286',settings:{pageSize:10}});
     checks.push({name:'Consulta numérica do hino 286',pass:exact.results.some(h=>h.id===prodigal.id)});
   }
+  // Regressões de narrativas verificadas por leitura da letra completa.
+  // O alvo do caso de Marcos 5 relata a multidão, o toque e a mulher curada;
+  // não confundir o episódio com alusões gerais ao sangue de Cristo.
+  for(const [query,number,allowedPosition] of [
+    ['Filho Pródigo','286',3],['Lucas 15:11-32','286',5],
+    ['Mulher fluxo de sangue','261',3],['Marcos 5:25-34','261',3]
+  ]){
+    const a=audits.find(x=>x.query===query);
+    const place=a?.top10.findIndex(hit=>hit.number===number)??-1;
+    checks.push({name:'Narrativa prioritária pela letra inteira: '+query+' → hino '+number,
+      pass:place>=0&&place<allowedPosition,
+      details:'posição='+(place+1)+'; esperado top '+allowedPosition});
+  }
+  for(const query of ['Mulher fluxo de sangue','Marcos 5:25-34']){
+    const a=audits.find(x=>x.query===query);
+    const place261=a?.top10.findIndex(hit=>hit.number==='261')??-1;
+    const placeGeneric=a?.top10.findIndex(hit=>hit.number==='614')??-1;
+    checks.push({name:'Narrativa de cura deve superar hino sobre expiação: '+query,
+      pass:place261>=0&&(placeGeneric<0||place261<placeGeneric),
+      details:'hino261='+(place261+1)+'; hino614='+(placeGeneric+1)});
+  }
   // Compara recomendações em cascata com o texto integral do hino de referência.
   const anchors=[prodigal?.id,details[0]?.id,details.find(h=>norm(h.title)==='vem o prodigo')?.id].filter(Boolean);
   const recommendations=[];
