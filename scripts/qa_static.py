@@ -81,7 +81,7 @@ require(re.search(r"\bversionName\s+'[\d.]+(?:-[a-z0-9.]+)?'", gradle), "version
 workflow = (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8")
 for gate in ("sources", "static", "regressions", "relevance", "embeddings", "semantic_search_qa", "semantic_crossversion_qa", "build_apk", "device_smoke", "audit_apk", "independent_review", "publish_apk"):
     require(re.search(r"^  " + gate + r":", workflow, re.M), "Agente ou etapa obrigatória ausente: " + gate)
-require("needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
+require("needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa, full_lyrics_qa]" in workflow,
         "Compilação não depende de todos os agentes de pré-build")
 require("needs: [build_apk, device_smoke]" in workflow,
         "APK deve depender dos testes instrumentados Android antes da auditoria")
