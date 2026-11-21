@@ -21,7 +21,9 @@ def digest(p):
     return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 
 def identical(a,b,message):
-    if a.shape!=b.shape or not np.array_equal(a,b):
+    # Float32 accumulations may differ by one ULP across identical sessions.
+    # This tolerance (1e-6) is orders below the observed cross-build drift (1e-2).
+    if a.shape!=b.shape or not np.allclose(a,b,rtol=0,atol=1e-6,equal_nan=False):
         diff=float(np.max(np.abs(a-b))) if a.shape==b.shape else None
         raise AssertionError(message+'; max_difference='+str(diff))
 
