@@ -301,6 +301,12 @@ jobs:
         with:
           name: e5-stanza-assets-qa
           path: app/src/main/assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: e5-stanza-metrics
+          path: qa-report
+      - name: Gerar referencia E5 ONNX 384D apenas para os testes Android
+        run: python3 scripts/qa_android_query_canary.py qa-report/e5-paraphrase-vectors.json app/src/androidTest/assets/e5-query-canary.json
       - name: Compilar APK debug
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
