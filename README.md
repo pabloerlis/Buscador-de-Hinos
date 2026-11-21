@@ -1,5 +1,14 @@
 # Buscador de Hinos Android v2.6.11 — restauração sem perda funcional
 
+## v2.6.13 — redução do trabalho GGUF e diagnóstico de timeout
+
+- A inferência nativa agora **reutiliza o contexto** do modelo entre chamadas; o estado do contexto e o callback de cancelamento são reinicializados a cada chamada. Ao descarregar/trocar o GGUF, o contexto é liberado antes do modelo.
+- Comparação: entrada menor (até 5 hinos, trechos de até 92 caracteres), saídas curtas com motivo de até 48 caracteres, limite de 72 tokens e orçamento de até 90 s.
+- Temas: gera **IDs numéricos** em vez de nomes longos; todos os temas disponíveis continuam elegíveis. Orçamento do modo automático até 60 s; teste diagnóstico até 90 s.
+- Em falhas/timeout, o app mostra etapa (contexto, prefill ou geração), tokens de entrada, duração do prefill e tokens já gerados, sem guardar letra, prompt nem hino.
+- A ponte Android admite até 120 s, sem alterar a busca local híbrida e sem impor espera pelo GGUF.
+- **Limitação:** o tempo real da inferência LFM3 no processador ARM64 depende do aparelho. CI Android x86_64 audita a presença do motor, mas NÃO comprova que o GGUF físico gera respostas dentro de 90 s. Sem amostra de latência do telefone, o problema não pode ser considerado corrigido em todos os aparelhos.
+
 **Base restaurada:** a versão avançada `qa/arm64-physical-evidence-6b4b` (v2.6.10, aprovação automatizada em 21/11/2026). O commit de `main` anterior à integração problemática foi preservado e a integração que entregou APK de 2,5 MiB foi desfeita; consultar a branch `backup/main-before-rollback-20261121` para auditoria.
 
 **Regra de entrega:** o APK aprovado deve conter **todos os mecanismos de busca existentes**: lexical, semântico temático, narrativas bíblicas, EventFrame, E5 Small ONNX com vetores por estrofe e biblioteca `libhinosllm.so` (motor `llama.cpp` para GGUF fornecido pelo usuário). O modelo GGUF em si **não** faz parte do APK; o usuário o seleciona no dispositivo. Não tratar como versão substituta qualquer variante model-free/E5-only. A compilação do candidato usa `-PenableLocalEmbeddings=true -PenableLocalModels=true`. Se faltar E5, biblioteca ONNX ou biblioteca nativa GGUF ARM64, `scripts/qa_apk.py` deve reprovar e bloquear a publicação.
