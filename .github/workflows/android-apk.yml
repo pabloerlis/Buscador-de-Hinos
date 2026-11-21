@@ -108,6 +108,42 @@ jobs:
           if-no-files-found: ignore
 
 
+  full_lyrics_qa:
+    name: "Agente 11 | Evidencias das letras inteiras em 1.557 hinos"
+    needs: sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          path: app/src/main/assets
+      - name: Baixar catalogo temporario para auditoria das letras
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output .tmp/catalog-2018.json
+      - name: Tres agentes independentes: texto integral, casos negativos e ranking
+        run: node tests/agents/run-validation.js .tmp/catalog-2018.json
+      - name: Guardar laudos tecnico e resumido sem publicar letras
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: full-lyrics-agents-qa
+          path: |
+            reports/validation/relatorio-completo.md
+            reports/validation/relatorio-simples.md
+            reports/validation/resultado-agentes.json
+          retention-days: 90
+          if-no-files-found: warn
+
   embeddings:
     name: "Agente 5 | E5, vetores por estrofe e proveniencia"
     needs: [sources, static]
@@ -301,9 +337,9 @@ jobs:
 
   build_apk:
     name: "Compilar apenas se agentes de testes aprovarem"
-    needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
+    needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa, full_lyrics_qa]
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -316,7 +352,7 @@ jobs:
           set -euo pipefail
           SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
           test -n "$SDKMANAGER"
-          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
@@ -337,7 +373,7 @@ jobs:
       - name: Compilar APK debug
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true
+        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true
       - name: Guardar candidato para auditoria (ainda nao aprovado)
         uses: actions/upload-artifact@v4
         with:
@@ -416,6 +452,7 @@ jobs:
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EXPECT_E5_EMBEDDINGS: 'true'
+          EXPECT_GGUF_ENGINE: 'true'
         run: python3 scripts/qa_apk.py apk-candidate/app-debug.apk
       - name: Preservar laudo de assinatura para revisão independente
         uses: actions/upload-artifact@v4
@@ -467,6 +504,18 @@ jobs:
           node tests/test-rrf-fusion.js
       - uses: actions/download-artifact@v4
         with:
+          name: full-lyrics-agents-qa
+          path: reports/validation
+      - name: Confirmar 100% dos testes de letra inteira
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          result=json.loads(Path('reports/validation/resultado-agentes.json').read_text())
+          assert result['decision']=='PASS', 'Agentes de letra inteira não aprovaram'
+          PY
+      - uses: actions/download-artifact@v4
+        with:
           name: semantic-crossversion-agent-qa
           path: qa-report
       - name: Validar parecer bloqueante do agente 10
@@ -509,6 +558,10 @@ jobs:
           path: qa-report
       - uses: actions/download-artifact@v4
         with:
+          name: full-lyrics-agents-qa
+          path: reports/validation
+      - uses: actions/download-artifact@v4
+        with:
           name: semantic-crossversion-agent-qa
           path: qa-report
       - name: Verificar que o agente independente aprovou antes da publicação
@@ -522,6 +575,8 @@ jobs:
           assert review['decision']=='approved' and not review['errors'], 'Agente 8 não aprovou o APK'
           audit=json.loads(Path('qa-report/apk-audit.json').read_text())
           assert audit['passed'] is True and review['apk']['sha256']==audit['sha256']
+          assert audit.get('local_e5_embedded') is True, 'E5 removido do APK'
+          assert audit.get('local_gguf_engine_embedded') is True, 'Motor GGUF removido do APK'
           gate=json.loads(Path('qa-report/semantic-crossversion-agent.json').read_text())
           assert gate['decision']=='approved' and not gate['errors'], 'Agente 10 reprovou'
           assert Path('apk-candidate/app-debug.apk').is_file()
@@ -543,5 +598,7 @@ jobs:
             qa-report/independent-review.json
             qa-report/semantic-crossversion-agent.json
             qa-report/android-device-evidence.log
+            reports/validation/relatorio-completo.md
+            reports/validation/relatorio-simples.md
           retention-days: 90
           if-no-files-found: error
