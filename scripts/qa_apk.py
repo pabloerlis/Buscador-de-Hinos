@@ -31,6 +31,7 @@ version_name = re.search(r"\bversionName\s+'([^']+)'",gradle)[1]
 version_code = re.search(r"\bversionCode\s+(\d+)",gradle)[1]
 expected_sha = os.environ.get("BUILD_SOURCE_SHA", "").strip()
 expect_e5 = os.environ.get('EXPECT_E5_EMBEDDINGS','false').lower()=='true'
+expect_gguf = os.environ.get('EXPECT_GGUF_ENGINE','false').lower()=='true'
 check(len(expected_sha)==40 and re.fullmatch(r"[0-9a-f]{40}",expected_sha),
       "SHA do commit de origem ausente ou inválido")
 
@@ -45,18 +46,23 @@ with zipfile.ZipFile(APK) as archive:
         check(required in files,"Asset essencial ausente: "+required)
     for name in files:
         lowered = name.lower()
-        if expect_e5:
-            # Permite APENAS o E5 pinado nesta variante (nunca um GGUF).
-            forbidden=(lowered.endswith((".gguf",".tflite")) or
-                       (lowered.endswith(".onnx") and name!="assets/e5-model.onnx") or
-                       re.search(r"/libhinosllm[^/]*\.so$",lowered))
-        else:
-            forbidden=(lowered.endswith((".gguf",".onnx",".tflite")) or
-                       re.search(r"/lib(?:onnxruntime|hinosllm)[^/]*\.so$",lowered))
+        # GGUF é importado pelo usuário: o motor nativo deve existir no APK,
+        # mas pesos GGUF e letras de hinos nunca são incluídos na distribuição.
+        forbidden=(lowered.endswith((".gguf",".tflite")) or
+                   (lowered.endswith(".onnx") and
+                    (not expect_e5 or name!="assets/e5-model.onnx")) or
+                   (not expect_gguf and re.search(r"/libhinosllm[^/]*\.so$",lowered)) or
+                   (not expect_e5 and re.search(r"/libonnxruntime[^/]*\.so$",lowered)))
         check(not forbidden,"Modelo incompatível com a variante: "+name)
         check(name not in ("assets/colecao.json","assets/data/data.json",
                            "assets/hinos-avaliacao.json"),
               "Catálogo de letras incorporado indevidamente: "+name)
+    if expect_gguf:
+        native_gguf="lib/arm64-v8a/libhinosllm.so"
+        check(native_gguf in files,"Motor GGUF ARM64 removido: "+native_gguf)
+        if native_gguf in files:
+            check(len(archive.read(native_gguf))>500_000,
+                  "Motor GGUF ARM64 inválido ou substituído por placeholder")
     if expect_e5:
         required_e5=("assets/e5-model.onnx","assets/e5-vocab.bin",
                      "assets/e5-index.json","assets/e5-source.txt")
@@ -118,6 +124,7 @@ report={"apk":APK.name,"version_name":version_name,"version_code":int(version_co
         "source_sha":expected_sha,"sha256":sha,"bytes":APK.stat().st_size,
         "signed":apksigner.is_file() and not any("Assinatura" in e for e in errors),
         "local_e5_embedded":expect_e5,
+        "local_gguf_engine_embedded":expect_gguf,
         "passed":not errors}
 output=ROOT/"qa-report/apk-audit.json"
 output.parent.mkdir(exist_ok=True)
