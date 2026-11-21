@@ -69,6 +69,7 @@ public final class MainActivity extends Activity {
     private static native int nativeLoadProgress();
     private static native byte[] nativeGenerate(byte[] prompt,byte[] grammar,int maxTokens,int timeoutMs,long[] metrics);
     private static native int nativeGenerationStage();
+    private static native long[] nativeGenerationStats();
     private static native void nativeResetCancellation();
     private static native void nativeCancel();
     private static native void nativeUnload();
@@ -351,6 +352,13 @@ public final class MainActivity extends Activity {
                 if(NATIVE_AVAILABLE&&"generating".equals(phase)){
                     result.put("generationStage",nativeGenerationStage());
                     result.put("elapsedMs",android.os.SystemClock.elapsedRealtime()-generationStarted);
+                    long[] stageStats=nativeGenerationStats();
+                    if(stageStats!=null&&stageStats.length>=6){
+                        result.put("promptTokens",stageStats[0]);
+                        result.put("setupMs",stageStats[1]);
+                        result.put("prefillMs",stageStats[2]);
+                        result.put("generatedTokens",stageStats[4]);
+                    }
                 }
                 long fileSize=preferences.getLong(MODEL_BYTES_KEY,-1);
                 if(selected&&fileSize>0)result.put("modelMB",Math.round(fileSize/1048576.0));
@@ -424,7 +432,7 @@ public final class MainActivity extends Activity {
             if(llmBusy){ggufEvent("generate",false,"O modelo já está em uso.",requestId,null);return;}
             if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um GGUF primeiro.",requestId,null);return;}
             if(prompt==null||prompt.trim().isEmpty()||prompt.length()>2400||grammar==null||grammar.length()>2400
-                    ||maxTokens<1||maxTokens>120||timeoutMs<1000||timeoutMs>60000){
+                    ||maxTokens<1||maxTokens>120||timeoutMs<1000||timeoutMs>120000){
                 ggufEvent("generate",false,"Parâmetros de geração inválidos.",requestId,null);
                 return;
             }
@@ -443,12 +451,24 @@ public final class MainActivity extends Activity {
                     long[] timing=new long[4];
                     byte[] output=nativeGenerate(prompt.getBytes(StandardCharsets.UTF_8),grammar.getBytes(StandardCharsets.UTF_8),maxTokens,timeoutMs,timing);
                     value=new String(output,StandardCharsets.UTF_8);
+                    long[] stageStats=nativeGenerationStats();
                     metrics=new JSONObject().put("setupMs",timing[0]).put("prefillMs",timing[1])
-                        .put("firstTokenMs",timing[2]).put("tokens",timing[3]);
+                        .put("firstTokenMs",timing[2]).put("tokens",timing[3])
+                        .put("promptTokens",stageStats[0]);
                     ok=true;
                 }catch(Throwable ex){
                     value=errorMessage(ex);
-                    modelError=value.equals("Geração cancelada.")?"":value;
+                    // Preserve diagnósticos mesmo quando o código nativo lança exceção
+                    // por timeout: sem texto de consulta, hino ou dados privados.
+                    try {
+                        long[] stats=nativeGenerationStats();
+                        if(stats!=null&&stats.length>=6){
+                            String stage=stats[5]==1?"tokenização/contexto":stats[5]==2?"entrada (prefill)":stats[5]==3?"saída (geração)":"inicialização";
+                            value+=" [etapa: "+stage+"; entrada: "+stats[0]+" tokens; preparação: "+stats[1]
+                                +" ms; prefill: "+stats[2]+" ms; saída: "+stats[4]+" tokens]";
+                        }
+                    }catch(Throwable ignored){}
+                    modelError=value.startsWith("Geração cancelada.")?"":value;
                 }
                 lastDurationMs=android.os.SystemClock.elapsedRealtime()-generationStarted;
                 activeGenerationId="";
