@@ -44,7 +44,8 @@ def main():
     expected=np.asarray([q['vector'] for q in queries['queries']],dtype=np.float32)
     session=ort.InferenceSession(str(model),sess_options=opt(),providers=['CPUExecutionProvider'])
     first=encode(session,tokenizer,src,max_tokens=96)
-    identical(first,expected,'Query vectors differ from independent same-configuration inference')
+    identical(first.astype(np.float16).astype(np.float32),expected,
+              'Serialized query vectors differ from independent same-configuration inference')
     identical(first,encode(session,tokenizer,src,max_tokens=96),'Queries changed within one session')
     other=ort.InferenceSession(str(model),sess_options=opt(),providers=['CPUExecutionProvider'])
     identical(first,encode(other,tokenizer,src,max_tokens=96),'Queries changed between independent sessions')
@@ -77,7 +78,7 @@ def main():
     locked=expected_reference.get('status')=='locked'
     matched=locked and fp==expected_reference.get('fingerprint')
     report={'schema_version':1,'status':'approved' if matched else 'unlocked_or_mismatch',
-        'configuration':'cpu_single_thread_deterministic_x64quantprecision_onnxruntime_1.20.1',
+        'configuration':'cpu_single_thread_uint8_deterministic_x64quantprecision_onnxruntime_1.20.1',
         'same_session_equal':True,'fresh_session_equal':True,
         'recomputed_index_passages_equal':count,
         'fingerprint':fp,'baseline_matched':matched,
