@@ -272,9 +272,36 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
+  semantic_crossversion_qa:
+    name: "Agente 10 | Regressao semantica entre versoes"
+    needs: semantic_search_qa
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: semantic-search-agent-qa
+          path: qa-report
+      - name: Autoteste do agente com exemplos positivos e negativos
+        run: node tests/test-semantic-crossversion-gate.js
+      - name: Agente 10 - conferir mudancas de posicao e metricas cross-version
+        run: node tests/qa_semantic_crossversion_agent.js
+      - name: Preservar laudo da decisao
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-crossversion-agent-qa
+          path: qa-report/semantic-crossversion-agent.json
+          retention-days: 90
+          if-no-files-found: ignore
+
   build_apk:
-    name: "Compilar apenas se os 4 agentes aprovarem"
-    needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa]
+    name: "Compilar apenas se agentes de testes aprovarem"
+    needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -400,7 +427,7 @@ jobs:
 
   independent_review:
     name: "Agente 8 | Testes independentes e analise critica da entrega"
-    needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa]
+    needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -438,6 +465,12 @@ jobs:
           set -euo pipefail
           node tests/test-event-frames.js
           node tests/test-rrf-fusion.js
+      - uses: actions/download-artifact@v4
+        with:
+          name: semantic-crossversion-agent-qa
+          path: qa-report
+      - name: Validar parecer bloqueante do agente 10
+        run: python3 -c "import json; r=json.load(open('qa-report/semantic-crossversion-agent.json')); assert r['agent']=='10-semantic-crossversion-qa' and r['decision']=='approved' and r['evaluated_cases']==12 and not r['errors']"
       - name: Revisar realmente o APK e recalcular metricas caso a caso
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -452,7 +485,7 @@ jobs:
           if-no-files-found: ignore
 
   publish_apk:
-    name: "Entrega | APK liberado somente após 8 agentes aprovarem"
+    name: "Entrega | APK liberado apenas apos pareceres dos agentes"
     needs: [audit_apk, independent_review]
     runs-on: ubuntu-latest
     timeout-minutes: 8
@@ -474,6 +507,10 @@ jobs:
         with:
           name: android-device-evidence-qa
           path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: semantic-crossversion-agent-qa
+          path: qa-report
       - name: Verificar que o agente independente aprovou antes da publicação
         shell: bash
         run: |
@@ -485,6 +522,8 @@ jobs:
           assert review['decision']=='approved' and not review['errors'], 'Agente 8 não aprovou o APK'
           audit=json.loads(Path('qa-report/apk-audit.json').read_text())
           assert audit['passed'] is True and review['apk']['sha256']==audit['sha256']
+          gate=json.loads(Path('qa-report/semantic-crossversion-agent.json').read_text())
+          assert gate['decision']=='approved' and not gate['errors'], 'Agente 10 reprovou'
           assert Path('apk-candidate/app-debug.apk').is_file()
           PY
       - name: Identificar a versao do artefato
@@ -502,6 +541,7 @@ jobs:
             apk-candidate/app-debug.apk
             qa-report/apk-audit.json
             qa-report/independent-review.json
+            qa-report/semantic-crossversion-agent.json
             qa-report/android-device-evidence.log
           retention-days: 90
           if-no-files-found: error

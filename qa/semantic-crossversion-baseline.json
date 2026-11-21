@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "status": "locked",
+  "version": "2.6.9",
+  "run_id": 44862164035,
+  "source_commit": "4852a81cf3b338e23a03854376f215bde1160718",
+  "artifact_id": 14690298061,
+  "artifact_report_sha256": "ea1275b11f7b9945a486fb75770931f1e32b3a629e600bcd30d27920a3c1cfc5",
+  "human_review_status": "pending",
+  "catalog_sha256": "57d42fb0bcc881a62b210dd1a3972822d2c39856f7a01278e104d407bf1b747a",
+  "model_sha256": "ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1",
+  "with_e5": {
+    "recall_at_10": 0.16666666666666666,
+    "recall_at_20": 0.3333333333333333,
+    "ndcg_at_5": 0.13591081279762146,
+    "mrr_at_20": 0.1377840909090909
+  },
+  "rows": [
+    {
+      "query_sha256": "c6b346d6d0b80abb8d901908f7fce5da61e8ce5bf66da62939e7206dbf86bffd",
+      "collection": "principal",
+      "number": "261",
+      "rank_without_e5": 13,
+      "rank_with_e5": 2
+    },
+    {
+      "query_sha256": "79b8fb8dadb9d98766fc010b226bab3f8c2e50143d38a68a1f1095f446b0d783",
+      "collection": "principal",
+      "number": "067",
+      "rank_without_e5": null,
+      "rank_with_e5": null
+    },
+    {
+      "query_sha256": "744c1cc1c59ac99e57c4ed633e4c51d2952201fdd82ccaaba2e94b920fee2df0",
+      "collection": "principal",
+      "number": "374",
+      "rank_without_e5": 48,
+      "rank_with_e5": 141
+    },
+    {
+      "query_sha256": "5ba7aef5dd623e46a5a8b2a7f900bf73a82ccefdd4eda5c6c99b8e6b999207a6",
+      "collection": "cia",
+      "number": "062",
+      "rank_without_e5": 2,
+      "rank_with_e5": 1
+    },
+    {
+      "query_sha256": "d2f13889e7269236cdbdf7f5bbc4293d4ae788f873b8dc88e9dd759fa97506e1",
+      "collection": "cia",
+      "number": "063",
+      "rank_without_e5": null,
+      "rank_with_e5": null
+    },
+    {
+      "query_sha256": "7448255c118c1aef3bd2580b5bbf4a65874590495b38075418e96a2a941738a9",
+      "collection": "principal",
+      "number": "704",
+      "rank_without_e5": null,
+      "rank_with_e5": null
+    },
+    {
+      "query_sha256": "053e326ac5de328e0331aa9daa070fccff8f046ec87f1b2fa9cc645c61ada14e",
+      "collection": "principal",
+      "number": "704",
+      "rank_without_e5": 35,
+      "rank_with_e5": 16
+    },
+    {
+      "query_sha256": "6c3f401ee8d4129d08a000b8340a8c92020942bba3fceda03e3506ec6ed60ec1",
+      "collection": "principal",
+      "number": "310",
+      "rank_without_e5": null,
+      "rank_with_e5": null
+    },
+    {
+      "query_sha256": "62f9126e2c85baf6aca124aa89f9fe95ee83f329eb37ebb8917aaec301ead0a4",
+      "collection": "principal",
+      "number": "310",
+      "rank_without_e5": null,
+      "rank_with_e5": null
+    },
+    {
+      "query_sha256": "bbb0cc94727e612c69f12647b330eebc49047638ea0c30b238b6cabfca1e8f06",
+      "collection": "principal",
+      "number": "259",
+      "rank_without_e5": 2,
+      "rank_with_e5": 71
+    },
+    {
+      "query_sha256": "c6570f3d50af33bac0edf76ceab58f910f9b9841ffe987d016fb62e03b853443",
+      "collection": "principal",
+      "number": "286",
+      "rank_without_e5": 69,
+      "rank_with_e5": 11
+    },
+    {
+      "query_sha256": "ef24dfce0a03afb95e3ac0ff91579d3714be01e715db0e432d663e3962fd57ee",
+      "collection": "principal",
+      "number": "286",
+      "rank_without_e5": 212,
+      "rank_with_e5": 293
+    }
+  ],
+  "policy": "Fail closed on lost top10/top20, lower Recall/nDCG/MRR and altered queries/targets. Provisional relevance labels are not proof of quality. Baseline changes require documented human review."
+}
