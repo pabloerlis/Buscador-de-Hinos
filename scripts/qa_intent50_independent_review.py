@@ -45,7 +45,7 @@ for i, (intent,p,s,v) in enumerate(zip(manifest["intents"],packet["rows"],sealed
     on=s.get("with_e5",[])
     pool={*off,*on}
     published=p.get("candidates",[])
-    require(len(off)==20 and len(on)==20 and len(set(off))==20 and len(set(on))==20,
+    require(len(off)<=20 and len(on)<=20 and len(set(off))==len(off) and len(set(on))==len(on),
             "Top20 missing or duplicated "+str(i))
     require(len(pool)==len(published) and {c.get("blind_id") for c in published}==pool,
             "Blind union is not exact at "+str(i))

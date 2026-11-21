@@ -60,12 +60,12 @@ function audit({manifest,manifestBytes,vectors,packet,sealed}){
     vector.vector.every(Number.isFinite)&&
     Math.abs(Math.hypot(...vector.vector)-1)<.03,'Invalid or missing 384D E5 vector '+i);
   for(const n of ['without_e5','with_e5']){
-   check(Array.isArray(secret[n])&&secret[n].length===20&&isStrings(secret[n])&&
+   check(Array.isArray(secret[n])&&secret[n].length<=20&&isStrings(secret[n])&&
      new Set(secret[n]).size===20,'Incorrect genuine top20 '+n+'/'+i);
   }
   const a=secret.without_e5||[],b=secret.with_e5||[],set=new Set([...a,...b]);
   const candidates=publicRow.candidates||[];
-  check(candidates.length===set.size&&set.size>=20&&set.size<=40,
+  check(candidates.length===set.size&&set.size<=40,
     'Candidate union incomplete '+i);
   check(new Set(candidates.map(x=>x.blind_id)).size===candidates.length,
     'Duplicate blinded candidate '+i);
@@ -87,6 +87,9 @@ function audit({manifest,manifestBytes,vectors,packet,sealed}){
   reviewed_intents:0,intents:rows.length,
   catalog_sha256:packet.catalog_sha256,manifest_sha256:manifestHash,
   observed_top20_overlap:overlapTotal,
+  with_e5_candidate_counts:hidden.map(r=>(r.with_e5||[]).length),
+  without_e5_candidate_counts:hidden.map(r=>(r.without_e5||[]).length),
+  note:'Real engine may return fewer than 20; do not invent missing candidates.',
   observation:'Top20 overlap is not relevance or Recall. No human judgments were performed.',
   errors};
 }

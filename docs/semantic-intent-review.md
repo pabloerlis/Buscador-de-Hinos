@@ -8,7 +8,7 @@
 
 ## Processo
 1. Agente 5 gera **50 embeddings ONNX UINT8 reais** com modelo/revisão pinados, apenas em CI; arquivo `qa-report/intent50-vectors.json` não entra no APK.
-2. Agente 12 chama o `OfflineAPI` real em 50 consultas com E5 desligado/ligado, recolhendo o top20 de ambas as variantes. A união, deduplicada, tem 20–40 candidatos.
+2. Agente 12 chama o `OfflineAPI` real em 50 consultas com E5 desligado/ligado, recolhendo o top20 de ambas as variantes. A união deduplicada contém até 40 candidatos; qualquer variante pode retornar menos de 20 ou até zero. Quantidades observadas ficam no relatório, sem criar resultados artificiais.
 3. O arquivo `intent50-blind-packet.json` apresenta consulta, títulos, coleção/número e identificador cego em **ordem embaralhada**, sem score, posição ou origem da variante. O arquivo **separado** `intent50-sealed-ranking.json` guarda a ordem das duas variantes para comparação só após o julgamento.
 4. Agente 12 recusa vazamento de scores, ausência de qualquer consulta/vetor ou alteração de identidade; o autoteste com 1 positivo + 10 negativos é executado pelo agente 3.
 5. Agente 8 reabre os artefatos e, em **outra implementação Python**, confere os conjuntos de candidatos/top20 e proveniência. Falhas impedem entrega do APK.
