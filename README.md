@@ -265,3 +265,11 @@ O GitHub Actions publica os relatórios **relatorio-completo.md**, **relatorio-s
 **Limite da medição:** o auditor usa indícios textuais de **todas as estrofes**, separados das heurísticas do aplicativo, mas não substitui revisores humanos ou um avaliador semântico independente. Os indicadores de apoio textual são *proxies*, não precisão semântica certificada. Sugestões ambíguas e possíveis falsos negativos entram em uma fila de revisão; não há redistribuição de letras completas.
 
 **Próxima etapa registrada:** avaliar as falhas do teste real, principalmente a posição do hino 286 para *Filho Pródigo*; corrigir o algoritmo em alteração separada, criar conjunto de relevância humana com o contexto completo e repetir a auditoria antes do próximo APK.
+
+### Resultado da rodada de agentes (21/11/2026)
+
+- **159/159 verificações PASS**, com 1.557 letras reais integralmente lidas, 22 consultas no catálogo real, 8 cenários adversariais de múltiplas estrofes e 18 alertas semânticos pendentes de revisão qualitativa.
+- **Filho Pródigo** e **Lucas 15:11-32**: hino **286 — UM DIA EU QUIS TE DEIXAR** em 1º; **VEM Ó PRÓDIGO** aparece entre as recomendações.
+- **Mulher fluxo de sangue** e **Marcos 5:25-34**: hino **261 — CRISTO CAMINHAVA LENTAMENTE** em 1º; relação baseada em referências à multidão, ao toque e à mulher, encontradas em toda a letra.
+- O teste automático produz os arquivos de relatório completo e simples antes do build. **Não implica revisão teológica humana nem validação Android física.** O APK padrão não embute E5 ou GGUF.
+- **Próxima etapa obrigatória:** [issue #25](https://github.com/pabloerlis/Buscador-de-Hinos/issues/25), revisar os 18 alertas e construir gabarito independente de relevância a partir de todas as estrofes. Em novos chats, usar o issue e os relatórios da última execução como contexto.
