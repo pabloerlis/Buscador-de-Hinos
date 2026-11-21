@@ -36,7 +36,7 @@ A compilação `build_apk` depende de `sources`, `static`, `regressions`, `relev
 - Uma funcionalidade por etapa, com novo `versionCode` crescente, `versionName` identificável e um APK distinto.
 - Incluir testes funcionais e casos negativos de contextos análogos; preservar resultados já bons.
 - Melhorar **a causa geral**; não criar exceções por hino, história, nome, código ou referência bíblica para fazer um benchmark passar.
-- Não colocar letras de hinos no APK. O APK **padrão** permanece sem modelos; a variante E5 desta etapa, compilada com `-PenableLocalEmbeddings=true`, inclui apenas o encoder ONNX int8, vocabulário, vetores e licenças auditados, nunca o GGUF.
+- Não colocar letras de hinos no APK. O APK **padrão** permanece sem modelos; a variante E5 desta etapa, compilada com `-PenableLocalEmbeddings=true`, inclui apenas o encoder ONNX UINT8 (v2.6.9+), vocabulário, vetores e licenças auditados, nunca o GGUF.
 - Atualizar métricas e explicar eventuais regressões; aumentar baselines somente após comprovar melhoria em avaliação mais ampla.
 - Manter branches/PRs em rascunho até aprovação dos gates, sem merge automático em `main`.
 
@@ -45,9 +45,9 @@ A compilação `build_apk` depende de `sources`, `static`, `regressions`, `relev
 ### Etapa 6B3 — Estabilidade E5 (v2.6.9/build 28)
 - Regerar vetores completos em CADA CI, sem cache entre builds. ONNX CPU com execução sequencial determinística e uma thread, inclusive na aplicação Android.
 - O agente 5 verifica novamente 12 consultas em sessões ONNX diferentes e 64 trechos de índice recomputados a partir da fonte pinada, sem registrar letras.
-- O manifesto `qa/e5-stability-reference.json` só é travado após medir uma execução diagnóstica e confirmar a mesma assinatura em outra execução com índice reconstruído. `pending` é falha bloqueante.
+- O manifesto `qa/e5-stability-reference.json` só é travado após medir uma execução diagnóstica e confirmar a mesma assinatura em outra execução com índice reconstruído. `pending` é falha bloqueante. A serialização dos 12 vetores de consultas QA usa Float16 canônico para eliminar ruído irrelevante de arredondamento de CPU sem alterar a inferência Android.
 - Agente 9 recalcula hashes dos arquivos E5 de entrega e da avaliação e exige identidade com a referência travada; agente 8 verifica os laudos. Alteração entre builds REPROVA antes do Gradle.
-- No x64, avaliar a opção ONNX Runtime `session.x64quantprecision=1`: evita saturação U8S8 em AVX2/AVX512 sem VNNI, quando aplicável; NÃO assumir efeito em ARM64 ou estabilidade comprovada sem teste real.
+- Após provar que o encoder INT8 gerava dois conjuntos de embeddings em CPUs diferentes, trocar na v2.6.9 para o `onnx/model_uint8.onnx` do mesmo Xenova multilingual-e5-small, SHA-256 `ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1`; os vetores de passagem continuam INT8 compactados. O modo `session.x64quantprecision=1` ISOLADO não resolveu o modelo anterior.
 - Não ajustar ranking para casos de teste; divergência de hashes se investiga, não se mascara. Um APK somente após 9 agentes e Android offline aprovar; ainda falta teste físico ARM64.
 
 Aprovação do pipeline não equivale a validação semântica exaustiva.
