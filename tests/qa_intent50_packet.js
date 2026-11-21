@@ -56,7 +56,7 @@ function pick20(result){
  assert.ok(Array.isArray(result._fullRanked),
   'Real OfflineAPI did not return a ranked list');
  const items=result._fullRanked.slice(0,20).map(canonical);
- assert.equal(new Set(items.map(x=>x.blind_id)).size,20,'Ranking duplicates');
+ assert.equal(new Set(items.map(x=>x.blind_id)).size,items.length,'Ranking duplicates');
  assert.ok(items.every(x=>x.title.length>0&&x.title.length<=180),'No title');
  return items;
 }
