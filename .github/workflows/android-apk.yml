@@ -229,9 +229,62 @@ jobs:
           retention-days: 1
           if-no-files-found: error
 
+  semantic_search_qa:
+    name: "Agente 9 | Testes independentes da busca semantica real"
+    needs: [sources, embeddings]
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          path: app/src/main/assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: e5-stanza-assets-qa
+          path: app/src/main/assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: e5-stanza-metrics
+          path: qa-report
+      - name: Baixar catalogo temporario pinado (nunca no APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --max-time 90 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output /tmp/semantic-test-catalog.json
+          test "$(wc -c < /tmp/semantic-test-catalog.json)" -gt 100000
+      - name: Testes sinteticos - evidencias, modo off, numero e repertorio
+        run: node tests/test-e5-api-integration.js
+      - name: Testes de negação de eventos e fusao RRF
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/test-event-frames.js
+          node tests/test-rrf-fusion.js
+      - name: Busca real E5 ON/OFF - 12 consultas, metricas, regressao e falsos positivos
+        run: |
+          node tests/qa_semantic_search_agent.js \
+            /tmp/semantic-test-catalog.json \
+            qa-report/e5-paraphrase-vectors.json \
+            qa-report/relevance-50.json
+      - name: Publicar relatorio de busca semantica sem letras
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: semantic-search-agent-qa
+          path: qa-report/semantic-search-agent.json
+          retention-days: 30
+          if-no-files-found: ignore
+
   build_apk:
     name: "Compilar apenas se os 4 agentes aprovarem"
-    needs: [sources, static, regressions, relevance, embeddings]
+    needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -351,7 +404,7 @@ jobs:
 
   independent_review:
     name: "Agente 8 | Testes independentes e analise critica da entrega"
-    needs: [audit_apk, device_smoke, relevance, embeddings]
+    needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -378,6 +431,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: android-device-evidence-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: semantic-search-agent-qa
           path: qa-report
       - name: Testar novamente casos narrativos negativos e fusao
         shell: bash

@@ -102,3 +102,12 @@ Nota: o emulador testa o APK x86_64; dispositivos reais arm64-v8a podem apresent
 - O agente 8 deve bloquear a entrega quando faltar qualquer um dos 12 vetores ou se relatórios declararem cobertura inexistente.
 - Não alterar pesos, regras de ranking ou rótulos provisórios por conta desses resultados: revisão humana das letras e ampliação para 50 julgamentos semânticos independentes são uma próxima etapa.
 - Novo APK apenas para cumprir ciclo de QA/versão; motor de pesquisa permanece o da v2.6.6. PR draft, sem merge em main, sem teste ARM64 físico.
+
+## Agente 9 — testes independentes da busca semântica (2.6.8/build 27)
+
+- Job obrigatório `semantic_search_qa` antes do build Android, adicional ao agente 8.
+- Executa de verdade o `OfflineAPI` no catálogo temporário licenciado com 12 consultas vetorizadas pelo E5 ONNX pinado, em condições E5 ligado/desligado. Recalcula Recall@10/20, nDCG@5 e MRR@20 por alvo, confere os resultados com benchmark separado.
+- Bloqueia APK diante de vetores inválidos, perda de recuperação versus E5 desligado, ausência de ganhos individuais, divergências por consulta, falsos positivos top10 e perda de número exato.
+- Verifica com testes sintéticos a recuperação por evidência, fallback, repertório, negação narrativa e RRF. Armazena apenas consultas e posições no laudo `qa-report/semantic-search-agent.json`; nenhuma letra.
+- Agente 8 reaudita a saída do agente 9 antes da publicação. Os 12 alvos são PROVISÓRIOS, sem juízo humano; aprovação técnica não implica semântica perfeita.
+- Etapa exclusiva de QA. Ranking de produção permanece idêntico à v2.6.7. Necessário APK novo, testes Android offline, assinatura, SHA e entrega, além de próxima issue. PR draft.

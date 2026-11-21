@@ -308,6 +308,55 @@ def audit_expanded():
             "review_status": "pending_human_semantic_review",
             "note": "26 consultas narrativas/bíblicas (12 novas paráfrases com E5 real) e 24 controles exatos; sem alegar 50 juízos humanos independentes"}
 
+def audit_semantic_search_agent():
+    """Recalcula independentemente as métricas de 12 pesquisas do Agente 9."""
+    data=load_json("semantic-search-agent.json")
+    ref=load_json("relevance-50.json")
+    check(data.get("schema_version")==1 and data.get("agent")=="9-independent-semantic-search" and
+          data.get("status")=="approved" and data.get("review_status")=="pending",
+          "Agente 9 não aprovou testes da busca semântica")
+    check(data.get("catalog_sha256")==ref.get("catalog_sha256") and
+          data.get("model_sha256")==ref.get("e5_coverage",{}).get("model_sha256"),
+          "Agente 9 usou catálogo ou modelo diferente")
+    rows=data.get("rows",[])
+    expected=[r for r in ref.get("current",{}).get("rows",[])
+              if r.get("category")=="semantic_paraphrase"]
+    check(len(rows)==12 and len(expected)==12 and data.get("cases")==12,
+          "Agente 9 não testou as 12 paráfrases")
+    for idx,(r,e) in enumerate(zip(rows,expected)):
+        t=e.get("positives",[{}])[0]
+        check(r.get("query")==e.get("query") and
+              r.get("collection")==t.get("collection") and
+              r.get("number")==t.get("number") and
+              r.get("rank_with_e5")==t.get("rank"),
+              "Ranking real do agente 9 divergiu na consulta "+str(idx))
+    measured={}
+    for name,key in (("without_e5","rank_without_e5"),("with_e5","rank_with_e5")):
+        ranks=[r.get(key) for r in rows]
+        for rank in ranks:
+            check(rank is None or (type(rank)==int and rank>0),
+                  "Rank inválido do agente 9")
+        n=len(ranks)
+        summary={"recall_at_10":metric_from_ranks(ranks,10),
+                 "recall_at_20":metric_from_ranks(ranks,20),
+                 "ndcg_at_5":sum(ndcg_for_one(r) for r in ranks)/n if n else 0,
+                 "mrr_at_20":sum(1/r for r in ranks if type(r)==int and 0<r<=20)/n if n else 0}
+        for metric,value in summary.items():
+            check(abs(finite_score(data.get(name,{}).get(metric),name+"/"+metric)-value)<1e-7,
+                  "Métrica semântica não reproduzível: "+name+"/"+metric)
+        measured[name]=summary
+    check(measured["with_e5"]["recall_at_10"]+1e-9>=measured["without_e5"]["recall_at_10"] and
+          measured["with_e5"]["recall_at_20"]+1e-9>=measured["without_e5"]["recall_at_20"],
+          "Perda no top10/top20 com E5 no agente 9")
+    check(data.get("changed_positions",0)>0 and data.get("recovered_top20",0)>0,
+          "Agente 9 não demonstrou recuperação vetorial")
+    check(data.get("negative_control_rank") is None or
+          data.get("negative_control_rank")>10, "Falso positivo narrativo top10")
+    check(data.get("number_exact_rank")==1, "Prioridade de número regrediu")
+    return {"cases":12,"ablation":measured,"decision":"approved",
+            "limitation":"Rótulos provisórios; não equivale à revisão humana de relevância."}
+
+
 def audit_apk_and_device():
     audit = load_json("apk-audit.json")
     log_file = REPORT_DIR / "android-device-evidence.log"
@@ -362,14 +411,15 @@ def main():
     hybrid = audit_hybrid()
     events = audit_events()
     extended = audit_expanded()
+    semantic_test = audit_semantic_search_agent()
     package = audit_apk_and_device()
     review = {"schema_version": 1, "agent": "8-independent-qa-review",
               "decision": "approved" if not ERRORS else "rejected",
               "apk": package, "ranking_suites": rank,
-              "e5_hybrid": hybrid, "event_variants": events, "relevance_50": extended, "warnings": WARNINGS, "errors": ERRORS,
+              "e5_hybrid": hybrid, "event_variants": events, "relevance_50": extended, "semantic_agent_9": semantic_test, "warnings": WARNINGS, "errors": ERRORS,
               "checked": ["regression_metrics_recomputed", "e5_case_ranks_recomputed",
                           "negative_event_and_rrf_tests", "event_AB_metrics_recomputed", "expanded_50_metrics_recomputed", "android_instrumentation_evidence",
-                          "signed_apk_report_crosschecked", "packaged_scripts_equal_tested_sources"]}
+                          "signed_apk_report_crosschecked", "packaged_scripts_equal_tested_sources", "semantic_agent_9_metrics_recomputed"]}
     REPORT_DIR.mkdir(exist_ok=True)
     output = REPORT_DIR / "independent-review.json"
     output.write_text(json.dumps(review, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
