@@ -490,6 +490,12 @@ const OfflineAPI = (() => {
       intent.direct=intent.direct.slice(0,9);
     }
     const selectedTopics=intent?intent.direct.map(t=>t.label):opts.mode==='literal'?[]:themes(analysisText),qTokens=tokens(analysisText);
+    // Bônus apenas quando a pesquisa é explicitamente "tema A e tema B".
+    // Buscas narrativas, bíblicas, paráfrases E5 ou títulos preservam exatamente
+    // a pontuação de base e a comparação reproduzível RRF vs EventFrame desligado.
+    const queryParts=normalizeLyrics(query).split(/\s+e\s+/);
+    const labeledThemes=new Set((intent?.direct||[]).map(t=>normalizeLyrics(t.label)));
+    const explicitThemePair=queryParts.length===2&&queryParts.every(term=>labeledThemes.has(term));
     const semanticWeight=opts.mode==='literal'?0:(opts.strength/75)*(opts.mode==='context'?1.3:1);
     const alternatives=opts.mode==='literal'||numberMatch||quoted.length?new Map():spellingAlternatives(qTokens);
     const lexicalCandidates=[...qTokens,...[...alternatives.values()].flat()];
@@ -558,7 +564,7 @@ const OfflineAPI = (() => {
           // Preserva a fusão E5/RRF e os mecanismos gerais de eventos bíblicos.
           const directLyricTopics=intent.direct.filter(topic=>(song.semantic_profile||[]).some(profile=>
             profile.id===topic.id && profile.evidence.some(cue=>hasWord(lyrics,normalizeLyrics(cue)))));
-          if(intent.direct.length>=2&&directLyricTopics.length>=2){
+          if(explicitThemePair&&directLyricTopics.length>=2){
             const bonus=Math.min(17,11+3*(directLyricTopics.length-2))*Math.min(semanticWeight,1);
             score+=bonus;
             evidence.unshift('Temas combinados comprovados na letra inteira: '+
