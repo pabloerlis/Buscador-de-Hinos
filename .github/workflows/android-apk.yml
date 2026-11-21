@@ -130,31 +130,8 @@ jobs:
           python3 -m pip install --disable-pip-version-check -q \
             "numpy>=1.26,<3" "onnxruntime==1.20.1" "tokenizers==0.20.3" \
             "huggingface_hub>=0.27,<1" requests
-      - name: Reutilizar índice E5 auditável entre compilações
-        id: e5-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            app/src/main/assets/e5-model.onnx
-            app/src/main/assets/e5-vocab.bin
-            app/src/main/assets/e5-index.json
-            app/src/main/assets/e5-source.txt
-            tests/e5-tokenizer-cases.json
-          key: e5-int8-stanzas-v3-${{ hashFiles('scripts/build_e5_assets.py') }}
-      - name: Preparar modelo int8 pinado e gerar vetores por trecho
-        if: steps.e5-cache.outputs.cache-hit != 'true'
+      - name: Reconstruir o indice E5 do zero (sem cache para provar estabilidade)
         run: python3 scripts/build_e5_assets.py
-      - name: Preservar pesos e índice após geração, mesmo se testes posteriores reprovarem
-        if: steps.e5-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            app/src/main/assets/e5-model.onnx
-            app/src/main/assets/e5-vocab.bin
-            app/src/main/assets/e5-index.json
-            app/src/main/assets/e5-source.txt
-            tests/e5-tokenizer-cases.json
-          key: ${{ steps.e5-cache.outputs.cache-primary-key }}
       - name: Verificar tokens Android contra tokenizer original
         run: python3 scripts/qa_e5_android_tokenizer.py
       - name: Auditar estrutura, origem, SHA e cobertura de estrofes
@@ -173,6 +150,8 @@ jobs:
         run: node tests/qa_e5_hybrid.js /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json
       - name: Vetorizar com ONNX real todas as 12 paráfrases (QA, nunca no APK)
         run: python3 scripts/qa_paraphrase_e5.py
+      - name: Agente 5 - repetibilidade entre sessoes e entre builds
+        run: python3 scripts/qa_e5_stability.py
       - uses: actions/download-artifact@v4
         with:
           name: bible-indexes-qa
@@ -214,6 +193,7 @@ jobs:
             qa-report/event-variant-matrix.json
             qa-report/relevance-50.json
             qa-report/e5-paraphrase-vectors.json
+            qa-report/e5-stability.json
           retention-days: 30
           if-no-files-found: ignore
       - name: Preservar apenas os artefatos que entram no APK E5
@@ -267,6 +247,8 @@ jobs:
           set -euo pipefail
           node tests/test-event-frames.js
           node tests/test-rrf-fusion.js
+      - name: Agente 9 - auditoria de hashes cross-build E5
+        run: node tests/qa_e5_crossbuild_agent.js
       - name: Busca real E5 ON/OFF - 12 consultas, metricas, regressao e falsos positivos
         run: |
           node tests/qa_semantic_search_agent.js \
