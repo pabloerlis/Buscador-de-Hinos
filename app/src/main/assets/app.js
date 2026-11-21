@@ -444,7 +444,7 @@ const GGUF=(()=>{
   const selectedState={ready:false,busy:false,task:null};
   let nextRequest=0,queuedAuto=null;
   const aiCache=new Map();
-  const MAX_AI_MS=16000;
+  const MAX_AI_MS=60000;
   const canUseTopics=()=>!state.exactNumber&&state.searchSettings.mode!=='literal';
   const phases={none:'Sem modelo',selected:'Arquivo selecionado',copying:'Copiando GGUF',loading:'Carregando modelo',ready:'GGUF carregado',generating:'IA em execução',error:'Falha ao carregar',unavailable:'Motor indisponível'};
   const generationStages=['Aguardando o motor…','Preparando contexto…','Processando entrada…','Gerando resposta…'];
@@ -520,11 +520,12 @@ const GGUF=(()=>{
     queuedAuto=null;
     if(selectedState.task?.type!=='diagnostic')cancelIfBusy();
   }
-  function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired}){
+  function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired,themeLabels}){
     task.id=String(++nextRequest);
     task.candidates=candidates;
     task.canLookup=canLookup;
     task.lookupRequired=lookupRequired;
+    task.themeLabels=themeLabels;
     setActivity(true,generationStages[0]);
     try{native().generate(prompt,task.id,grammar,maxTokens,timeoutMs);}
     catch(error){resetTask('Não foi possível iniciar a IA: '+error.message,true);return false;}
@@ -538,10 +539,15 @@ const GGUF=(()=>{
     $('ai-last').textContent='';
     return sendTask(task,request);
   }
-  function hintsFromJson(answer){
+  function hintsFromJson(answer,task){
     try{
-      const labels=JSON.parse(answer);
-      if(Array.isArray(labels)&&labels.length<=4&&labels.every(label=>typeof label==='string'))return OfflineAPI.validateHints(labels);
+      const ids=JSON.parse(answer);
+      if(!Array.isArray(ids)||ids.length>4)return [];
+      const labels=ids.map(id=>{
+        if(Number.isSafeInteger(id)&&id>=1&&id<=(task?.themeLabels?.length||0))return task.themeLabels[id-1];
+        return typeof id==='string'?id:null; // compatibilidade com respostas antigas
+      }).filter(Boolean);
+      return OfflineAPI.validateHints(labels);
     }catch(error){ /* Resposta incompleta ou inválida. */ }
     return [];
   }
@@ -550,7 +556,7 @@ const GGUF=(()=>{
     if(selectedState.task){queuedAuto={query,epoch:state.searchEpoch};return;}
     interpret(query,MAX_AI_MS);
   }
-  function interpret(query,timeoutMs=30000){
+  function interpret(query,timeoutMs=90000){
     if(!query?.trim()||state.busy||state.repertoirePending||!canUseTopics())return;
     const key=JSON.stringify([nativeStatus().name||'',OfflineAPI.normalize(query),state.exclude.map(OfflineAPI.normalize)]);
     const cached=aiCache.get(key);
@@ -665,7 +671,7 @@ const GGUF=(()=>{
       catch(error){resetTask('A IA respondeu em um formato inválido. Tente comparar novamente.',true);return;}
       resetTask('Comparação concluída.');return;
     }
-    const hints=hintsFromJson(answer);
+    const hints=hintsFromJson(answer,task);
     if(!hints.length){resetTask('IA não sugeriu temas reconhecidos.');return;}
     aiCache.set(task.cacheKey,hints);
     if(aiCache.size>25)aiCache.delete(aiCache.keys().next().value);
