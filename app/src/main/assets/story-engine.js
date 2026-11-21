@@ -25,26 +25,31 @@ const StoryEngine = (() => {
         const phraseHits=s.matchPhrases.filter(p=>p.re.test(normTitle)||p.re.test(normLyrics)).map(p=>p.text).slice(0,3);
         const groupHits=s.matchGroups.map(g=>g.filter(c=>c.re.test(normTitle)||c.re.test(normLyrics)).map(c=>c.text).slice(0,3));
         const groups=groupHits.filter(x=>x.length);
-        if(!phraseHits.length && groups.length<2)continue;
-        // Filho Pródigo exige retorno real ao Pai; "pai" e "perdão" isolados
-        // não descrevem a parábola. As três etapas podem estar em estrofes diferentes.
-        if(s.id==='filho_prodigo'&&!phraseHits.length&&
-          (!groupHits[0]?.length || !groupHits[1]?.length || !groupHits[2]?.length))continue;
-        // Com apenas dois sinais independentes, exigir ao menos um sinal contextual específico.
-        const evidence=[...new Set([...phraseHits,...groupHits.flat()])];
+        const plainLyrics=' '+normLyrics.replace(/[^a-z0-9]+/g,' ')+' ';
+        const explicitParable=s.id==='filho_prodigo' &&
+          /(?:^|[^a-z0-9])prodigo(?:$|[^a-z0-9])/.test(normalize(title+' '+lyrics)) &&
+          / (?:pai|casa|perdido|errando|vagas) /.test(plainLyrics);
+        if(!phraseHits.length&&!explicitParable&&groups.length<2)continue;
+        // O chamado explícito ao pródigo é válido mesmo antes da volta.
+        // Sem essa referência, a letra precisa narrar o retorno ao Pai,
+        // e não somente consagração genérica "a ti, Senhor".
+        if(s.id==='filho_prodigo'&&!phraseHits.length&&!explicitParable&&
+          (!groupHits[0]?.length || !groupHits[1]?.length || !groupHits[2]?.length ||
+           !/ (?:pai|casa|lar) /.test(plainLyrics)))continue;
+        const evidence=[...new Set([...(explicitParable?['pródigo']:[]),...phraseHits,...groupHits.flat()])];
         const groupQuality=groups.length>=3?3:groups.length===2?1.5:0;
         // Reconhece a sequência descrita ao longo de estrofes diferentes,
         // sem depender da presença literal do nome da parábola.
-        const fullLyrics=' '+normLyrics.replace(/[^a-z0-9]+/g,' ')+' ';
+        const fullLyrics=plainLyrics;
         const completeReturnArc=s.id==='filho_prodigo' &&
           / (?:deixei|abandonei|parti|partiu|afastei|longe|perdi|perdido|desviei) /.test(fullLyrics) &&
           / (?:voltei|voltou|voltando|volto|retornei|regressei|regressou|retornar) /.test(fullLyrics) &&
           / (?:pai|casa|lar) /.test(fullLyrics) &&
           / (?:abracaste|abraco|abracou|recebeu|recebeste|acolheu|acolheste|festa|perdoaste|perdoado) /.test(fullLyrics);
         const score=Math.min(18, phraseHits.length*7.5 + groupQuality*3 + Math.min(3,evidence.length)*0.45+
-          (completeReturnArc?7.5:0));
+          (completeReturnArc?7.5:0)+(explicitParable?9:0));
         profile.push({id:s.id,label:s.label,score:+score.toFixed(2),evidence:evidence.slice(0,6),reference:s.reference,
-          kind:completeReturnArc?'sequência de afastamento, retorno e acolhimento':phraseHits.length?'expressão específica':'conjunto de evidências'});
+          kind:completeReturnArc?'sequência de afastamento, retorno e acolhimento':explicitParable?'alusão explícita à parábola':phraseHits.length?'expressão específica':'conjunto de evidências'});
       }
       return profile.sort((a,b)=>b.score-a.score).slice(0,18);
     }
