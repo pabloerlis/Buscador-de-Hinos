@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "status": "pending",
+  "fingerprint": null,
+  "policy": "Set only after diagnostic first run. A second independently rebuilt run must exactly match."
+}
