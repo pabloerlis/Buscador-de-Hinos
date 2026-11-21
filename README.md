@@ -1,3 +1,15 @@
+# Buscador de Hinos Android v2.6.11 — restauração sem perda funcional
+
+**Base restaurada:** a versão avançada `qa/arm64-physical-evidence-6b4b` (v2.6.10, aprovação automatizada em 21/11/2026). O commit de `main` anterior à integração problemática foi preservado e a integração que entregou APK de 2,5 MiB foi desfeita; consultar a branch `backup/main-before-rollback-20261121` para auditoria.
+
+**Regra de entrega:** o APK aprovado deve conter **todos os mecanismos de busca existentes**: lexical, semântico temático, narrativas bíblicas, EventFrame, E5 Small ONNX com vetores por estrofe e biblioteca `libhinosllm.so` (motor `llama.cpp` para GGUF fornecido pelo usuário). O modelo GGUF em si **não** faz parte do APK; o usuário o seleciona no dispositivo. Não tratar como versão substituta qualquer variante model-free/E5-only. A compilação do candidato usa `-PenableLocalEmbeddings=true -PenableLocalModels=true`. Se faltar E5, biblioteca ONNX ou biblioteca nativa GGUF ARM64, `scripts/qa_apk.py` deve reprovar e bloquear a publicação.
+
+**Correções de busca:** preservar integralmente o ranking híbrido E5/RRF e os motores de narrativas existentes. Os três agentes de letras completas revisam 1.557 hinos reais e 22 consultas, incluindo a recuperação dos hinos 286 (Filho Pródigo), 261 (Mulher do fluxo de sangue), e prioridade de múltiplos temas em estrofes diferentes. O gate `full_lyrics_qa` bloqueia o build junto com os demais agentes existentes. Os relatórios completo e simples são publicados como artefatos.
+
+**Próxima etapa:** revisar alertas contextuais e construir um gabarito humano de relevância (issue #25), sem desativar modelos, bibliotecas ou recursos preexistentes. Testes em emulador não substituem a validação física ARM64 do usuário.
+
+---
+
 # Buscador de Hinos Android v2.6.6 — cobertura de testes ampliada (etapa 6A)
 
 **Mudança entregue nesta versão:** inclusão de uma avaliação exploratória pareada com **50 consultas** e auditoria independente de categorias e métricas antes de publicar o APK. **O algoritmo de recomendações é o mesmo da v2.6.5**; não reivindicamos aumento de qualidade da busca nem instalação de cross-encoder nesta etapa.
