@@ -208,7 +208,28 @@ def audit_events():
 def audit_expanded():
     """Confere novamente as 50 posições e categorias sem confiar nos totais JS."""
     source = load_json("relevance-50.json")
-    check(source.get("schema_version") == 1, "Schema inválido da avaliação 50")
+    check(source.get("schema_version") == 2, "Schema inválido da avaliação 50")
+    coverage = source.get("e5_coverage", {})
+    check(coverage.get("semantic_paraphrase_queries") == 12 and
+          coverage.get("semantic_paraphrase_vectors") == 12 and
+          coverage.get("semantic_legacy_vectors") == 7 and
+          coverage.get("source_kind") == "actual_e5_onnx_inference" and
+          coverage.get("model_sha256") == "4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c",
+          "Paráfrases foram avaliadas sem inferência E5 real integral")
+    vectors=load_json("e5-paraphrase-vectors.json")
+    check(vectors.get("schema_version") == 1 and
+          vectors.get("source_kind") == "actual_e5_onnx_inference" and
+          vectors.get("human_review_status") == "pending" and
+          vectors.get("model_sha256") == coverage.get("model_sha256") and
+          len(vectors.get("queries", [])) == 12,
+          "Artefato E5 das 12 paráfrases ausente ou incompatível")
+    for row in vectors.get("queries", []):
+        values=row.get("vector", [])
+        check(len(values) == 384 and all(isinstance(v,(int,float)) and
+              math.isfinite(v) for v in values) and
+              .97 < math.sqrt(sum(v*v for v in values)) < 1.03,
+              "Vetor de paráfrase com dimensão/norma inválida")
+
     check(source.get("case_count") == 50, "Avaliação ampliada não contém 50 consultas")
     check(source.get("catalog_count", 0) >= 1500, "Avaliação ampliada não importou o catálogo real")
     expected_counts = {"semantic_legacy": 14, "semantic_paraphrase": 12,
@@ -224,6 +245,12 @@ def audit_expanded():
         check(len(rows) == 50, "Relatório de " + name + " sem 50 casos")
         check(len({row.get("query") for row in rows}) >= 47,
               "Consultas insuficientemente diversas: " + name)
+        paraphrase_rows = [r for r in rows if r.get("category") == "semantic_paraphrase"]
+        check(len(paraphrase_rows) == 12 and all(r.get("e5_used") is True for r in paraphrase_rows),
+              "Alguma paráfrase não recebeu E5 real em " + name)
+        check([r.get("query") for r in paraphrase_rows] ==
+              [x.get("query") for x in vectors.get("queries", [])],
+              "Paráfrases comparadas não são os vetores gerados em " + name)
         grades = [hit.get("rank") for row in rows for hit in row.get("positives", [])]
         for rank in grades:
             check(rank is None or (isinstance(rank, int) and not isinstance(rank, bool) and rank > 0),
@@ -279,7 +306,7 @@ def audit_expanded():
         WARNINGS.append("Controle de número abaixo de 90% no top10")
     return {"queries": 50, "group_metrics": collected,
             "review_status": "pending_human_semantic_review",
-            "note": "26 consultas narrativas/bíblicas (12 novas paráfrases) e 24 controles exatos; sem alegar 50 juízos humanos independentes"}
+            "note": "26 consultas narrativas/bíblicas (12 novas paráfrases com E5 real) e 24 controles exatos; sem alegar 50 juízos humanos independentes"}
 
 def audit_apk_and_device():
     audit = load_json("apk-audit.json")

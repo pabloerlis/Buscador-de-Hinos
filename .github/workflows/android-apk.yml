@@ -171,6 +171,8 @@ jobs:
         run: python3 scripts/benchmark_e5.py
       - name: Comparar ranking híbrido real com o ranking anterior
         run: node tests/qa_e5_hybrid.js /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json
+      - name: Vetorizar com ONNX real todas as 12 paráfrases (QA, nunca no APK)
+        run: python3 scripts/qa_paraphrase_e5.py
       - uses: actions/download-artifact@v4
         with:
           name: bible-indexes-qa
@@ -198,7 +200,8 @@ jobs:
           node tests/qa_relevance_50.js \
             /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json \
             /tmp/hinos-rrf/app/src/main/assets \
-            "$PWD/app/src/main/assets"
+            "$PWD/app/src/main/assets" \
+            qa-report/e5-paraphrase-vectors.json
       - name: Registrar métricas de recuperação sem letras
         if: always()
         uses: actions/upload-artifact@v4
@@ -210,6 +213,7 @@ jobs:
             qa-report/event-ranking.json
             qa-report/event-variant-matrix.json
             qa-report/relevance-50.json
+            qa-report/e5-paraphrase-vectors.json
           retention-days: 30
           if-no-files-found: ignore
       - name: Preservar apenas os artefatos que entram no APK E5

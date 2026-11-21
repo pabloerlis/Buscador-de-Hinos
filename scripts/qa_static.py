@@ -111,6 +111,10 @@ require("tests/qa_relevance_50.js" in workflow and "qa-report/relevance-50.json"
 require("scripts/qa_independent_review.py" in workflow,
         "Agente 8 de revisão independente obrigatório")
 require("scripts/qa_e5.py" in workflow, "Agente de embeddings E5 ausente")
+require("scripts/qa_paraphrase_e5.py" in workflow and "qa-report/e5-paraphrase-vectors.json" in workflow,
+        "Paráfrases sem inferência E5 real ou evidência no artefato")
+require((ROOT/"qa/semantic-paraphrase-queries.json").is_file(),
+        "Lista auditável de consultas de paráfrase ausente")
 require("continue-on-error: true" not in workflow, "Um dos agentes ignora falhas")
 require("retention-days: 1" in workflow, "Artefatos intermediários sem prazo curto")
 

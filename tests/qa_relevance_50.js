@@ -9,9 +9,9 @@
  */
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),vm=require('node:vm');
-const [catalogPath,vectorsPath,rrfDir,currentDir]=process.argv.slice(2);
-assert.ok([catalogPath,vectorsPath,rrfDir,currentDir].every(Boolean),
-  'Uso: node tests/qa_relevance_50.js catalog.json vectors.json rrf-assets current-assets');
+const [catalogPath,vectorsPath,rrfDir,currentDir,paraphraseVectorsPath]=process.argv.slice(2);
+assert.ok([catalogPath,vectorsPath,rrfDir,currentDir,paraphraseVectorsPath].every(Boolean),
+  'Uso: node tests/qa_relevance_50.js catalog.json vectors.json rrf-assets current-assets paraphrase-vectors.json');
 const catalog=JSON.parse(fs.readFileSync(catalogPath,'utf8'));
 const vectors=JSON.parse(fs.readFileSync(vectorsPath,'utf8'));
 assert.ok(Array.isArray(vectors)&&vectors.length===7,'São necessárias as mesmas 7 consultas E5 fixadas.');
@@ -85,6 +85,26 @@ const paraphrases=[
 ].map(([query,collection,number,intent])=>make(query,'semantic_paraphrase',
   [{collection,number}],intent,'parafrase_de_passagem_requer_revisao_humana'));
 assert.equal(paraphrases.length,12);
+const manifest=JSON.parse(fs.readFileSync(path.resolve(__dirname,'../qa/semantic-paraphrase-queries.json'),'utf8'));
+const generated=JSON.parse(fs.readFileSync(paraphraseVectorsPath,'utf8'));
+assert.equal(manifest.schema_version,1);
+assert.equal(manifest.human_review_status,'pending');
+assert.deepEqual(manifest.queries,paraphrases.map(p=>p.query),'Paráfrases de QA divergentes do manifesto');
+assert.equal(generated.schema_version,1);
+assert.equal(generated.source_kind,'actual_e5_onnx_inference');
+assert.equal(generated.human_review_status,'pending');
+assert.equal(generated.model_sha256,'4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c');
+assert.equal(generated.queries.length,12,'Faltam embeddings reais para paráfrases');
+for(let i=0;i<paraphrases.length;i++){
+  const row=generated.queries[i], expected=paraphrases[i];
+  assert.equal(row.query,expected.query,'Vetor E5 pertence a outra consulta');
+  assert.ok(Array.isArray(row.vector)&&row.vector.length===384,'Dimensão E5 inválida');
+  assert.ok(row.vector.every(Number.isFinite),'Vetor E5 não finito');
+  const norm=Math.hypot(...row.vector);
+  assert.ok(norm>.97&&norm<1.03,'Vetor E5 não normalizado');
+  expected.vector=row.vector;
+}
+
 const numberControls=[
   ['hino 67','principal','067'],['hino 261','principal','261'],
   ['hino 374','principal','374'],['hino 704','principal','704'],
@@ -202,7 +222,7 @@ async function evaluate(name,directory){
       ...(c.vector?{vector_query:c.vector}:{})};
     const result=await api.request('/api/search',opts);
     assert.ok(Array.isArray(result._fullRanked),'Ranking ausente: '+name+'/'+c.query);
-    output.push({query:c.query,category:c.category,relation_id:c.relation_id,
+    output.push({query:c.query,category:c.category,e5_used:Boolean(c.vector),relation_id:c.relation_id,
       provenance:c.provenance,
       positives:c.positives.map(p=>({...p,rank:locate(result._fullRanked,p)})),
       negatives:(c.negatives||[]).map(p=>({...p,rank:locate(result._fullRanked,p)})),
@@ -225,14 +245,19 @@ async function evaluate(name,directory){
           target:cases[i].positives[j],before,after});
     }
   }
-  const report={schema_version:1,catalog_sha256:crypto.createHash('sha256')
+  const report={schema_version:2,e5_coverage:{
+    semantic_paraphrase_queries:12,semantic_paraphrase_vectors:paraphrases.filter(p=>p.vector).length,
+    semantic_legacy_vectors:curated.filter(p=>p.vector).length,
+    source_kind:generated.source_kind,model_sha256:generated.model_sha256,
+    tokenizer_revision:generated.tokenizer_revision
+  },catalog_sha256:crypto.createHash('sha256')
     .update(fs.readFileSync(catalogPath)).digest('hex'),catalog_count:current.catalog_count,
     case_count:cases.length,category_counts:Object.fromEntries(
       [...new Set(cases.map(x=>x.category))].map(x=>[x,cases.filter(c=>c.category===x).length])),
     caveats:['Rótulos semânticos de paráfrases aguardam revisão humana independente',
       'Títulos e números são testes de contrato, não provas de entendimento semântico',
       'Paráfrases da mesma passagem são correlacionadas; não interpretar como 50 intenções independentes',
-      'Consultas sem vetor E5 verificável rodam sem E5; a comparação de versões permanece pareada',
+      'Os 12 vetores E5 das paráfrases são de inferência ONNX real, mesma consulta nas duas versões',
       'Resultados representam apenas alvos conhecidos, não recall completo da biblioteca',
       'Nenhuma letra é redistribuída nos relatórios'],
     human_review_status:'pending',baseline,current,worsened_cases:worsening};
