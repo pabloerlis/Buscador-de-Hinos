@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import java.security.MessageDigest;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -88,7 +89,7 @@ public class E5DeviceSmokeTest {
                     "window.__e5QaOriginalComplete=window.VectorNative.complete;" +
                     "window.VectorNative.complete=function(answer){" +
                     "window.__e5QaReply=answer;window.__e5QaOriginalComplete(answer);};" +
-                    "window.NativeVector.embed('e5-qa','mulher doente tocou nas vestes de Cristo');true;"));
+                    "window.NativeVector.embed('e5-qa','Uma mulher enferma tocou nas vestes de Jesus e foi curada');true;"));
             boolean completed=false;
             limit=System.currentTimeMillis()+180_000;
             while(System.currentTimeMillis()<limit){
@@ -109,6 +110,25 @@ public class E5DeviceSmokeTest {
                     "if(!e.vector.every(Number.isFinite))return false;" +
                     "const n=e.vector.reduce((s,x)=>s+x*x,0);" +
                     "return n>.97&&n<1.03;})()"));
+            // Canonical UINT8 semantic query (not a hymn lyric).
+            // The check compares 384 real Android ONNX dimensions to CPU-probed
+            // ONNX outputs from AMD EPYC 7763/9V45 and Intel Xeon 6975P-C.
+            String arrayJSON=evaluate(web,"JSON.stringify(window.__e5QaReply.vector)");
+            String decoded=(String)new org.json.JSONTokener(arrayJSON).nextValue();
+            org.json.JSONArray values=new org.json.JSONArray(decoded);
+            assertEquals("Android native E5 vector dimension changed",384,values.length());
+            byte[] q8=new byte[384];
+            for(int i=0;i<384;i++){
+                double value=values.getDouble(i);
+                assertTrue("Nonfinite Android E5 dimension",Double.isFinite(value));
+                q8[i]=(byte)Math.max(-127,Math.min(127,(int)Math.rint(value*127)));
+            }
+            byte[] hash=MessageDigest.getInstance("SHA-256").digest(q8);
+            StringBuilder hex=new StringBuilder();
+            for(byte x:hash)hex.append(String.format(java.util.Locale.US,"%02x",x&255));
+            assertEquals("Android E5 differs from pinned UINT8 semantic query",
+                "555bda01cdc0f22dcc4864d75303562e5f7cbb539530aeabc476218b5f0eb26d",
+                hex.toString());
         }
     }
 }
