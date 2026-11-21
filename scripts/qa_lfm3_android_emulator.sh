@@ -14,26 +14,30 @@ adb shell svc wifi disable
 adb shell svc data disable
 mkdir -p qa-report
 : > qa-report/lfm3-device-evidence.log
-for mode in baseline optimized; do
+for mode in optimized baseline; do
   if [ "$mode" = baseline ]; then selected="$baseline"; else selected="$apk"; fi
   echo "=== TESTE LFM3 $mode ===" | tee -a qa-report/lfm3-device-evidence.log
-  adb install -r "$selected"
-  adb install -r "$test_apk"
-  adb push "$model" /data/local/tmp/hinos-lfm3.gguf
+  timeout -k 10s 120s adb install -r "$selected"
+  timeout -k 10s 90s adb install -r "$test_apk"
+  timeout -k 10s 180s adb push "$model" /data/local/tmp/hinos-lfm3.gguf
   adb shell chmod 644 /data/local/tmp/hinos-lfm3.gguf
   adb shell run-as "$pkg" mkdir -p files
-  adb shell run-as "$pkg" cp /data/local/tmp/hinos-lfm3.gguf files/qa-lfm3.gguf
+  timeout -k 10s 180s adb shell run-as "$pkg" cp /data/local/tmp/hinos-lfm3.gguf files/qa-lfm3.gguf
   adb logcat -c
   log="$(mktemp)"
   # A variante historica pode expirar; nao bloquear a execucao da variante otimizada.
   # Somente o timeout da comparacao baseline, apos OK real, pode ser observado como controle negativo.
   set +e
-  timeout 750s adb shell am instrument -w -r -e class \
+  timeout -k 10s 510s adb shell am instrument -w -r -e class \
     br.com.buscadordehinos.app.Lfm3DeviceSmokeTest \
     br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$log"
   instrument_rc=${PIPESTATUS[0]}
   set -e
   adb logcat -d -v brief -s 'LFM3_BENCH:I' '*:S' | tee -a "$log"
+  # Sempre preservar a prova da execução antes dos asserts bloqueantes.
+  cat "$log" >> qa-report/lfm3-device-evidence.log
+  echo "INSTRUMENT_RUN_RC mode=$mode code=$instrument_rc" | tee -a qa-report/lfm3-device-evidence.log
+  adb shell dumpsys meminfo "$pkg" > "qa-report/lfm3-memory-$mode.txt" 2>&1 || true
   if ! grep -q 'BENCHMARK_RESULT case=simple ' "$log"; then
     echo "REPROVADO: baseline/otimizada sem inferencia simples mensuravel ($mode)."
     exit 1
@@ -54,10 +58,9 @@ for mode in baseline optimized; do
       exit 1
     fi
   fi
-  cat "$log" >> qa-report/lfm3-device-evidence.log
   rm -f "$log"
   adb shell run-as "$pkg" rm -f files/qa-lfm3.gguf
   adb shell rm -f /data/local/tmp/hinos-lfm3.gguf
 done
-python3 scripts/qa_native_performance_gate.py --generate-only
+python3 scripts/qa_native_performance_gate.py
 echo "AGENTE LFM3 — APROVADO: GGUF oficial, JNI, carregamento e saída GBNF reais."

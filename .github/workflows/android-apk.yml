@@ -480,7 +480,14 @@ jobs:
         with:
           name: native-build-evidence-qa
           path: qa-report
-      - name: Baixar GGUF LFM3 oficial para teste, jamais para APK
+      - name: Reutilizar modelo oficial por hash exato (somente CI; nunca no APK)
+        id: gguf-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/LFM3-1.7B-QAD-Q4_0.gguf
+          key: official-lfm3-17b-qad-q4-0-sha256-43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452
+      - name: Baixar GGUF LFM3 oficial somente se ausente do cache
+        if: steps.gguf-cache.outputs.cache-hit != 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -489,6 +496,8 @@ jobs:
             'https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF/resolve/main/LFM3-1.7B-QAD-Q4_0.gguf' \
             --output /tmp/LFM3-1.7B-QAD-Q4_0.gguf
           echo "43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452  /tmp/LFM3-1.7B-QAD-Q4_0.gguf" | sha256sum --check
+      - name: Confirmar SHA-256 do GGUF oficial, inclusive quando veio do cache
+        run: echo "43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452  /tmp/LFM3-1.7B-QAD-Q4_0.gguf" | sha256sum --check
       - name: Habilitar KVM no emulador
         shell: bash
         run: |
@@ -515,6 +524,8 @@ jobs:
           path: |
             qa-report/lfm3-device-evidence.log
             qa-report/lfm3-native-benchmark.json
+            qa-report/lfm3-memory-baseline.txt
+            qa-report/lfm3-memory-optimized.txt
           retention-days: 30
           if-no-files-found: ignore
 
