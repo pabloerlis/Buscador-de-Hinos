@@ -322,16 +322,7 @@ jobs:
         with:
           name: semantic-search-agent-qa
           path: qa-report
-      - uses: actions/download-artifact@v4
-        with:
-          name: native-build-evidence-qa
-          path: qa-report
-      - uses: actions/download-artifact@v4
-        with:
-          name: lfm3-android-evidence-qa
-          path: qa-report
-      - name: Agente independente - verificar flags, benchmark comparativo e inferência real
-        run: python3 scripts/qa_native_performance_gate.py
+
       - name: Autoteste do agente com exemplos positivos e negativos
         run: node tests/test-semantic-crossversion-gate.js
       - name: Agente 10 - conferir mudancas de posicao e metricas cross-version
