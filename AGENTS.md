@@ -40,7 +40,15 @@ A compilação `build_apk` depende de `sources`, `static`, `regressions`, `relev
 - Atualizar métricas e explicar eventuais regressões; aumentar baselines somente após comprovar melhoria em avaliação mais ampla.
 - Manter branches/PRs em rascunho até aprovação dos gates, sem merge automático em `main`.
 
-**Diagnóstico manual:** os logs e relatórios JSON dos jobs são a evidência. Aprovação do pipeline não equivale a validação semântica exaustiva.
+**Diagnóstico manual:** os logs e relatórios JSON dos jobs são a evidência.
+
+### Etapa 6B3 — Estabilidade E5 (v2.6.9/build 28)
+- Regerar vetores completos em CADA CI, sem cache entre builds. ONNX CPU com execução sequencial determinística e uma thread, inclusive na aplicação Android.
+- O agente 5 verifica novamente 12 consultas em sessões ONNX diferentes e 64 trechos de índice recomputados a partir da fonte pinada, sem registrar letras.
+- O manifesto `qa/e5-stability-reference.json` só é travado após medir uma execução diagnóstica e confirmar a mesma assinatura em outra execução com índice reconstruído. `pending` é falha bloqueante.
+- Agente 9 recalcula hashes dos arquivos E5 de entrega e da avaliação e exige identidade com a referência travada; agente 8 verifica os laudos. Alteração entre builds REPROVA antes do Gradle.
+- Não ajustar ranking para casos de teste; divergência de hashes se investiga, não se mascara. Um APK somente após 9 agentes e Android offline aprovar; ainda falta teste físico ARM64.
+ Aprovação do pipeline não equivale a validação semântica exaustiva.
 
 ## Etapa 2 — embeddings semânticos E5 por trechos
 
