@@ -71,10 +71,10 @@ with zipfile.ZipFile(APK) as archive:
                   "Modelo E5 incompatível com SHA-256 fixado")
             index_bytes=archive.read("assets/e5-index.json")
             pinned=ROOT/"qa/e5-index-golden.json"
-            expected_sha=json.loads((ROOT/"qa/e5-stability-reference.json").read_text())["fingerprint"]["index_sha256"]
-            check(pinned.is_file() and hashlib.sha256(pinned.read_bytes()).hexdigest()==expected_sha,
+            expected_index_sha=json.loads((ROOT/"qa/e5-stability-reference.json").read_text())["fingerprint"]["index_sha256"]
+            check(pinned.is_file() and hashlib.sha256(pinned.read_bytes()).hexdigest()==expected_index_sha,
                   "Índice E5 padrão auditado ausente ou modificado")
-            check(hashlib.sha256(index_bytes).hexdigest()==expected_sha,
+            check(hashlib.sha256(index_bytes).hexdigest()==expected_index_sha,
                   "APK não contém o índice E5 imutável aprovado")
             idx=json.loads(index_bytes)
             check(idx.get("version")==3 and idx.get("dimension")==384 and
