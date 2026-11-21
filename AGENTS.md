@@ -94,3 +94,11 @@ Nota: o emulador testa o APK x86_64; dispositivos reais arm64-v8a podem apresent
 - Os relatórios não podem incluir letras, e nenhum caso de teste pode determinar regra especial para uma história ou hino.
 - Sem reranker em produção até avaliação fora do APK, orçamento de memória, licença e teste ARM64.
 - Uma versão nova só pode ser declarada concluída quando CI, instrumentação e auditoria do APK v2.6.6/code25 aprovarem, o arquivo entregue tiver SHA verificado e a próxima issue estiver documentada.
+
+## Etapa 6B1 — paridade E5 real nas 12 paráfrases (v2.6.7/code26)
+
+- Vetorizar as 12 novas consultas no CI com o mesmo ONNX int8 e tokenizer pinados do APK; validar hash, forma 384D, norma e correspondência exata de consulta.
+- Rodar RRF e EventFrameEngine com vetores E5 idênticos, preservando a matriz legada de 14 consultas e reportando métricas separadas.
+- O agente 8 deve bloquear a entrega quando faltar qualquer um dos 12 vetores ou se relatórios declararem cobertura inexistente.
+- Não alterar pesos, regras de ranking ou rótulos provisórios por conta desses resultados: revisão humana das letras e ampliação para 50 julgamentos semânticos independentes são uma próxima etapa.
+- Novo APK apenas para cumprir ciclo de QA/versão; motor de pesquisa permanece o da v2.6.6. PR draft, sem merge em main, sem teste ARM64 físico.
