@@ -512,7 +512,7 @@ jobs:
           import json
           from pathlib import Path
           result=json.loads(Path('reports/validation/resultado-agentes.json').read_text())
-          assert result['decision']=='PASS', 'Agentes de letra inteira não aprovaram'
+          assert result['status']=='PASS', 'Agentes de letra inteira não aprovaram'
           PY
       - uses: actions/download-artifact@v4
         with:
