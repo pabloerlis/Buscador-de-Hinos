@@ -4,7 +4,7 @@ const LocalHymnAI = (() => {
   const MAX_CANDIDATES = 5;
   const MAX_PICKS = 2;
   const MAX_REASON_LENGTH = 90;
-  const COMPARISON_TIMEOUT_MS = 60000;
+  const COMPARISON_TIMEOUT_MS = 90000;
   const LOOKUP_CHARACTERS = 'A-Za-zÀ-ÖØ-öø-ÿ ';
   const invalidLookupCharacter = new RegExp(`[^${LOOKUP_CHARACTERS}]`);
   const clip = (value, limit) => String(value ?? '').replace(/\s+/g, ' ').trim().slice(0, limit);
@@ -12,15 +12,15 @@ const LocalHymnAI = (() => {
   const diagnostic = {
     prompt: 'Responda apenas OK.',
     grammar: 'root ::= "OK"',
-    maxTokens: 8,
-    timeoutMs: 45000
+    maxTokens: 4,
+    timeoutMs: 90000
   };
 
   function prepareComparison(query, exclusions, hymns, context, lookup = null) {
     const candidates = new Map();
     for (const hymn of hymns) {
       const { id } = hymn;
-      const excerpt = clip(hymn.snippet, 140);
+      const excerpt = clip(hymn.snippet, 92);
       if (!Number.isSafeInteger(id) || id < 1 || candidates.has(id) || !excerpt || excerpt === 'Nenhum trecho disponível') continue;
       candidates.set(id, {
         id,
@@ -34,20 +34,20 @@ const LocalHymnAI = (() => {
 
     const canLookup = lookup === null;
     const input = {
-      pedido: promptText(query, 200),
-      exclusões: exclusions.slice(0, 4).map(value => promptText(value, 40)),
-      temas: (context?.topics || []).slice(0, 4).map(value => promptText(value, 24)),
+      pedido: promptText(query, 120),
+      exclusões: exclusions.slice(0, 2).map(value => promptText(value, 30)),
+      temas: (context?.topics || []).slice(0, 2).map(value => promptText(value, 20)),
       ...(context?.reference && context.passage ? {
-        referência: promptText(context.reference, 50),
-        passagem: promptText(context.passage, 160)
+        referência: promptText(context.reference, 38),
+        passagem: promptText(context.passage, 90)
       } : {}),
       ...(lookup ? { busca_complementar: { termos: lookup.term, novos_hinos: lookup.added } } : {}),
-      hinos: [...candidates.values()].map(({ id, title, excerpt }) => ({ id, título: promptText(title, 55), trecho: promptText(excerpt, 140) }))
+      hinos: [...candidates.values()].map(({ id, title, excerpt }) => ({ id, título: promptText(title, 42), trecho: promptText(excerpt, 92) }))
     };
-    const instructions = 'Escolha até dois hinos do mais adequado ao menos adequado ao pedido. Responda com uma lista JSON de objetos id e motivo. Use IDs distintos e um motivo curto em português, sustentado pelo trecho. Use [] se não houver evidência.';
-    const tool = 'Se os trechos forem insuficientes, você pode chamar a busca local uma vez com {"buscar_hinos":"palavras alternativas"}. Use de 3 a 64 letras e espaços.';
+    const instructions = 'Escolha até 2 hinos por evidência no trecho. Responda somente JSON [{"id":1,"motivo":"texto curto"}]. IDs distintos; motivo até 48 caracteres. [] se nenhum.';
+    const tool = 'Se necessário, busque uma vez com {"buscar_hinos":"termos alternativos"}.';
     const lookupRequired = canLookup && !candidates.size;
-    const instruction = lookupRequired ? 'A busca atual não encontrou hinos. Chame a busca local com {"buscar_hinos":"palavras alternativas"}. Use de 3 a 64 letras e espaços.' : instructions + (canLookup ? '\n' + tool : '');
+    const instruction = lookupRequired ? 'Sem candidatos. Retorne {"buscar_hinos":"termos alternativos"}, somente letras e espaços.' : instructions + (canLookup ? '\n' + tool : '');
     const prompt = instruction + '\n' + JSON.stringify(input);
     const grammar = [
       'root ::= '+(lookupRequired?'lookup':canLookup?'picks | lookup':'picks'),
@@ -55,7 +55,7 @@ const LocalHymnAI = (() => {
       ...(candidates.size ? [
         String.raw`entry ::= "{" ws "\"id\"" ws ":" ws hymn-id ws "," ws "\"motivo\"" ws ":" ws reason ws "}"`,
         'hymn-id ::= ' + [...candidates.keys()].map(id => JSON.stringify(String(id))).join(' | '),
-        String.raw`reason ::= "\"" [^"\\\x00-\x1F]{1,90} "\""`,
+        String.raw`reason ::= "\"" [^"\\\x00-\x1F]{1,48} "\""`,
       ] : []),
       ...(canLookup ? [
         String.raw`lookup ::= "{" ws "\"buscar_hinos\"" ws ":" ws "\"" lookup-text "\"" ws "}"`,
@@ -63,7 +63,7 @@ const LocalHymnAI = (() => {
       ] : []),
       'ws ::= " "?'
     ].join('\n');
-    return { prompt, grammar, maxTokens: lookupRequired ? 40 : 120, timeoutMs: COMPARISON_TIMEOUT_MS, candidates, canLookup, lookupRequired };
+    return { prompt, grammar, maxTokens: lookupRequired ? 36 : 72, timeoutMs: COMPARISON_TIMEOUT_MS, candidates, canLookup, lookupRequired };
   }
 
   function readComparison(response, { candidates, canLookup, lookupRequired }) {
@@ -103,16 +103,22 @@ const LocalHymnAI = (() => {
 
   function prepareThemes(query, exclusions, labels, timeoutMs) {
     if (!labels.length) return null;
-    const input = { pedido: promptText(query, 230), exclusões: exclusions.slice(0,4).map(x => promptText(x,40)), temas: labels };
+    // IDs numéricos evitam gerar nomes longos de temas no processador do telefone.
+    // Nenhum tema é removido da lista permitida.
+    const options = labels.map((label, i) => [i + 1, promptText(label, 40)]);
+    const input = {pedido: promptText(query, 140),
+      exclusões: exclusions.slice(0, 2).map(x => promptText(x, 24)),
+      temas: options.map(([id, label]) => id + ':' + label)};
     return {
-      prompt: 'Escolha até quatro temas do catálogo diretamente relacionados ao pedido. Responda com uma lista JSON de nomes de tema. Se nenhum for adequado, responda [].\n'+JSON.stringify(input),
+      prompt: 'Escolha até 4 números dos temas ligados ao pedido. Responda apenas JSON [1,2] ou [].\n' + JSON.stringify(input),
       grammar: [
         'root ::= "[" ws (theme (ws "," ws theme){0,3})? ws "]"',
-        'theme ::= '+labels.map(label => JSON.stringify(JSON.stringify(label))).join(' | '),
+        'theme ::= ' + options.map(([id]) => JSON.stringify(String(id))).join(' | '),
         'ws ::= " "?'
       ].join('\n'),
-      maxTokens: 56,
-      timeoutMs
+      maxTokens: 24,
+      timeoutMs,
+      themeLabels: labels.slice()
     };
   }
 
