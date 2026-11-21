@@ -24,4 +24,6 @@ if ! grep -Eq 'OK \([0-9]+ tests?\)' "$log" ||
   echo "REPROVADO: teste nativo Android não apresentou aprovação explícita."
   exit 1
 fi
+mkdir -p qa-report
+cp "$log" qa-report/android-device-evidence.log
 echo "AGENTE ANDROID — APROVADO: WebView, tela Sobre e inferência E5 ONNX real."
