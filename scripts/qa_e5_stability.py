@@ -77,7 +77,7 @@ def main():
     locked=expected_reference.get('status')=='locked'
     matched=locked and fp==expected_reference.get('fingerprint')
     report={'schema_version':1,'status':'approved' if matched else 'unlocked_or_mismatch',
-        'configuration':'cpu_single_thread_deterministic_onnxruntime_1.20.1',
+        'configuration':'cpu_single_thread_deterministic_x64quantprecision_onnxruntime_1.20.1',
         'same_session_equal':True,'fresh_session_equal':True,
         'recomputed_index_passages_equal':count,
         'fingerprint':fp,'baseline_matched':matched,
