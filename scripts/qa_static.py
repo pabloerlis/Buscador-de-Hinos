@@ -70,12 +70,27 @@ require(re.search(r"\bversionCode\s+\d+\b", gradle), "versionCode inválido")
 require(re.search(r"\bversionName\s+'[\d.]+(?:-[a-z0-9.]+)?'", gradle), "versionName inválido")
 
 workflow = (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8")
-for gate in ("sources", "static", "regressions", "relevance", "embeddings", "build_apk", "device_smoke", "audit_apk"):
+for gate in ("sources", "static", "regressions", "relevance", "embeddings", "build_apk", "device_smoke", "audit_apk", "independent_review", "publish_apk"):
     require(re.search(r"^  " + gate + r":", workflow, re.M), "Agente ou etapa obrigatória ausente: " + gate)
 require("needs: [sources, static, regressions, relevance, embeddings]" in workflow,
         "Compilação não depende de todos os agentes de pré-build")
 require("needs: [build_apk, device_smoke]" in workflow,
         "APK deve depender dos testes instrumentados Android antes da auditoria")
+require(re.search(r"^  independent_review:", workflow, re.M),
+        "Agente 8 de teste e análise independente não está no workflow")
+require(re.search(r"^  publish_apk:", workflow, re.M),
+        "Job de entrega condicionada não está no workflow")
+require("needs: [audit_apk, device_smoke, relevance, embeddings]" in workflow,
+        "Agente 8 deve esperar relatórios de relevância, E5, Android e auditoria")
+require("needs: [audit_apk, independent_review]" in workflow,
+        "O APK final deve depender da aprovação do agente 8")
+require("scripts/qa_independent_review.py" in workflow,
+        "Não há script do agente 8 para testar e analisar o APK")
+require("android-device-evidence-qa" in workflow and "independent-review-qa" in workflow,
+        "Evidência do Android e relatório do agente 8 devem ser preservados")
+require(workflow.index("  independent_review:") < workflow.index("  publish_apk:"),
+        "A análise independente deve preceder a publicação")
+
 require("scripts/qa_android_emulator.sh" in workflow,
         "Workflow sem executor de teste Android nativo")
 runner_script = (ROOT / "scripts/qa_android_emulator.sh").read_text(encoding="utf-8")
