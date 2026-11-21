@@ -297,6 +297,13 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
           script: bash scripts/qa_android_emulator.sh
+      - name: Guardar evidência efetiva dos testes instrumentados
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-device-evidence-qa
+          path: qa-report/android-device-evidence.log
+          retention-days: 30
+          if-no-files-found: error
 
   audit_apk:
     name: "Agente 7 | Auditoria do APK validado em Android"
@@ -321,6 +328,99 @@ jobs:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EXPECT_E5_EMBEDDINGS: 'true'
         run: python3 scripts/qa_apk.py apk-candidate/app-debug.apk
+      - name: Preservar laudo de assinatura para revisão independente
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-audit-qa
+          path: qa-report/apk-audit.json
+          retention-days: 30
+          if-no-files-found: error
+
+  independent_review:
+    name: "Agente 8 | Testes independentes e analise critica da entrega"
+    needs: [audit_apk, device_smoke, relevance, embeddings]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-candidate-qa
+          path: apk-candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: quality-metrics
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: e5-stanza-metrics
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-audit-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-device-evidence-qa
+          path: qa-report
+      - name: Testar novamente casos narrativos negativos e fusao
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/test-event-frames.js
+          node tests/test-rrf-fusion.js
+      - name: Revisar realmente o APK e recalcular metricas caso a caso
+        env:
+          BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: python3 scripts/qa_independent_review.py apk-candidate/app-debug.apk
+      - name: Publicar relatorio da decisao independente
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: independent-review-qa
+          path: qa-report/independent-review.json
+          retention-days: 90
+          if-no-files-found: ignore
+
+  publish_apk:
+    name: "Entrega | APK liberado somente após 8 agentes aprovarem"
+    needs: [audit_apk, independent_review]
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-candidate-qa
+          path: apk-candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-audit-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: independent-review-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-device-evidence-qa
+          path: qa-report
+      - name: Verificar que o agente independente aprovou antes da publicação
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          review=json.loads(Path('qa-report/independent-review.json').read_text())
+          assert review['decision']=='approved' and not review['errors'], 'Agente 8 não aprovou o APK'
+          audit=json.loads(Path('qa-report/apk-audit.json').read_text())
+          assert audit['passed'] is True and review['apk']['sha256']==audit['sha256']
+          assert Path('apk-candidate/app-debug.apk').is_file()
+          PY
       - name: Identificar a versao do artefato
         id: meta
         shell: bash
@@ -328,12 +428,14 @@ jobs:
           version="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle | head -n 1)"
           test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Publicar somente APK validado
+      - name: Publicar APK aprovado para entrega ao usuário
         uses: actions/upload-artifact@v4
         with:
           name: Buscador-de-Hinos-v${{ steps.meta.outputs.version }}-QA-aprovado
           path: |
             apk-candidate/app-debug.apk
             qa-report/apk-audit.json
+            qa-report/independent-review.json
+            qa-report/android-device-evidence.log
           retention-days: 90
           if-no-files-found: error
