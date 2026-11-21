@@ -43,10 +43,10 @@ A compilação `build_apk` depende de `sources`, `static`, `regressions`, `relev
 **Diagnóstico manual:** os logs e relatórios JSON dos jobs são a evidência.
 
 ### Etapa 6B3 — Estabilidade E5 (v2.6.9/build 28)
-- Regerar vetores completos em CADA CI, sem cache entre builds. ONNX CPU com execução sequencial determinística e uma thread, inclusive na aplicação Android.
-- O agente 5 verifica novamente 12 consultas em sessões ONNX diferentes e 64 trechos de índice recomputados a partir da fonte pinada, sem registrar letras.
-- O manifesto `qa/e5-stability-reference.json` só é travado após medir uma execução diagnóstica e confirmar a mesma assinatura em outra execução com índice reconstruído. `pending` é falha bloqueante. A serialização dos 12 vetores de consultas QA usa Float16 canônico para eliminar ruído irrelevante de arredondamento de CPU sem alterar a inferência Android.
-- Agente 9 recalcula hashes dos arquivos E5 de entrega e da avaliação e exige identidade com a referência travada; agente 8 verifica os laudos. Alteração entre builds REPROVA antes do Gradle.
+- Regerar vetores completos em CADA CI, sem cache entre builds; isso é uma **prova de tolerância a CPUs**, não uma exigência irrealista de igualdade bit a bit entre ISAs. ONNX com execução sequencial e uma thread.
+- O agente 5 verifica 12 consultas em sessões ONNX diferentes, 64 trechos recompostos bit a bit na própria sessão e compara TODOS os 10.496 vetores gerados com o índice fixado em `qa/e5-index-golden.json`. O desvio cross-CPU precisa respeitar cos mínimo 0,992, percentil 1 >=0,995, mediana >=0,9975, diferença absoluta por componente int8 <=3 e fração de diferenças <=20%.
+- O pacote APK usa **sempre a mesma referência imutável** de índice E5, SHA em `qa/e5-stability-reference.json`, independentemente da CPU do GitHub Actions. O modelo/tokenizer/catálogo e as 12 consultas ONNX reais também são pinados. Consultas QA em Float16 canônico removem apenas ruído de arredondamento.
+- Agentes 9, 7 e 8 verificam que o índice distribuído bate exatamente com o SHA da referência e que o desvio numérico do índice regerado permanece dentro do limite. Alteração substancial REPROVA antes do Gradle; nenhuma letra distribuída.
 - Após provar que o encoder INT8 gerava dois conjuntos de embeddings em CPUs diferentes, trocar na v2.6.9 para o `onnx/model_uint8.onnx` do mesmo Xenova multilingual-e5-small, SHA-256 `ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1`; os vetores de passagem continuam INT8 compactados. O modo `session.x64quantprecision=1` ISOLADO não resolveu o modelo anterior.
 - Não ajustar ranking para casos de teste; divergência de hashes se investiga, não se mascara. Um APK somente após 9 agentes e Android offline aprovar; ainda falta teste físico ARM64.
 
