@@ -3,10 +3,10 @@
 The file is packaged into androidTest APK ONLY, never app release APK.
 """
 import hashlib
+import math
 import json
 from pathlib import Path
 import sys
-import numpy as np
 
 source=Path(sys.argv[1])
 dest=Path(sys.argv[2])
@@ -17,9 +17,9 @@ assert data['model_sha256']=='ee13574a23e4384619a172d4c0c8c6b825528fde30258c5613
 assert len(data['queries'])==12
 query=data['queries'][0]
 assert query['query']=='Uma mulher enferma tocou nas vestes de Jesus e foi curada'
-vec=np.array(query['vector'],dtype=np.float64)
-assert vec.shape==(384,) and np.isfinite(vec).all()
-packed=np.clip(np.rint(vec*127),-127,127).astype(np.int8).tobytes()
+vec=query['vector']
+assert len(vec)==384 and all(isinstance(x,(int,float)) and math.isfinite(x) for x in vec)
+packed=bytes(max(-127,min(127,round(x*127)))&255 for x in vec)
 sha=hashlib.sha256(packed).hexdigest()
 assert sha=='555bda01cdc0f22dcc4864d75303562e5f7cbb539530aeabc476218b5f0eb26d'
 payload={'schema_version':1,'source':'actual_pinned_e5_onnx_inference',
