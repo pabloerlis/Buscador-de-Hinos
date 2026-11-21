@@ -1,6 +1,22 @@
 {
   "schema_version": 1,
-  "status": "pending",
-  "fingerprint": null,
-  "policy": "Replace only after UINT8 index and query fingerprints match on independent CPU rebuilds. Do not skip E5 ON/OFF ranking QA."
+  "status": "locked",
+  "fingerprint": {
+    "model_sha256": "ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1",
+    "tokenizer_sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+    "catalog_sha256": "57d42fb0bcc881a62b210dd1a3972822d2c39856f7a01278e104d407bf1b747a",
+    "index_sha256": "7a6c594712d092eb7082dcb2292fbcdd0ed57dd39709d8222d25b1e7ccd4ceb5",
+    "queries_sha256": "b1a5152ab6ff77cf6aab61b8a4c43ff2d5602ed2c95d5bc7a1f245519a50debf"
+  },
+  "verification": {
+    "full_rebuilds": [
+      "https://github.com/pabloerlis/Buscador-de-Hinos/actions/runs/44857724533",
+      "https://github.com/pabloerlis/Buscador-de-Hinos/actions/runs/44858248070"
+    ],
+    "independent_cpu_query_probe": "https://github.com/pabloerlis/Buscador-de-Hinos/actions/runs/44857487490",
+    "passages": 10496,
+    "queries": 12,
+    "probe_note": "Two full rebuilds produced identical packed index and FP16-canonical query hashes. Three independent x64 CPU types matched UINT8 q8/fp16 query fingerprints."
+  },
+  "policy": "Fail build when model, tokenizer, catalog, all packed 10496 passage index bytes, or 12 canonical E5 query vectors differ. Preserve additional ON/OFF semantic and Android instrumented tests. No lyrics in this manifest."
 }
