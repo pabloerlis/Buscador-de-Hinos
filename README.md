@@ -246,3 +246,22 @@ fixa do modelo e gera `e5-model.onnx`, `e5-vocab.bin` e `e5-index.json` no diret
 3. Pesquisar `Hino 125` e confirmar que a correspondência exata prevalece.
 4. Desativar E5 nas configurações e conferir que a busca textual permanece ativa.
 5. Trocar/alterar letras no JSON e confirmar a desativação dos vetores incompatíveis.
+
+
+## Agentes independentes — auditoria semântica de letras completas (nov/2026)
+
+A qualidade das sugestões é verificada por três agentes distintos antes de compilar o APK:
+
+1. **Avaliador de casos integrais** (tests/agents/fixture-agent.js): oito consultas com hinos originais de três estrofes e distratores intencionais. Confere recuperabilidade, persistência do texto completo e rastreabilidade dos trechos.
+2. **Auditor do catálogo real** (tests/agents/catalog-agent.js): baixa em tempo de execução as três coletâneas de 2018, importa com a API real, lê todas as letras completas e examina 22 consultas, inclusive *Filho Pródigo*, *Mulher com fluxo de sangue*, *Marcos 5:25-34*, temas combinados e recomendações em cadeia. **O hino 286 — Um dia eu quis te deixar — deve estar entre os dez primeiros resultados para Filho Pródigo.**
+3. **Consolidador de laudos** (tests/agents/run-validation.js): registra os testes executados, calcula o veredito e emite relatórios independentes.
+
+Execução: gerar os índices bíblicos com os scripts do projeto; baixar temporariamente o JSON da fonte indicada em README para .tmp/catalog-2018.json; então executar `node tests/agents/run-validation.js .tmp/catalog-2018.json`.
+
+O GitHub Actions publica os relatórios **relatorio-completo.md**, **relatorio-simples.md** e **resultado-agentes.json** no artefato `Relatorios-Testes-Semanticos-Letra-Inteira`, mesmo quando os testes falham. O download da coletânea não é publicado nos artefatos nem empacotado no APK.
+
+**Critério de conclusão:** todos os testes obrigatórios PASS e workflow verde. O APK é compilado e enviado como artefato somente depois da aprovação. Falhas reais não devem ser omitidas para liberar o build. Após cada etapa, entregar o link exato do novo APK aprovado e registrar a próxima etapa no GitHub.
+
+**Limite da medição:** o auditor usa indícios textuais de **todas as estrofes**, separados das heurísticas do aplicativo, mas não substitui revisores humanos ou um avaliador semântico independente. Os indicadores de apoio textual são *proxies*, não precisão semântica certificada. Sugestões ambíguas e possíveis falsos negativos entram em uma fila de revisão; não há redistribuição de letras completas.
+
+**Próxima etapa registrada:** avaliar as falhas do teste real, principalmente a posição do hino 286 para *Filho Pródigo*; corrigir o algoritmo em alteração separada, criar conjunto de relevância humana com o contexto completo e repetir a auditoria antes do próximo APK.
