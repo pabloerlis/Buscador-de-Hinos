@@ -126,26 +126,10 @@ public class E5DeviceSmokeTest {
             byte[] hash=MessageDigest.getInstance("SHA-256").digest(q8);
             StringBuilder hex=new StringBuilder();
             for(byte x:hash)hex.append(String.format(java.util.Locale.US,"%02x",x&255));
-            byte[] expected=android.util.Base64.decode(
-                "DQD59gQDAAIDAwcGB/f4AwX2/f0BAf0IBwb/Bgb99/UI9QQF9/8E/foEAgcEBPoF+P37DAH/CP78+P0FBf/7Aw8HBQP+A/4H+gH9/Qf2Cf4B9/gG+wYG+QL5CQn7//v1/AQL+gX8Bvz4CAb6BPf9BwQI+AT6+AjzB/3/9vn0BQAFBAQCBgECC/v+APz8B/UABf4K/Aj8B/wCAwz39f0CCPf2/QP4/QMD+///DPsKAAD5EAIC/fz2+Pft9QcH+gL/APP/AfkIBwT+/gIIDQL0CPQEBvT8CPQBAH5BQX9A/UBAwb99QH8+vb5+PgBAwn8+/cC+Qb7/gsABQIA//X9CwIJ+AMEAAsHBgvy/fn+/wYH+ff6BQb8/AkJBQgG/vkF+P8C+wP8B+gYFBvoE9vwHA/UI+vsBBwoJ/foFBAEC9fn1+f3+Agf49wQFDPr3C/j99wP+/QEH/AQB+wgA/AsH8AAG+wP+/QcD+fkHBwsEAAUE9/4C/PoJ+v8MBAUF",
-                android.util.Base64.DEFAULT);
-            // A mismatch report gives numerical evidence instead of disabling the gate.
-            assertEquals("Corrupted 384D golden reference",384,expected.length);
-            int different=0,maxDelta=0;
-            double dot=0,normA=0,normB=0;
-            StringBuilder sample=new StringBuilder();
-            for(int i=0;i<384;i++){
-                int a=q8[i],b=expected[i];
-                int delta=Math.abs(a-b);
-                if(delta!=0){different++; if(sample.length()<160)sample.append(i).append(':').append(a).append('/').append(b).append(';');}
-                maxDelta=Math.max(maxDelta,delta);
-                dot+=(double)a*b;normA+=(double)a*a;normB+=(double)b*b;
-            }
-            double cosine=dot/Math.sqrt(normA*normB);
-            android.util.Log.i("E5_CANARY_QA","mismatches="+different+" maxDelta="+maxDelta+
-                " cosine="+cosine+" first="+sample);
-            assertEquals("Android E5 differs from pinned UINT8 semantic query; different="+different+
-                " maxDelta="+maxDelta+" cosine="+cosine+" first="+sample,
+            // Preserve strict test; emit the raw packed vector only on failure
+            // so an independent QA agent can measure its drift from the CPU reference.
+            assertEquals("Android E5 differs from pinned UINT8 semantic query; native_q8_base64="+
+                android.util.Base64.encodeToString(q8,android.util.Base64.NO_WRAP),
                 "555bda01cdc0f22dcc4864d75303562e5f7cbb539530aeabc476218b5f0eb26d",
                 hex.toString());
         }
