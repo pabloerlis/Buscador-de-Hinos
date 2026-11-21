@@ -553,6 +553,17 @@ const OfflineAPI = (() => {
           semanticResult=semantic.evaluate(song.semantic_profile||[],opts.related?intent:{direct:intent.direct,related:[]});
           score+=semanticResult.score*semanticWeight;
           if(semanticResult.proof.length)evidence.push(...semanticResult.proof.slice(0,2));
+          // O usuário pediu temas combinados: a evidência deve existir na
+          // letra inteira, não somente em títulos, tags ou associações fracas.
+          // Preserva a fusão E5/RRF e os mecanismos gerais de eventos bíblicos.
+          const directLyricTopics=intent.direct.filter(topic=>(song.semantic_profile||[]).some(profile=>
+            profile.id===topic.id && profile.evidence.some(cue=>hasWord(lyrics,normalizeLyrics(cue)))));
+          if(intent.direct.length>=2&&directLyricTopics.length>=2){
+            const bonus=Math.min(17,11+3*(directLyricTopics.length-2))*Math.min(semanticWeight,1);
+            score+=bonus;
+            evidence.unshift('Temas combinados comprovados na letra inteira: '+
+              directLyricTopics.slice(0,3).map(t=>t.label.toLowerCase()).join(' e '));
+          }
         }else{
           const matching=selectedTopics.filter(t=>song.topics.includes(t));
           score+=matching.length*6.5*semanticWeight;
