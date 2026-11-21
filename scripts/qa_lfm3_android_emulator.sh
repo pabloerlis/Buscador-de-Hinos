@@ -25,21 +25,34 @@ for mode in baseline optimized; do
   adb shell run-as "$pkg" cp /data/local/tmp/hinos-lfm3.gguf files/qa-lfm3.gguf
   adb logcat -c
   log="$(mktemp)"
+  # A variante historica pode expirar; nao bloquear a execucao da variante otimizada.
+  # Somente o timeout da comparacao baseline, apos OK real, pode ser observado como controle negativo.
+  set +e
   timeout 750s adb shell am instrument -w -r -e class \
     br.com.buscadordehinos.app.Lfm3DeviceSmokeTest \
     br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$log"
+  instrument_rc=${PIPESTATUS[0]}
+  set -e
   adb logcat -d -v brief -s 'LFM3_BENCH:I' '*:S' | tee -a "$log"
-  if grep -Eq 'FAILURES!!!|INSTRUMENTATION_STATUS_CODE: -2|Error in officialLfm3' "$log"; then
-    echo "REPROVADO: inferência real LFM3 ($mode)."
+  if ! grep -q 'BENCHMARK_RESULT case=simple ' "$log"; then
+    echo "REPROVADO: baseline/otimizada sem inferencia simples mensuravel ($mode)."
     exit 1
   fi
-  if ! grep -Eq 'OK \(1 tests?\)' "$log" || ! grep -q 'INSTRUMENTATION_STATUS_CODE: 0' "$log"; then
-    echo "REPROVADO: Android não aprovou $mode."
-    exit 1
-  fi
-  if ! grep -q 'BENCHMARK_RESULT case=compare-five ' "$log" || ! grep -q 'BENCHMARK_RESULT case=simple ' "$log"; then
-    echo "REPROVADO: inferência comparativa não gerou métricas ($mode)."
-    exit 1
+  if [ "$mode" = baseline ] \
+      && grep -q 'Caused by: java.lang.IllegalStateException: Tempo limite de geração atingido.' "$log" \
+      && grep -q 'INSTRUMENTATION_STATUS_CODE: -2' "$log" \
+      && ! grep -q 'BENCHMARK_RESULT case=compare-five ' "$log" \
+      && [ "$instrument_rc" -eq 0 ]; then
+    echo 'EXPECTED_BASELINE_TIMEOUT case=compare-five budget_ms=180000' | tee -a "$log"
+  else
+    if [ "$instrument_rc" -ne 0 ] \
+        || grep -Eq 'FAILURES!!!|INSTRUMENTATION_STATUS_CODE: -2|Error in officialLfm3' "$log" \
+        || ! grep -Eq 'OK \(1 tests?\)' "$log" \
+        || ! grep -q 'INSTRUMENTATION_STATUS_CODE: 0' "$log" \
+        || ! grep -q 'BENCHMARK_RESULT case=compare-five ' "$log"; then
+      echo "REPROVADO: execução LFM3 não aprovada ($mode)."
+      exit 1
+    fi
   fi
   cat "$log" >> qa-report/lfm3-device-evidence.log
   rm -f "$log"

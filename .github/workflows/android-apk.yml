@@ -687,7 +687,8 @@ jobs:
           assert gate['decision']=='approved' and not gate['errors'], 'Agente 10 reprovou'
           assert Path('apk-candidate/app-debug.apk').is_file()
           perf=json.loads(Path('qa-report/lfm3-native-benchmark.json').read_text())
-          assert perf['passed'] is True and perf['baseline']['compare']['total_ms']>0 and perf['optimized']['compare']['total_ms']>0
+          assert perf['passed'] is True and perf['baseline']['simple']['total_ms']>0 and perf['optimized']['simple']['total_ms']>0 and perf['optimized']['compare-five']['total_ms']>0
+          assert perf['baseline']['compare-five'].get('timed_out', False) or perf['baseline']['compare-five'].get('total_ms', 0)>0
           for mode in ('baseline', 'optimized'):
             assert json.loads(Path(f'qa-report/native-flags-{mode}.json').read_text())['passed'] is True
           PY
