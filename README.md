@@ -1,3 +1,13 @@
+# Buscador de Hinos Android v2.6.12 — compatibilidade GGUF LFM3
+
+**Alteração exclusiva:** atualizar o motor `llama.cpp` de `b8201` para `b12088`, que reconhece `lfm3`, e migrar a opção nativa de carregamento para `LLAMA_LOAD_MODE_MMAP`, conforme a API atual. Modelo de validação: `LiquidAI/LFM3-1.7B-GGUF/LFM3-1.7B-QAD-Q4_0.gguf`, SHA-256 `43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452`. O modelo de 1,05 GB permanece **externo ao APK**. A licença do modelo é `lfm1.0` e ele só é baixado temporariamente para os testes. A compatibilidade em dispositivo físico ARM64 depende de ensaio do usuário; aprovação de build/emulador não substitui esse ensaio.
+
+**Preservação obrigatória:** manter sem alterações o índice E5 Small ONNX, ranking lexical, RRF, EventFrame, narrativas bíblicas, importação, configuração do repertório e o bridge GGUF atual. É proibido produzir um APK menor eliminando ONNX ou `libhinosllm.so`. O agente independente e a auditoria binária devem impedir publicação sem todos os recursos.
+
+**Referência oficial:** https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF ; compatibilidade inicial `b11960`, usada aqui a revisão mais recente `b12088` para absorver ajustes de inferência e API.
+
+---
+
 # Buscador de Hinos Android v2.6.11 — restauração sem perda funcional
 
 **Base restaurada:** a versão avançada `qa/arm64-physical-evidence-6b4b` (v2.6.10, aprovação automatizada em 21/11/2026). O commit de `main` anterior à integração problemática foi preservado e a integração que entregou APK de 2,5 MiB foi desfeita; consultar a branch `backup/main-before-rollback-20261121` para auditoria.
@@ -132,7 +142,7 @@ O APK padrão desativa GGUF e E5. O GitHub Actions compila com `gradle assembleD
 2. Toque em **Testar modelo**. O app executa uma geração curta e mostra o tempo de preparação, de processamento da entrada e até o primeiro token.
 3. Faça uma pesquisa com pelo menos dois hinos e toque em **Comparar com IA**. O modelo recebe até cinco trechos do índice local, junto dos temas e da passagem bíblica quando disponíveis. O app mostra até duas escolhas com a justificativa da IA e o trecho da coletânea.
 
-A busca e a comparação pelo índice continuam disponíveis durante a geração. A comparação via GGUF tem um prazo de até 60 segundos. Todas as consultas e inferências são executadas no aparelho após a importação. O motor incluído é `llama.cpp b8201` e não suporta arquivos GGUF com arquitetura `gemma4`.
+A busca e a comparação pelo índice continuam disponíveis durante a geração. A comparação via GGUF tem um prazo de até 60 segundos. Todas as consultas e inferências são executadas no aparelho após a importação. O motor incluído nesta versão é `llama.cpp b12088`, com suporte à arquitetura `lfm3`; outras arquiteturas e formatos devem ser validados individualmente.
 
 Para verificar cancelamento durante o uso, inicie uma comparação e toque em **Interromper IA**. Para verificar o descarte de respostas antigas, inicie uma comparação e faça uma nova busca antes da conclusão.
 

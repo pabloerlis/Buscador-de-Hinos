@@ -430,6 +430,57 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  lfm3_model_qa:
+    name: "Agente 12 | GGUF LFM3 oficial no Android JNI"
+    needs: [build_apk, device_smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-candidate-qa
+          path: apk-candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-instrumentation-qa
+          path: apk-instrumentation
+      - name: Baixar GGUF LFM3 oficial para teste, jamais para APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --connect-timeout 30 \
+            --max-time 1200 \
+            'https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF/resolve/main/LFM3-1.7B-QAD-Q4_0.gguf' \
+            --output /tmp/LFM3-1.7B-QAD-Q4_0.gguf
+          echo "43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452  /tmp/LFM3-1.7B-QAD-Q4_0.gguf" | sha256sum --check
+      - name: Habilitar KVM no emulador
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instalar o APK completo e inferir com o GGUF oficial no Android offline
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          heap-size: 512M
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          script: bash scripts/qa_lfm3_android_emulator.sh
+      - name: Guardar evidência Android LFM3 real
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfm3-android-evidence-qa
+          path: qa-report/lfm3-device-evidence.log
+          retention-days: 30
+          if-no-files-found: ignore
+
   audit_apk:
     name: "Agente 7 | Auditoria do APK validado em Android"
     needs: [build_apk, device_smoke]
@@ -464,7 +515,7 @@ jobs:
 
   independent_review:
     name: "Agente 8 | Testes independentes e analise critica da entrega"
-    needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
+    needs: [audit_apk, device_smoke, lfm3_model_qa, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -518,6 +569,17 @@ jobs:
         with:
           name: semantic-crossversion-agent-qa
           path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: lfm3-android-evidence-qa
+          path: qa-report
+      - name: Validar resultado real do agente LFM3
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          log = Path('qa-report/lfm3-device-evidence.log').read_text()
+          assert 'OK (1 test)' in log and 'INSTRUMENTATION_STATUS_CODE: 0' in log, 'LFM3 não passou na instrumentação Android'
+          PY
       - name: Validar parecer bloqueante do agente 10
         run: python3 -c "import json; r=json.load(open('qa-report/semantic-crossversion-agent.json')); assert r['agent']=='10-semantic-crossversion-qa' and r['decision']=='approved' and r['evaluated_cases']==12 and not r['errors']"
       - name: Revisar realmente o APK e recalcular metricas caso a caso
@@ -563,6 +625,10 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: semantic-crossversion-agent-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: lfm3-android-evidence-qa
           path: qa-report
       - name: Verificar que o agente independente aprovou antes da publicação
         shell: bash

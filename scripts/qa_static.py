@@ -90,8 +90,10 @@ require(re.search(r"^  independent_review:", workflow, re.M),
         "Agente 8 de teste e análise independente não está no workflow")
 require(re.search(r"^  publish_apk:", workflow, re.M),
         "Job de entrega condicionada não está no workflow")
-require("needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
-        "Agente 8 deve esperar relatórios de relevância, E5, Android e auditoria")
+require("needs: [audit_apk, device_smoke, lfm3_model_qa, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
+        "Agente 8 deve esperar relevância, E5, Android, LFM3 e auditoria")
+require("name: lfm3-android-evidence-qa" in workflow and "scripts/qa_lfm3_android_emulator.sh" in workflow,
+        "Teste de carregamento real LFM3 e suas evidências devem bloquear a publicação")
 require("needs: [audit_apk, independent_review]" in workflow,
         "O APK final deve depender da aprovação do agente 8")
 require("scripts/qa_independent_review.py" in workflow,

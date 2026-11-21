@@ -15,7 +15,7 @@ set(GGML_CPU_ALL_VARIANTS OFF CACHE BOOL "" FORCE)
 include(FetchContent)
 FetchContent_Declare(llamacpp
   GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
-  GIT_TAG b8201
+  GIT_TAG b12088
   GIT_SHALLOW TRUE
   GIT_PROGRESS TRUE
 )
