@@ -47,6 +47,10 @@ require("event-frame-engine.js" in page.js, "Motor de acontecimentos não carreg
 require("event-toggle" in page.ids, "Controle de interpretação de acontecimentos ausente")
 require("tests/qa_event_ranking.js" in (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8"),
         "Falta benchmark comparativo com/sem ações bíblicas")
+require("tests/qa_event_variant_matrix.js" in (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8"),
+        "Falta matriz reproduzível de variantes narrativa A/B antes do APK")
+require("event-variant-matrix.json" in (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8"),
+        "Relatório de comparação A/B não é preservado no CI")
 require("fusion-mode" in page.ids, "Opção de comparação RRF/legado ausente")
 offline_api = (ASSETS / "offline-api.js").read_text(encoding="utf-8")
 require("FusionRRF.rank" in offline_api and "fusionMode" in offline_api,
