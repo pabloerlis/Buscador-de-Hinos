@@ -40,32 +40,24 @@
     <main>
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-inner">
-          <div class="eyebrow"><span class="eyebrow-dot"></span> UMA NOVA FORMA DE ENCONTRAR HINOS</div>
-          <h1 id="hero-title">A mensagem certa.<br><em>O hino que você procura.</em></h1>
-          <p class="hero-subtitle">Encontre hinos pelo tema, pelo significado ou pelo contexto. Mesmo quando você não lembra das palavras exatas.</p>
+          <h1 id="hero-title">Encontre um hino</h1>
+          <p class="hero-subtitle">Pesquise por tema, passagem bíblica, número ou trecho da letra.</p>
           <form id="search-form" class="search-box" role="search">
             <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="7"/><path d="m16 16 5 5"/></svg>
             <label class="sr-only" for="search-input">Pesquisar hinos</label>
-            <input id="search-input" type="search" maxlength="500" autocomplete="off" placeholder="Tema, contexto ou passagem bíblica…" required>
+            <input id="search-input" type="search" maxlength="500" autocomplete="off" enterkeyhint="search" placeholder="Ex.: João 14 ou consolo" required>
             <button type="submit" id="search-button">Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           </form>
-          <div class="collection-quick" id="quick-collections" aria-label="Filtrar coleções">
-            <span>Pesquisar em:</span>
-            <label><input type="checkbox" data-collection="principal" checked> Coletânea 2018 <small id="quick-count-principal">—</small></label>
-            <label><input type="checkbox" data-collection="avulsos" checked> Avulsos <small id="quick-count-avulsos">—</small></label>
-            <label><input type="checkbox" data-collection="cia" checked> CIA <small id="quick-count-cia">—</small></label>
-            <label><input type="checkbox" data-collection="pessoal" checked> Pessoal <small id="quick-count-pessoal">—</small></label>
-          </div>
-          <div class="suggestions"><span>Sugestões:</span>
-            <button data-suggestion="Gratidão a Deus" type="button">Gratidão</button>
-            <button data-suggestion="Consolo nos momentos difíceis" type="button">Consolo</button>
-            <button data-suggestion="Salvação pela graça" type="button">Salvação</button>
-            <button data-suggestion="Volta de Jesus e vigilância" type="button">Volta de Jesus</button>
-            <button data-suggestion="Salmo 23" type="button">Salmo 23</button><button data-suggestion="Filipenses 4:6" type="button">Fp 4:6</button>
-            <button data-suggestion="Filho Pródigo" type="button">Filho Pródigo</button>
-          </div>
+          <details class="collection-picker" id="collection-picker">
+            <summary>Coleções <span id="collection-selection">Todas</span></summary>
+            <div class="collection-quick" id="quick-collections" aria-label="Filtrar coleções">
+              <label><input type="checkbox" data-collection="principal" checked> Coletânea 2018 <small id="quick-count-principal">—</small></label>
+              <label><input type="checkbox" data-collection="avulsos" checked> Avulsos <small id="quick-count-avulsos">—</small></label>
+              <label><input type="checkbox" data-collection="cia" checked> CIA <small id="quick-count-cia">—</small></label>
+              <label><input type="checkbox" data-collection="pessoal" checked> Pessoal <small id="quick-count-pessoal">—</small></label>
+            </div>
+          </details>
         </div>
-        <div class="hero-accent" aria-hidden="true"><span>♪</span><span>♫</span><span>♪</span></div>
       </section>
 
       <section class="main-content" aria-label="Pesquisa e resultados">
@@ -84,32 +76,47 @@
             <p>O aplicativo importa Coletânea 2018, Avulsos 2018 e CIA 2018 diretamente do JSON público, ou de um JSON do seu aparelho. A importação fica armazenada apenas neste dispositivo.</p>
             <div class="import-buttons">
               <button id="import-remote" class="primary-btn">Importar as 3 coleções</button>
-              <label class="secondary-btn file-upload">Escolher arquivo JSON<input id="import-file" type="file" accept=".json,application/json" hidden></label>
+              <label class="secondary-btn file-upload">Escolher arquivo JSON<input id="import-file" type="file" accept=".json,application/json" class="sr-only"></label>
             </div>
             <p class="import-note">Depois de importar, a busca local funciona sem internet e sem servidor Python.</p>
           </div>
         </div>
 
         <div id="welcome-panel" class="welcome-panel">
-          <div class="welcome-top"><span class="section-kicker">COMO VOCÊ PODE PESQUISAR</span><span class="data-count" id="data-count">Aguardando base</span></div>
-          <div class="features-grid">
-            <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg></div><h3>Palavras e trechos</h3><p>Digite um número, título ou parte da letra de um hino.</p></div>
-            <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c5 4 8 7 8 11a8 8 0 1 1-16 0c0-4 3-7 8-11zM8 14c0 2 2 4 4 4"/></svg></div><h3>Temas e sentimentos</h3><p>Busque por fé, gratidão, esperança e outros conceitos.</p></div>
-            <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM8 10h8M8 14h5"/></svg></div><h3>Contexto e ocasião</h3><p>Descreva o que deseja transmitir e refine os resultados.</p></div>
+          <div class="welcome-top"><h2>Experimente buscar</h2><span class="data-count" id="data-count">Aguardando biblioteca</span></div>
+          <div class="suggestions">
+            <button data-suggestion="Gratidão a Deus" type="button">Gratidão</button>
+            <button data-suggestion="Consolo nos momentos difíceis" type="button">Consolo</button>
+            <button data-suggestion="Salvação pela graça" type="button">Salvação</button>
+            <button data-suggestion="Volta de Jesus e vigilância" type="button">Volta de Jesus</button>
+            <button data-suggestion="Salmo 23" type="button">Salmo 23</button>
+            <button data-suggestion="Filipenses 4:6" type="button">Filipenses 4:6</button>
+            <button data-suggestion="Filho Pródigo" type="button">Filho Pródigo</button>
           </div>
         </div>
 
         <div id="results-panel" class="results-panel hidden">
           <div class="results-heading">
-            <div><span class="section-kicker">RESULTADOS DA PESQUISA</span><h2 id="results-title">Hinos encontrados</h2><p id="results-subtitle"></p></div>
+            <div><h2 id="results-title" tabindex="-1">Hinos encontrados</h2><p id="results-subtitle" role="status"></p></div>
             <button id="new-search" class="text-action" type="button">Nova pesquisa <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5M4 4v4h4"/></svg></button>
           </div>
-          <p class="score-method">Afinidade estimada por evidências da letra, relações semânticas e embeddings E5 Small, quando disponíveis. Percentuais não são probabilidades.</p>
           <p id="vector-results-state" data-vector-ui class="vector-live" role="status" aria-live="polite"></p>
           <div class="results-layout">
+            <aside class="results-tools" aria-label="Ações da busca">
+              <div class="results-actions">
+                <button id="refine-toggle" class="secondary-btn" type="button" aria-controls="refine-panel" aria-expanded="false">Refinar</button>
+                <button id="gguf-compare" class="secondary-btn" type="button" disabled>Comparar hinos</button>
+              </div>
+              <div id="refine-panel" class="refine-panel hidden">
+                <p id="refine-mode" class="subtle-note">Busca contextual</p>
+                <div id="conversation" class="conversation" aria-live="polite"></div>
+                <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" enterkeyhint="send" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
+                <p class="privacy-note">Use “apenas” para exigir um tema, “sem” para excluir, “sem foco em” para reduzir a prioridade ou “nova busca por” para recomeçar.</p>
+              </div>
+            </aside>
             <div class="results-main">
               <div id="notice" class="notice hidden" role="status"></div>
-              <div id="search-diagnostics" class="semantic-interpret hidden"><strong>Como o índice interpretou a busca</strong><div id="search-concepts" class="concept-list"></div></div>
+              <details id="search-diagnostics" class="semantic-interpret hidden"><summary>Interpretação da busca</summary><div id="search-concepts" class="concept-list"></div></details>
               <div id="ai-workspace" data-gguf-ui class="ai-workspace hidden" aria-live="polite">
                 <div class="ai-workspace-head"><strong id="ai-state-badge" class="ai-stage">IA não carregada</strong><span id="ai-timer" class="ai-timer"></span></div>
                 <div id="ai-task" class="ai-task">Busca local disponível.</div>
@@ -120,7 +127,7 @@
               <div id="gguf-banner" data-gguf-ui class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
                 <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar com IA</button></div></div>
               <div id="gguf-comparison" class="ai-interpretation hidden"><div id="gguf-comparison-text" role="status" aria-live="polite"></div><div id="gguf-comparison-actions" class="ai-buttons"></div></div>
-        <div id="results-list" class="results-list" aria-live="polite"></div>
+              <div id="results-list" class="results-list" aria-live="polite"></div>
               <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
               <details id="not-learned-search" class="unlearned-drawer hidden">
                 <summary><span>Não aprendidos nesta pesquisa</span><strong id="not-learned-search-count">0</strong></summary>
@@ -129,18 +136,10 @@
                 <button id="not-learned-more" class="secondary-btn hidden" type="button">Ver mais não aprendidos</button>
               </details>
             </div>
-            <aside class="refine-panel">
-              <div class="refine-header"><span class="refine-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6 3 3M6 18l3-3m6-6 3-3"/></svg></span><div><h3>Refinar com contexto</h3><p id="refine-mode">Busca contextual</p></div></div>
-              <button id="gguf-compare" class="secondary-btn compare-offline" type="button" disabled>Comparar resultados</button>
-              <div id="conversation" class="conversation" aria-live="polite"></div>
-              <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
-              <p class="privacy-note">Use “apenas os de vigilância” para exigir um tema, “sem alegria” para excluir, “sem foco em alegria” para reduzir a prioridade ou “nova busca por esperança” para limpar o contexto.</p>
-            </aside>
           </div>
         </div>
       </section>
     </main>
-    <footer><span>Buscador de Hinos <span class="footer-dot">·</span> Três coleções 2018</span><span>Encontre pelo significado, confirme pela letra.</span></footer>
   </div>
 
   <div id="modal-layer" class="modal-layer hidden" aria-hidden="true">
@@ -150,8 +149,9 @@
       <div class="modal-body">
         <div class="modal-section repertoire-modal-status"><strong id="modal-repertoire-status">Disponível para indicação</strong><button id="modal-repertoire-toggle" class="secondary-btn" type="button">Marcar como não aprendido</button></div>
         <div class="related-heading"><button class="secondary-btn hidden" id="related-back" type="button">← Voltar ao hino anterior</button><span id="related-trail" class="related-trail"></span></div>
+        <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div>
         <section class="modal-section related-section" id="related-section" aria-label="Recomendações de hinos semelhantes">
-          <div class="related-top"><div><span class="section-kicker">DESCUBRA MAIS HINOS</span><h3>Hinos semelhantes a este</h3></div><span class="local-badge">100% offline</span></div>
+          <div class="related-top"><h3>Hinos semelhantes</h3></div>
           <p id="related-description" class="subtle-note">Letras comparadas por temas, narrativas e palavras relevantes.</p>
           <div id="related-list" class="related-list" aria-live="polite"></div>
           <details id="related-unlearned" class="unlearned-drawer hidden"><summary><span>Relacionados ainda não aprendidos</span><strong id="related-unlearned-count">0</strong></summary>
@@ -160,7 +160,7 @@
           </details>
           <p class="related-method">As porcentagens são índices de afinidade estimada, não probabilidades nem avaliação teológica oficial.</p>
         </section>
-        <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
+        <div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
       <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
       <div class="modal-bottom"><span id="modal-edition"></span><button class="secondary-btn" data-close="modal">Fechar</button></div>
     </section>
@@ -169,9 +169,16 @@
   <div id="settings-layer" class="modal-layer hidden" aria-hidden="true">
     <div class="modal-scrim" data-close="settings"></div>
     <section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
-      <div class="modal-top"><div><span class="modal-overline">APLICATIVO</span><h2 id="settings-title">Configurações</h2></div><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
-      <div class="settings-content"><p>Busca por palavras, conceitos e narrativas bíblicas, inteiramente offline depois de importar a coletânea.</p>
-      <details class="advanced-settings about-app" id="about-app" aria-label="Sobre o aplicativo">
+      <div class="modal-top"><h2 id="settings-title">Configurações</h2><button class="icon-button" data-close="settings" aria-label="Fechar configurações">×</button></div>
+      <div class="settings-tabs" role="tablist" aria-label="Seções das configurações">
+        <button id="settings-tab-library" role="tab" type="button" aria-selected="true" aria-controls="settings-panel-library">Biblioteca</button>
+        <button id="settings-tab-search" role="tab" type="button" aria-selected="false" aria-controls="settings-panel-search" tabindex="-1">Busca</button>
+        <button id="settings-tab-ai" role="tab" type="button" aria-selected="false" aria-controls="settings-panel-ai" tabindex="-1" data-gguf-ui>IA local</button>
+        <button id="settings-tab-about" role="tab" type="button" aria-selected="false" aria-controls="settings-panel-about" tabindex="-1">Sobre</button>
+      </div>
+      <div class="settings-content" id="settings-scroll">
+      <div id="settings-panel-about" role="tabpanel" aria-labelledby="settings-tab-about" tabindex="0" hidden>
+      <details class="advanced-settings about-app" id="about-app" aria-label="Sobre o aplicativo" open>
         <summary>Sobre</summary>
         <div class="about-content">
           <h3>Buscador de Hinos</h3>
@@ -186,6 +193,12 @@
           <p class="subtle-note">Informações obtidas diretamente do APK instalado; data exibida em UTC. Estes dados não dependem da conexão com a internet.</p>
         </div>
       </details><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span data-gguf-ui>Modelo GGUF</span><strong id="settings-ai" data-gguf-ui>Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      <details class="advanced-settings settings-sources"><summary>Fontes e licenças</summary>
+      <p class="subtle-note">Fontes das relações: Bible Topics Dataset (NEUU, CC BY 4.0) e Bible Cross-References Dataset (NEUU/OpenBible, CC BY 4.0), com curadoria de nomes narrativos em português. Fontes: <a href="https://github.com/neuu-org/bible-topics-dataset">Temas</a> e <a href="https://github.com/neuu-org/bible-crossrefs-dataset">Referências cruzadas</a>. Texto bíblico: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
+      <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p>
+      </details>
+      </div>
+      <div id="settings-panel-library" role="tabpanel" aria-labelledby="settings-tab-library" tabindex="0">
       <section class="semantic-settings" aria-label="Coleções e importação">
         <div class="setting-section-heading"><h3>Biblioteca unificada</h3><span class="local-badge">Offline</span></div>
         <p class="subtle-note">Escolha onde pesquisar. Hinos idênticos em várias coleções aparecem uma única vez, preservando suas referências de origem.</p>
@@ -194,7 +207,7 @@
         <label class="setting-check"><input id="collection-cia" type="checkbox" checked> Crianças, Intermediários e Adolescentes — CIA 2018 <small id="count-cia"></small></label>
         <label class="setting-check"><input id="collection-pessoal" type="checkbox" checked> Outros JSON importados <small id="count-pessoal"></small></label>
         <p class="subtle-note">No download são ignorados as coletâneas antigas e os grupos de teste do arquivo original. Os dados e a indexação ficam no telefone. E5 pré-calculado acompanha as três edições 2018; outras versões permanecem pesquisáveis pelo motor textual.</p>
-        <div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar 3 coleções</button><label class="secondary-btn file-upload">Importar JSON<input id="settings-file" type="file" accept=".json,application/json" hidden></label></div>
+        <div class="settings-actions"><button id="settings-import" class="secondary-btn" type="button">Atualizar 3 coleções</button><label class="secondary-btn file-upload">Importar JSON<input id="settings-file" type="file" accept=".json,application/json" class="sr-only"></label></div>
       </section>
       <section class="semantic-settings" aria-label="Repertório conhecido da igreja">
         <div class="setting-section-heading"><h3>Repertório da igreja</h3><span class="local-badge">Salvo no aparelho</span></div>
@@ -203,6 +216,8 @@
         <div id="knowledge-list" class="knowledge-list" aria-live="polite"></div>
         <p class="subtle-note">A lista não altera as letras nem os índices. Ela permanece nas atualizações normais do aplicativo; desinstalar ou limpar os dados pode apagá-la.</p>
       </section>
+      </div>
+      <div id="settings-panel-search" role="tabpanel" aria-labelledby="settings-tab-search" tabindex="0" hidden>
       <section class="semantic-settings" aria-label="Preferências de busca semântica">
         <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>
         <label for="search-mode">Prioridade da pesquisa</label>
@@ -250,7 +265,9 @@
         <div class="settings-actions"><button id="alias-add" class="secondary-btn" type="button">Adicionar associação</button></div>
         <div id="alias-list" class="alias-list" aria-live="polite"></div>
       </section>
-      <details class="advanced-settings" data-gguf-ui><summary>IA local experimental (GGUF)</summary><section class="gguf-box" aria-label="Modelo de IA local">
+      </div>
+      <div id="settings-panel-ai" role="tabpanel" aria-labelledby="settings-tab-ai" tabindex="0" hidden>
+      <section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (GGUF)</h3>
         <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. O modelo pode sugerir temas, comparar até cinco trechos e solicitar uma busca complementar na coletânea. Use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
         <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
@@ -261,9 +278,9 @@
         <div class="settings-actions"><button id="gguf-test" class="secondary-btn" type="button" disabled>Testar modelo</button><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div>
         <p id="gguf-test-result" class="subtle-note" role="status" aria-live="polite">Carregue o GGUF para testar a geração no aparelho.</p>
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
-      </section></details>
-      <p class="subtle-note">Fontes das relações: Bible Topics Dataset (NEUU, CC BY 4.0) e Bible Cross-References Dataset (NEUU/OpenBible, CC BY 4.0), com curadoria de nomes narrativos em português. Fontes: <a href="https://github.com/neuu-org/bible-topics-dataset">Temas</a> e <a href="https://github.com/neuu-org/bible-crossrefs-dataset">Referências cruzadas</a>. Texto bíblico: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
-      <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p></div>
+      </section>
+      </div>
+      </div>
     </section>
   </div>
   <div id="toast" role="status" class="toast hidden"></div>

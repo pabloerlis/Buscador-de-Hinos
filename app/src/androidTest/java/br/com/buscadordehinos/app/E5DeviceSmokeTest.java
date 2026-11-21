@@ -54,6 +54,27 @@ public class E5DeviceSmokeTest {
                 Thread.sleep(1000);
             }
             assertTrue("Interface or E5 native bridge did not load",ready);
+            assertEquals("Settings navigation or collection synchronization failed","true",
+                evaluate(web,
+                    "(()=>{" +
+                    "const el=id=>document.getElementById(id);" +
+                    "const open=el('open-settings'); open.focus(); open.click();" +
+                    "const library=el('settings-panel-library');" +
+                    "const main=el('collection-principal');" +
+                    "const quick=document.querySelector('[data-collection=principal]');" +
+                    "const previous=main.checked; main.click();" +
+                    "const synced=quick.checked===main.checked&&main.checked!==previous;" +
+                    "main.click();" +
+                    "const search=el('settings-tab-search'); search.click();" +
+                    "const preferences=library.hidden&&!el('settings-panel-search').hidden;" +
+                    "el('settings-tab-about').click();" +
+                    "const about=!el('settings-panel-about').hidden&&el('about-app').open;" +
+                    "document.querySelector('#settings-layer .icon-button[data-close]').click();" +
+                    "const restored=document.activeElement===open;" +
+                    "el('ai-indicator').click();" +
+                    "const ai=!el('settings-panel-ai').hidden;" +
+                    "document.querySelector('#settings-layer .icon-button[data-close]').click();" +
+                    "return synced&&preferences&&about&&restored&&ai;})()"));
             String metadata=evaluate(web,
                 "(()=>{try{const a=JSON.parse(window.NativeHinos.buildInfo());" +
                 "return a.versionName==='" + BuildConfig.VERSION_NAME +

@@ -1,6 +1,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
+const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
 const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
@@ -58,7 +59,16 @@ function resultCard(hymn,{unlearned=false}={}){
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
 }
-function showResults(){$('welcome-panel').classList.add('hidden');$('results-panel').classList.remove('hidden');$('results-panel').scrollIntoView({behavior:'smooth',block:'start'});}
+function showResults() {
+  $('welcome-panel').classList.add('hidden');
+  $('results-panel').classList.remove('hidden');
+  $('results-panel').scrollIntoView({block:'start'});
+}
+
+function setRefineOpen(open) {
+  $('refine-toggle').setAttribute('aria-expanded', String(open));
+  $('refine-panel').classList.toggle('hidden', !open);
+}
 async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false}={}){
   if(state.busy)return false;
   if(!state.ready){toast('Importe a coletânea para começar.');$('import-panel').scrollIntoView({behavior:'smooth',block:'center'});return false;}
@@ -184,8 +194,30 @@ $('related-list').addEventListener('click',event=>{
 $('related-back').addEventListener('click',()=>{
   if(state.hymnTrail.length>1){const prior=state.hymnTrail[state.hymnTrail.length-2];openHymn(prior,{back:true});}
 });
-function openLayer(name){const el=$(name+'-layer');el.classList.remove('hidden');el.setAttribute('aria-hidden','false');state.activeModal=name;document.body.style.overflow='hidden';q('.icon-button[data-close]',el)?.focus();}
-function closeLayer(){if(!state.activeModal)return;const el=$(state.activeModal+'-layer');el.classList.add('hidden');el.setAttribute('aria-hidden','true');state.activeModal=null;document.body.style.overflow='';}
+let modalTrigger = null;
+function openLayer(name) {
+  const layer = $(name+'-layer');
+  modalTrigger = document.activeElement;
+  layer.classList.remove('hidden');
+  layer.setAttribute('aria-hidden','false');
+  state.activeModal = name;
+  document.body.style.overflow = 'hidden';
+  q('.icon-button[data-close]', layer).focus();
+  q('.app-shell').inert = true;
+}
+
+function closeLayer() {
+  if (!state.activeModal) return;
+  const layer = $(state.activeModal+'-layer');
+  state.activeModal = null;
+  document.body.style.overflow = '';
+  q('.app-shell').inert = false;
+  const focusTarget = modalTrigger?.getClientRects().length ? modalTrigger : $('search-input');
+  focusTarget.focus({preventScroll:true});
+  layer.classList.add('hidden');
+  layer.setAttribute('aria-hidden','true');
+  modalTrigger = null;
+}
 async function importRemote(){
   const buttons=[$('import-remote'),$('settings-import'),$('upgrade-import')];buttons.forEach(b=>{b.disabled=true;b.textContent='Importando…';});
   try{const r=await jsonRequest('/api/import-remote',{});toast(`Biblioteca atualizada: ${r.count} hinos únicos; ${r.added} novos; ${r.duplicates} registros duplicados.`);await refreshStatus();closeLayer();}
@@ -195,17 +227,96 @@ async function importRemote(){
 async function importFile(input){const file=input.files?.[0];if(!file)return;if(file.size>12_000_000){toast('O arquivo precisa ter até 12 MB.');return;}
   try{const data=JSON.parse(await file.text());const response=await jsonRequest('/api/import',{data});toast(`Biblioteca: ${response.count} hinos únicos (${response.added} novos).`);await refreshStatus();closeLayer();}
   catch(e){toast('Falha ao importar JSON: '+e.message);}finally{input.value='';}}
-$('search-form').addEventListener('submit',ev=>{ev.preventDefault();performSearch($('search-input').value.trim());});
-$('refine-form').addEventListener('submit',async ev=>{ev.preventDefault();const message=$('refine-input').value.trim();if(!message||state.busy)return;appendConversation('user',message);$('refine-input').value='';const success=await performSearch(message,{refine:true});appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados. Acrescente outra restrição se necessário.`:'Não consegui refinar a pesquisa.');});
+async function submitSearch(query) {
+  if (query && state.ready && !state.busy) {
+    $('collection-picker').open=false;
+    $('search-diagnostics').open=false;
+    setRefineOpen(false);
+    $('conversation').replaceChildren();
+  }
+  if (await performSearch(query)) $('results-title').focus({preventScroll:true});
+}
+$('search-form').addEventListener('submit',ev=>{ev.preventDefault();submitSearch($('search-input').value.trim());});
+$('refine-toggle').addEventListener('click',()=>{
+  const open=$('refine-panel').classList.contains('hidden');
+  setRefineOpen(open);
+  if(open)$('refine-input').focus();
+});
+$('refine-form').addEventListener('submit',async ev=>{
+  ev.preventDefault();
+  const message=$('refine-input').value.trim();
+  if(!message||state.busy)return;
+  appendConversation('user',message);
+  $('refine-input').value='';
+  const success=await performSearch(message,{refine:true});
+  appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados.`:'Não consegui refinar a pesquisa.');
+  if(success){
+    setRefineOpen(false);
+    $('results-title').focus({preventScroll:true});
+  }
+});
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
 $('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
-document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;performSearch(b.dataset.suggestion);}));
-$('open-settings').addEventListener('click',()=>openLayer('settings'));$('ai-indicator').addEventListener('click',()=>openLayer('settings'));
+document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
+
+const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
+function selectSettingsTab(tab) {
+  for (const candidate of settingsTabs) {
+    const selected = candidate === tab;
+    candidate.setAttribute('aria-selected', String(selected));
+    candidate.tabIndex = selected ? 0 : -1;
+    $(candidate.getAttribute('aria-controls')).hidden = !selected;
+  }
+  $('settings-scroll').scrollTop = 0;
+  if (tab.id === 'settings-tab-about') BuildAbout.render();
+}
+for (const tab of settingsTabs) {
+  tab.addEventListener('click',()=>selectSettingsTab(tab));
+  tab.addEventListener('keydown',event=>{
+    const visible = settingsTabs.filter(candidate=>candidate.getClientRects().length);
+    const index = visible.indexOf(tab);
+    const next = {ArrowLeft:(index+visible.length-1)%visible.length,
+      ArrowRight:(index+1)%visible.length, Home:0, End:visible.length-1}[event.key];
+    if (next === undefined) return;
+    event.preventDefault();
+    selectSettingsTab(visible[next]);
+    visible[next].focus();
+  });
+}
+$('open-settings').addEventListener('click',()=>{
+  selectSettingsTab($('settings-tab-library'));
+  openLayer('settings');
+});
+$('ai-indicator').addEventListener('click',()=>{
+  selectSettingsTab($('settings-tab-ai'));
+  openLayer('settings');
+});
 $('about-app').addEventListener('toggle',()=>{if($('about-app').open)BuildAbout.render();});
 $('import-remote').addEventListener('click',importRemote);$('settings-import').addEventListener('click',importRemote);$('upgrade-import').addEventListener('click',importRemote);
 $('import-file').addEventListener('change',ev=>importFile(ev.target));$('settings-file').addEventListener('change',ev=>importFile(ev.target));
-document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeLayer));document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeLayer();});
+document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeLayer));
+document.addEventListener('keydown',event=>{
+  if (!state.activeModal) return;
+  if (event.key === 'Escape') {
+    event.preventDefault();
+    closeLayer();
+    return;
+  }
+  if (event.key !== 'Tab') return;
+  const dialog = q('[role="dialog"]', $(state.activeModal+'-layer'));
+  const focusable = [...dialog.querySelectorAll('button, a[href], input, select, summary, [tabindex]')]
+    .filter(el=>el.tabIndex>=0 && !el.disabled && el.getClientRects().length);
+  const first = focusable[0];
+  const last = focusable[focusable.length-1];
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
+});
 
 // Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
 const SearchPreferences=(()=>{
@@ -236,10 +347,7 @@ const SearchPreferences=(()=>{
       else input.value=String(cfg[key]);
     }
     $('rec-weight-value').textContent=cfg.recWeight+'%';$('semantic-power-value').textContent=cfg.strength+'%';$('min-affinity-value').textContent=cfg.minAffinity+'%';
-    for(const id of ['principal','avulsos','cia','pessoal']){
-      $('collection-'+id).checked=cfg.collections[id]!==false;
-      const quick=document.querySelector('[data-collection="'+id+'"]');if(quick)quick.checked=cfg.collections[id]!==false;
-    }
+    syncCollections();
     renderAliases();
   }
   function readInputs(){
@@ -247,7 +355,7 @@ const SearchPreferences=(()=>{
     for(const [key,id] of Object.entries(ids)){
       const input=$(id);options[key]=input.type==='checkbox'?input.checked:input.type==='range'||key==='pageSize'||key==='bibleDepth'?Number(input.value):input.value;
     }
-    options.collections=Object.fromEntries(['principal','avulsos','cia','pessoal'].map(id=>[id,$('collection-'+id).checked]));
+    options.collections=state.searchSettings.collections;
     if(!window.NativeVector)options.vectorMode='off';
     return OfflineAPI.searchOptions(options);
   }
@@ -259,13 +367,30 @@ const SearchPreferences=(()=>{
   function refreshSearch(){
     if(state.ready&&state.effectiveQuery)performSearch(state.effectiveQuery,{semanticHints:state.semanticHints,autoAI:false,preserveContext:true});
   }
+  function syncCollections() {
+    const selected = collectionIds.filter(id=>state.searchSettings.collections[id]!==false);
+    for (const id of collectionIds) {
+      const checked = selected.includes(id);
+      $('collection-'+id).checked = checked;
+      q(`[data-collection="${id}"]`).checked = checked;
+    }
+    $('collection-selection').textContent = selected.length===collectionIds.length?'Todas':
+      selected.length===0?'Nenhuma':`${selected.length} de ${collectionIds.length}`;
+  }
   $('rec-weight').oninput=()=>{$('rec-weight-value').textContent=$('rec-weight').value+'%';};
   $('semantic-power').oninput=()=>{$('semantic-power-value').textContent=$('semantic-power').value+'%';};
   $('min-affinity').oninput=()=>{$('min-affinity-value').textContent=$('min-affinity').value+'%';};
   $('settings-search-save').onclick=()=>{save();closeLayer();refreshSearch();toast('Preferências de busca aplicadas.');};
-  document.querySelectorAll('[data-collection]').forEach(input=>input.addEventListener('change',()=>{
-    const id=input.dataset.collection; $('collection-'+id).checked=input.checked;save();refreshSearch();
-  }));
+  for (const id of collectionIds) {
+    for (const input of [$('collection-'+id), q(`[data-collection="${id}"]`)]) {
+      input.addEventListener('change',()=>{
+        state.searchSettings.collections[id] = input.checked;
+        localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
+        syncCollections();
+        refreshSearch();
+      });
+    }
+  }
   $('settings-search-reset').onclick=()=>{
     state.searchSettings=OfflineAPI.searchOptions(defaults);localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
     fill();refreshSearch();toast('Configurações restauradas.');
@@ -492,7 +617,7 @@ const GGUF=(()=>{
     $('gguf-model-meta').textContent=`Tamanho GGUF: ${fmt(status.modelMB)} · Armazenamento livre: ${fmt(status.storageMB)} · Cache local: ${fmt(status.cachedMB)} · RAM disponível: ${fmt(status.availableMB)} · RAM total: ${fmt(status.totalMB)} · Memória nativa usada: ${fmt(status.nativeMB)}. Valores aproximados, sujeitos às restrições do Android.`;
     if(status.lastError){$('gguf-last').textContent='Erro mais recente: '+status.lastError;}
     else if(status.lastDurationMs>0){$('gguf-last').textContent=`Última execução: ${Math.round(status.lastDurationMs/1000)} s`;}
-    $('gguf-banner').classList.toggle('hidden',!state.ready);
+    $('gguf-banner').classList.toggle('hidden',!state.ready||!selectedState.ready);
     $('ai-workspace').classList.toggle('hidden',!selectedState.ready&&!selectedState.busy);
     $('gguf-banner-text').textContent=selectedState.ready?'IA local disponível':'Carregue um GGUF em Configurações para usar a IA.';
     updateIndicator(status);
