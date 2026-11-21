@@ -14,6 +14,7 @@
 #include <new>
 
 static llama_model* g_model=nullptr;
+static llama_context* g_context=nullptr; // Reutilizado entre solicitações, liberado antes do modelo.
 static std::mutex g_mutex;
 static std::mutex g_log_mutex;
 static bool g_initialized=false;
@@ -21,6 +22,11 @@ static std::string g_recent_logs;
 static std::atomic<int> g_load_progress{0};
 static std::atomic<int> g_generation_stage{0};
 static std::atomic<bool> g_cancel{false};
+static std::atomic<int> g_prompt_tokens{0};
+static std::atomic<long long> g_setup_ms{0};
+static std::atomic<long long> g_prefill_ms{0};
+static std::atomic<long long> g_first_token_ms{-1};
+static std::atomic<long long> g_generated_tokens{0};
 
 using Clock = std::chrono::steady_clock;
 
@@ -84,11 +90,27 @@ extern "C" JNIEXPORT void JNICALL
 Java_br_com_buscadordehinos_app_MainActivity_nativeResetCancellation(JNIEnv*,jclass){
     g_cancel.store(false,std::memory_order_relaxed);
     g_generation_stage.store(0,std::memory_order_relaxed);
+    g_prompt_tokens.store(0);
+    g_setup_ms.store(0);
+    g_prefill_ms.store(0);
+    g_first_token_ms.store(-1);
+    g_generated_tokens.store(0);
 }
 
 extern "C" JNIEXPORT jint JNICALL
 Java_br_com_buscadordehinos_app_MainActivity_nativeGenerationStage(JNIEnv*,jclass){
     return g_generation_stage.load(std::memory_order_relaxed);
+}
+
+extern "C" JNIEXPORT jlongArray JNICALL
+Java_br_com_buscadordehinos_app_MainActivity_nativeGenerationStats(JNIEnv* env,jclass){
+    const jlong snapshot[] = {
+        g_prompt_tokens.load(),g_setup_ms.load(),g_prefill_ms.load(),
+        g_first_token_ms.load(),g_generated_tokens.load(),g_generation_stage.load()
+    };
+    jlongArray result=env->NewLongArray(6);
+    if(result)env->SetLongArrayRegion(result,0,6,snapshot);
+    return result;
 }
 
 extern "C" JNIEXPORT jint JNICALL
@@ -104,6 +126,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeLoad(JNIEnv* env,jclass,jstri
     if(!cpath){javaException(env,"Caminho do arquivo inválido.");return nullptr;}
     std::string path(cpath);env->ReleaseStringUTFChars(pathString,cpath);
     try {
+        if(g_context){llama_free(g_context);g_context=nullptr;}
         if(g_model){llama_model_free(g_model);g_model=nullptr;}
         if(!g_initialized){llama_log_set(recordLog,nullptr);llama_backend_init();g_initialized=true;}
         {std::lock_guard<std::mutex> lock(g_log_mutex);g_recent_logs.clear();}
@@ -128,6 +151,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeLoad(JNIEnv* env,jclass,jstri
 extern "C" JNIEXPORT void JNICALL
 Java_br_com_buscadordehinos_app_MainActivity_nativeUnload(JNIEnv*,jclass){
     std::lock_guard<std::mutex> guard(g_mutex);
+    if(g_context){llama_free(g_context);g_context=nullptr;}
     if(g_model){llama_model_free(g_model);g_model=nullptr;}
     g_load_progress.store(0);
 }
@@ -161,6 +185,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         std::vector<llama_token> tokens(n_tokens);
         int count=llama_tokenize(vocab,prompt.c_str(),prompt.size(),tokens.data(),n_tokens,true,true);
         if(count<0){javaException(env,"Falha na tokenização do prompt.");return nullptr;}
+        g_prompt_tokens.store(count);
         const int predict=std::clamp(static_cast<int>(tokenLimit),1,120);
         llama_context_params cp=llama_context_default_params();
         cp.n_ctx=1280;
@@ -171,8 +196,13 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         cp.abort_callback_data=&deadline;
         cp.n_threads=std::min(4,std::max(1,(int)std::thread::hardware_concurrency()));
         cp.n_threads_batch=cp.n_threads;
-        std::unique_ptr<llama_context, decltype(&llama_free)> ctx(llama_init_from_model(g_model,cp), llama_free);
-        if(!ctx){javaException(env,"Não foi possível alocar contexto de 1280 tokens. A RAM efetivamente disponível para este processo pode ser menor que a exibida no sistema.");return nullptr;}
+        if(!g_context)g_context=llama_init_from_model(g_model,cp);
+        if(!g_context){javaException(env,"Não foi possível alocar contexto de 1280 tokens. A RAM efetivamente disponível para este processo pode ser menor que a exibida no sistema.");return nullptr;}
+        // O callback aponta para um deadline desta chamada: nunca o deixe pendurado no contexto em cache.
+        llama_set_abort_callback(g_context,shouldCancel,&deadline);
+        struct AbortScope {llama_context* context; ~AbortScope(){llama_set_abort_callback(context,nullptr,nullptr);} } abortScope{g_context};
+        llama_memory_clear(llama_get_memory(g_context),true); // Limpa inclusive estado recorrente (LFM3).
+        llama_context* ctx=g_context;
         std::unique_ptr<llama_sampler, decltype(&llama_sampler_free)> sampler(
             llama_sampler_chain_init(llama_sampler_chain_default_params()), llama_sampler_free);
         if(!sampler){javaException(env,"Não foi possível inicializar a amostragem.");return nullptr;}
@@ -186,6 +216,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         llama_sampler_chain_add(sampler.get(), greedy);
 
         const jlong setupMs = elapsedMs(started);
+        g_setup_ms.store(setupMs);
         g_generation_stage.store(2,std::memory_order_relaxed);
         const auto prefillStarted = Clock::now();
         std::string out;
@@ -195,18 +226,20 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
             if(shouldCancel(&deadline)) {failed=true;break;}
             int length=std::min(96,count-begin);
             llama_batch batch=llama_batch_get_one(tokens.data()+begin,length);
-            if(llama_decode(ctx.get(),batch)!=0){failed=true;break;}
+            if(llama_decode(ctx,batch)!=0){failed=true;break;}
         }
         const jlong prefillMs = elapsedMs(prefillStarted);
+        g_prefill_ms.store(prefillMs);
         jlong firstTokenMs = -1;
         jlong generated = 0;
         if(!failed){
             g_generation_stage.store(3,std::memory_order_relaxed);
             for(int i=0;i<predict;i++){
                 if(shouldCancel(&deadline)){failed=true;break;}
-                llama_token next=llama_sampler_sample(sampler.get(),ctx.get(),-1);
+                llama_token next=llama_sampler_sample(sampler.get(),ctx,-1);
                 if(llama_vocab_is_eog(vocab,next))break;
-                if (generated++ == 0) firstTokenMs = elapsedMs(started);
+                if (generated++ == 0) {firstTokenMs = elapsedMs(started); g_first_token_ms.store(firstTokenMs);}
+                g_generated_tokens.store(generated);
                 int size=llama_token_to_piece(vocab,next,nullptr,0,0,true);
                 if(size<0)size=-size;
                 if(size>0&&size<4096){
@@ -216,7 +249,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
                 }
                 if(i+1<predict){
                     llama_batch nextBatch=llama_batch_get_one(&next,1);
-                    if(llama_decode(ctx.get(),nextBatch)!=0){failed=true;break;}
+                    if(llama_decode(ctx,nextBatch)!=0){failed=true;break;}
                 }
             }
         }
