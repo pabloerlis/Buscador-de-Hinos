@@ -1,6 +1,13 @@
 {
   "schema_version": 1,
-  "status": "pending",
-  "fingerprint": null,
-  "policy": "Set only after diagnostic first run. A second independently rebuilt run must exactly match."
+  "status": "locked",
+  "fingerprint": {
+    "model_sha256": "4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c",
+    "tokenizer_sha256": "0b44a9d7b51c3c62626640cda0e2c2f70fdacdc25bbbd68038369d14ebdf4c39",
+    "catalog_sha256": "57d42fb0bcc881a62b210dd1a3972822d2c39856f7a01278e104d407bf1b747a",
+    "index_sha256": "500bd1d4ef3d79569a7a268e798065683729657530a3aca1fc2ba8eea7e73f81",
+    "queries_sha256": "29ed5b851fc118bddbe2253e95ed9b5d02c3399539f5c0981b8c5bfc0d21f983"
+  },
+  "source": "Diagnostic rebuild CI 44855394926, independently recomputed 12 queries and 64 passages; prior CI 44852130609 has matching packed index/query hashes, different source branch.",
+  "policy": "Must match freshly rebuilt index and 12 actual E5 vectors for every release; never embed hymn lyrics."
 }
