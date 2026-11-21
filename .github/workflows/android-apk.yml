@@ -322,6 +322,16 @@ jobs:
         with:
           name: semantic-search-agent-qa
           path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-build-evidence-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: lfm3-android-evidence-qa
+          path: qa-report
+      - name: Agente independente - verificar flags, benchmark comparativo e inferência real
+        run: python3 scripts/qa_native_performance_gate.py
       - name: Autoteste do agente com exemplos positivos e negativos
         run: node tests/test-semantic-crossversion-gate.js
       - name: Agente 10 - conferir mudancas de posicao e metricas cross-version
@@ -370,10 +380,36 @@ jobs:
           path: qa-report
       - name: Gerar referencia E5 ONNX 384D apenas para os testes Android
         run: python3 scripts/qa_android_query_canary.py qa-report/e5-paraphrase-vectors.json app/src/androidTest/assets/e5-query-canary.json
-      - name: Compilar APK debug
+      - name: Compilar baseline nativa Debug sem -O3 para comparação isolada
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true
+        run: |
+          gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PoptimizeGgufNative=false
+          mkdir -p qa-baseline
+          cp app/build/outputs/apk/debug/app-debug.apk qa-baseline/app-debug.apk
+          python3 scripts/qa_native_compile_flags.py --mode baseline
+      - name: Guardar APK baseline apenas como controle de desempenho
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-baseline-native-qa
+          path: qa-baseline/app-debug.apk
+          retention-days: 1
+          if-no-files-found: error
+      - name: Compilar APK debug com os kernels nativos otimizados
+        env:
+          BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PoptimizeGgufNative=true
+      - name: Auditar compile_commands.json REAL ARM64 e x86_64 (bloqueante)
+        run: python3 scripts/qa_native_compile_flags.py --mode optimized
+      - name: Publicar comandos e flags efetivos de ambas as compilações
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-build-evidence-qa
+          path: |
+            qa-report/native-flags-baseline.json
+            qa-report/native-flags-optimized.json
+          retention-days: 30
+          if-no-files-found: error
       - name: Guardar candidato para auditoria (ainda nao aprovado)
         uses: actions/upload-artifact@v4
         with:
@@ -430,6 +466,63 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+  lfm3_model_qa:
+    name: "Agente 12 | GGUF LFM3 oficial no Android JNI"
+    needs: [build_apk, device_smoke]
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-candidate-qa
+          path: apk-candidate
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-instrumentation-qa
+          path: apk-instrumentation
+      - uses: actions/download-artifact@v4
+        with:
+          name: apk-baseline-native-qa
+          path: apk-baseline
+      - name: Baixar GGUF LFM3 oficial para teste, jamais para APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --show-error --silent --retry 3 --connect-timeout 30 \
+            --max-time 1200 \
+            'https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF/resolve/main/LFM3-1.7B-QAD-Q4_0.gguf' \
+            --output /tmp/LFM3-1.7B-QAD-Q4_0.gguf
+          echo "43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452  /tmp/LFM3-1.7B-QAD-Q4_0.gguf" | sha256sum --check
+      - name: Habilitar KVM no emulador
+        shell: bash
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instalar o APK completo e inferir com o GGUF oficial no Android offline
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 4096M
+          heap-size: 512M
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          script: bash scripts/qa_lfm3_android_emulator.sh
+      - name: Guardar evidência Android LFM3 real
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lfm3-android-evidence-qa
+          path: |
+            qa-report/lfm3-device-evidence.log
+            qa-report/lfm3-native-benchmark.json
+          retention-days: 30
+          if-no-files-found: ignore
+
   audit_apk:
     name: "Agente 7 | Auditoria do APK validado em Android"
     needs: [build_apk, device_smoke]
@@ -464,7 +557,7 @@ jobs:
 
   independent_review:
     name: "Agente 8 | Testes independentes e analise critica da entrega"
-    needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
+    needs: [audit_apk, device_smoke, lfm3_model_qa, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -564,6 +657,14 @@ jobs:
         with:
           name: semantic-crossversion-agent-qa
           path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: lfm3-android-evidence-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-build-evidence-qa
+          path: qa-report
       - name: Verificar que o agente independente aprovou antes da publicação
         shell: bash
         run: |
@@ -580,6 +681,10 @@ jobs:
           gate=json.loads(Path('qa-report/semantic-crossversion-agent.json').read_text())
           assert gate['decision']=='approved' and not gate['errors'], 'Agente 10 reprovou'
           assert Path('apk-candidate/app-debug.apk').is_file()
+          perf=json.loads(Path('qa-report/lfm3-native-benchmark.json').read_text())
+          assert perf['passed'] is True and perf['baseline']['compare']['total_ms']>0 and perf['optimized']['compare']['total_ms']>0
+          for mode in ('baseline', 'optimized'):
+            assert json.loads(Path(f'qa-report/native-flags-{mode}.json').read_text())['passed'] is True
           PY
       - name: Identificar a versao do artefato
         id: meta
@@ -598,6 +703,10 @@ jobs:
             qa-report/independent-review.json
             qa-report/semantic-crossversion-agent.json
             qa-report/android-device-evidence.log
+            qa-report/lfm3-device-evidence.log
+            qa-report/lfm3-native-benchmark.json
+            qa-report/native-flags-baseline.json
+            qa-report/native-flags-optimized.json
             reports/validation/relatorio-completo.md
             reports/validation/relatorio-simples.md
           retention-days: 90
