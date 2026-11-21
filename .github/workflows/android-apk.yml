@@ -177,6 +177,20 @@ jobs:
           path: app/src/main/assets
       - name: Comparar ações e personagens com mecanismo ligado e desligado
         run: node tests/qa_event_ranking.js /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json
+      - name: Medir RRF vs eventos A/B com catalogo e vetores identicos
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE_SHA=fda52c2fe548f5fcbcdd2bd9ea2359f02c774bcf
+          ALT_SHA=1dda4aeeab7d7de4941736f34eb5a86240840b79
+          git fetch --no-tags --depth=1 origin "$BASE_SHA" "$ALT_SHA"
+          git worktree add --detach /tmp/hinos-rrf "$BASE_SHA"
+          git worktree add --detach /tmp/hinos-event-b "$ALT_SHA"
+          node tests/qa_event_variant_matrix.js \
+            /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json \
+            /tmp/hinos-rrf/app/src/main/assets \
+            "$PWD/app/src/main/assets" \
+            /tmp/hinos-event-b/app/src/main/assets
       - name: Registrar métricas de recuperação sem letras
         if: always()
         uses: actions/upload-artifact@v4
@@ -186,6 +200,7 @@ jobs:
             qa-report/e5-metrics.json
             qa-report/e5-hybrid.json
             qa-report/event-ranking.json
+            qa-report/event-variant-matrix.json
           retention-days: 30
           if-no-files-found: ignore
       - name: Preservar apenas os artefatos que entram no APK E5
