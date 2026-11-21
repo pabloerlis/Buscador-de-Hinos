@@ -1,7 +1,5 @@
 name: E5 CPU diagnostic - int8 vs uint8
 on:
-  push:
-    branches: [feat/e5-deterministic-stability-269]
   workflow_dispatch:
 permissions:
   contents: read
