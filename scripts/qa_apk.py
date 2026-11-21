@@ -65,7 +65,7 @@ with zipfile.ZipFile(APK) as archive:
         check(any(n.endswith("/libonnxruntime.so") and "arm64-v8a" in n for n in files),
               "Biblioteca ONNX Runtime ARM64 ausente")
         if all(n in files for n in required_e5):
-            model_sha="4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c"
+            model_sha="ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1"
             data=archive.read("assets/e5-model.onnx")
             check(len(data)>100_000_000 and hashlib.sha256(data).hexdigest()==model_sha,
                   "Modelo E5 incompatível com SHA-256 fixado")
