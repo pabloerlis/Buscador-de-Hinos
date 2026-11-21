@@ -33,8 +33,18 @@ const StoryEngine = (() => {
         // Com apenas dois sinais independentes, exigir ao menos um sinal contextual específico.
         const evidence=[...new Set([...phraseHits,...groupHits.flat()])];
         const groupQuality=groups.length>=3?3:groups.length===2?1.5:0;
-        const score=Math.min(18, phraseHits.length*7.5 + groupQuality*3 + Math.min(3,evidence.length)*0.45);
-        profile.push({id:s.id,label:s.label,score:+score.toFixed(2),evidence:evidence.slice(0,6),reference:s.reference,kind:phraseHits.length?'expressão específica':'conjunto de evidências'});
+        // Reconhece a sequência descrita ao longo de estrofes diferentes,
+        // sem depender da presença literal do nome da parábola.
+        const fullLyrics=' '+normLyrics.replace(/[^a-z0-9]+/g,' ')+' ';
+        const completeReturnArc=s.id==='filho_prodigo' &&
+          / (?:deixei|abandonei|parti|partiu|afastei|longe|perdi|perdido|desviei) /.test(fullLyrics) &&
+          / (?:voltei|voltou|voltando|volto|retornei|regressei|regressou|retornar) /.test(fullLyrics) &&
+          / (?:pai|casa|lar) /.test(fullLyrics) &&
+          / (?:abracaste|abraco|abracou|recebeu|recebeste|acolheu|acolheste|festa|perdoaste|perdoado) /.test(fullLyrics);
+        const score=Math.min(18, phraseHits.length*7.5 + groupQuality*3 + Math.min(3,evidence.length)*0.45+
+          (completeReturnArc?7.5:0));
+        profile.push({id:s.id,label:s.label,score:+score.toFixed(2),evidence:evidence.slice(0,6),reference:s.reference,
+          kind:completeReturnArc?'sequência de afastamento, retorno e acolhimento':phraseHits.length?'expressão específica':'conjunto de evidências'});
       }
       return profile.sort((a,b)=>b.score-a.score).slice(0,18);
     }
