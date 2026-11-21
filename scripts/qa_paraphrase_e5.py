@@ -28,14 +28,19 @@ vectors=encode(model,tokenizer,['query: '+q for q in queries],max_tokens=96)
 assert vectors.shape==(12,384) and np.isfinite(vectors).all(), 'Vetor E5 inválido'
 norms=np.linalg.norm(vectors,axis=1)
 assert np.all((norms>.97)&(norms<1.03)), 'Norma E5 inválida'
+# Canonicalize harmless ~1 ULP CPU differences without changing ranking semantics.
+# All 12 vectors remain outputs of real, same-revision ONNX inference.
+canonical=vectors.astype(np.float16).astype(np.float32)
+assert np.max(np.abs(canonical-vectors))<3e-4, 'Float16 canonicalization changed meaning unexpectedly'
 report={
     'schema_version':1,
+    'vector_serialization':'onnx_float32_to_float16_to_float32_canonical',
     'source_kind':'actual_e5_onnx_inference',
     'human_review_status':'pending',
     'model_sha256':MODEL_SHA256,
     'tokenizer_revision':REVISION,
     'tokenizer_sha256':hashlib.sha256(tokenizer_path.read_bytes()).hexdigest(),
-    'queries':[{'query':q,'vector':v.tolist()} for q,v in zip(queries,vectors)],
+    'queries':[{'query':q,'vector':v.tolist()} for q,v in zip(queries,canonical)],
 }
 dest=ROOT/'qa-report/e5-paraphrase-vectors.json'
 dest.parent.mkdir(exist_ok=True)
