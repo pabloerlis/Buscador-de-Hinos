@@ -101,10 +101,18 @@ async function run(catalogFile){
       pass:place>=0&&place<allowedPosition,
       details:'posição='+(place+1)+'; esperado top '+allowedPosition});
   }
+  const invitation=details.find(h=>norm(h.title)==='vem o prodigo');
+  const prodigalAudit=audits.find(a=>a.query==='Filho Pródigo');
+  const invitationPlace=prodigalAudit?.top10.findIndex(h=>h.id===invitation?.id)??-1;
+  checks.push({name:'Convite explícito ao pródigo preservado na busca',
+    pass:!!invitation&&invitationPlace>=0,
+    details:'posição='+(invitationPlace+1)+'; hino='+String(invitation?.title||'ausente')});
   for(const query of ['Mulher fluxo de sangue','Marcos 5:25-34']){
     const a=audits.find(x=>x.query===query);
     const place261=a?.top10.findIndex(hit=>hit.number==='261')??-1;
     const placeGeneric=a?.top10.findIndex(hit=>hit.number==='614')??-1;
+    checks.push({name:'Hino 261 é primeira sugestão da cena da mulher curada: '+query,
+      pass:place261===0,details:'posição='+(place261+1)});
     checks.push({name:'Narrativa de cura deve superar hino sobre expiação: '+query,
       pass:place261>=0&&(placeGeneric<0||place261<placeGeneric),
       details:'hino261='+(place261+1)+'; hino614='+(placeGeneric+1)});
