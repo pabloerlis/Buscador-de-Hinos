@@ -113,6 +113,12 @@ require("tests/qa_relevance_50.js" in workflow and "qa-report/relevance-50.json"
 require("scripts/qa_independent_review.py" in workflow,
         "Agente 8 de revisão independente obrigatório")
 require("scripts/qa_e5.py" in workflow, "Agente de embeddings E5 ausente")
+require("-PenableLocalEmbeddings=true -PenableLocalModels=true" in workflow,
+        "Compilação de entrega perdeu E5 ou motor GGUF nativo")
+require("EXPECT_E5_EMBEDDINGS: 'true'" in workflow and "EXPECT_GGUF_ENGINE: 'true'" in workflow,
+        "Auditoria de APK não exige ambos os motores locais")
+require("node tests/agents/run-validation.js" in workflow and
+        "full_lyrics_qa" in workflow, "Agentes de letras completas não bloqueiam a compilação")
 golden=ROOT/"qa/e5-index-golden.json"
 reference=json.loads((ROOT/"qa/e5-stability-reference.json").read_text(encoding="utf-8"))
 require(reference.get("status")=="locked" and golden.is_file(),
