@@ -315,6 +315,13 @@ def audit_semantic_search_agent():
     check(data.get("schema_version")==1 and data.get("agent")=="9-independent-semantic-search" and
           data.get("status")=="approved" and data.get("review_status")=="pending",
           "Agente 9 não aprovou testes da busca semântica")
+    stability=load_json("e5-stability.json")
+    check(stability.get("schema_version")==1 and stability.get("status")=="approved" and
+          stability.get("baseline_matched") is True and
+          stability.get("same_session_equal") is True and
+          stability.get("fresh_session_equal") is True and
+          stability.get("recomputed_index_passages_equal",0)>=64,
+          "Estabilidade E5 entre builds não comprovada pelos agentes 5/9")
     check(data.get("catalog_sha256")==ref.get("catalog_sha256") and
           data.get("model_sha256")==ref.get("e5_coverage",{}).get("model_sha256"),
           "Agente 9 usou catálogo ou modelo diferente")
