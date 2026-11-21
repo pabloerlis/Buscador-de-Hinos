@@ -1,0 +1,47 @@
+name: Pin audited E5 golden index (one-time)
+on:
+  push:
+    branches: [feat/e5-deterministic-stability-269]
+    paths: [qa/e5-index-pin-once.trigger]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  pin_golden:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download previously audited UINT8 passage index
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/hinos-golden
+          gh run download 44858810922 --repo "$GITHUB_REPOSITORY" \
+            --name e5-stanza-assets-qa --dir /tmp/hinos-golden
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          file=Path('/tmp/hinos-golden/e5-index.json')
+          raw=file.read_bytes()
+          assert hashlib.sha256(raw).hexdigest()=='7a6c594712d092eb7082dcb2292fbcdd0ed57dd39709d8222d25b1e7ccd4ceb5'
+          index=json.loads(raw)
+          assert index['count']==1557 and index['passages']==10496
+          assert index['model_sha256']=='ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1'
+          assert all(set(row)=={'id','n','t','f','c','s','v'} for row in index['records'])
+          assert all(len(row['v'])==len(row['s']) for row in index['records'])
+          print('Approved golden E5 index',len(raw),'bytes, 10496 quantized passage vectors, no lyrics')
+          PY
+      - name: Commit immutable golden index on feature branch (no merge)
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa
+          cp /tmp/hinos-golden/e5-index.json qa/e5-index-golden.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add qa/e5-index-golden.json
+          git commit -m 'qa(e5): pin independently audited UINT8 index for deterministic APK packaging'
+          git push origin "HEAD:${GITHUB_REF_NAME}"

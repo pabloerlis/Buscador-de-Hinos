@@ -16,7 +16,7 @@ assert.equal(reference.catalog_sha256,crypto.createHash('sha256').update(raw).di
 assert.equal(vectors.schema_version,1);
 assert.equal(vectors.human_review_status,'pending');
 assert.equal(vectors.source_kind,'actual_e5_onnx_inference');
-assert.equal(vectors.model_sha256,'4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c');
+assert.equal(vectors.model_sha256,'ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1');
 assert.equal(manifest.human_review_status,'pending');
 assert.equal(vectors.queries.length,12);
 assert.equal(manifest.queries.length,12);

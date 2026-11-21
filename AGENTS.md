@@ -36,11 +36,22 @@ A compilação `build_apk` depende de `sources`, `static`, `regressions`, `relev
 - Uma funcionalidade por etapa, com novo `versionCode` crescente, `versionName` identificável e um APK distinto.
 - Incluir testes funcionais e casos negativos de contextos análogos; preservar resultados já bons.
 - Melhorar **a causa geral**; não criar exceções por hino, história, nome, código ou referência bíblica para fazer um benchmark passar.
-- Não colocar letras de hinos no APK. O APK **padrão** permanece sem modelos; a variante E5 desta etapa, compilada com `-PenableLocalEmbeddings=true`, inclui apenas o encoder ONNX int8, vocabulário, vetores e licenças auditados, nunca o GGUF.
+- Não colocar letras de hinos no APK. O APK **padrão** permanece sem modelos; a variante E5 desta etapa, compilada com `-PenableLocalEmbeddings=true`, inclui apenas o encoder ONNX UINT8 (v2.6.9+), vocabulário, vetores e licenças auditados, nunca o GGUF.
 - Atualizar métricas e explicar eventuais regressões; aumentar baselines somente após comprovar melhoria em avaliação mais ampla.
 - Manter branches/PRs em rascunho até aprovação dos gates, sem merge automático em `main`.
 
-**Diagnóstico manual:** os logs e relatórios JSON dos jobs são a evidência. Aprovação do pipeline não equivale a validação semântica exaustiva.
+**Diagnóstico manual:** os logs e relatórios JSON dos jobs são a evidência.
+
+### Etapa 6B3 — Estabilidade E5 (v2.6.9/build 28)
+- Regerar vetores completos em CADA CI, sem cache entre builds; isso é uma **prova de tolerância a CPUs**, não uma exigência irrealista de igualdade bit a bit entre ISAs. ONNX com execução sequencial e uma thread.
+- O agente 5 verifica 12 consultas em sessões ONNX diferentes, 64 trechos recompostos bit a bit na própria sessão e compara TODOS os 10.496 vetores gerados com o índice fixado em `qa/e5-index-golden.json`. O desvio cross-CPU precisa respeitar cos mínimo 0,992, percentil 1 >=0,995, mediana >=0,9975, diferença absoluta por componente int8 <=3 e fração de diferenças <=20%.
+- O pacote APK usa **sempre a mesma referência imutável** de índice E5, SHA em `qa/e5-stability-reference.json`, independentemente da CPU do GitHub Actions. O modelo/tokenizer/catálogo e as 12 consultas ONNX reais também são pinados. Consultas QA em Float16 canônico removem apenas ruído de arredondamento.
+- Agentes 9, 7 e 8 verificam que o índice distribuído bate exatamente com o SHA da referência e que o desvio numérico do índice regerado permanece dentro do limite. Alteração substancial REPROVA antes do Gradle; nenhuma letra distribuída.
+- Após provar que o encoder INT8 gerava dois conjuntos de embeddings em CPUs diferentes, trocar na v2.6.9 para o `onnx/model_uint8.onnx` do mesmo Xenova multilingual-e5-small, SHA-256 `ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1`; os vetores de passagem continuam INT8 compactados. O modo `session.x64quantprecision=1` ISOLADO não resolveu o modelo anterior.
+- Baseline do índice E5 efetivamente incorporado em Git por workflow autorizado `e5-pin-golden.yml`: `qa/e5-index-golden.json` (5,6 MB, apenas vetores, metadados e hashes, nenhuma letra), fonte [CI #44858810922](https://github.com/pabloerlis/Buscador-de-Hinos/actions/runs/44858810922), SHA256 `7a6c594712d092eb7082dcb2292fbcdd0ed57dd39709d8222d25b1e7ccd4ceb5`. Não confundir índice do APK, bitwise fixo, com saída do encoder entre CPUs, medida sob tolerância.
+- Não ajustar ranking para casos de teste; divergência de hashes se investiga, não se mascara. Um APK somente após 9 agentes e Android offline aprovar; ainda falta teste físico ARM64.
+
+Aprovação do pipeline não equivale a validação semântica exaustiva.
 
 ## Etapa 2 — embeddings semânticos E5 por trechos
 

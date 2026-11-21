@@ -1,0 +1,35 @@
+name: E5 CPU diagnostic - int8 vs uint8
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  cpu_variants:
+    name: "CPU x64 sample ${{ matrix.sample }}"
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        sample: [a, b, c]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Pin ONNXRuntime and tokenizer
+        run: |
+          python -m pip install -q --disable-pip-version-check "numpy==1.26.4" "onnxruntime==1.20.1" "tokenizers==0.20.3" "huggingface_hub==0.27.1"
+      - name: Compare UINT8 / INT8 inference across independent CPUs
+        env:
+          OMP_NUM_THREADS: '1'
+          MKL_NUM_THREADS: '1'
+          OPENBLAS_NUM_THREADS: '1'
+        run: python scripts/qa_e5_cpu_profile.py
+      - name: Save SHA and CPU evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: e5-cpu-${{ matrix.sample }}
+          path: qa-report/e5-cpu-profile.json
+          retention-days: 10
+          if-no-files-found: error

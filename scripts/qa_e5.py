@@ -18,7 +18,7 @@ def check(ok,msg):
 
 check(index.get('version')==3,'Versão de índice E5 incorreta')
 check(index.get('dimension')==384,'Dimensão E5 incompatível')
-check(index.get('model_sha256')=='4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c','Hash do modelo não fixado')
+check(index.get('model_sha256')=='ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1','Hash do modelo não fixado')
 check(index.get('count')>=1500,'Cobertura de hinos insuficiente')
 check(index.get('passages',0)>=4000,'Trechos E5 insuficientes (não indexa estrofes)')
 check(index.get('source_url','').find('/da8e75932982123301affce688e45b4152c9e06e/')>0,'Coletânea sem revisão fixada')

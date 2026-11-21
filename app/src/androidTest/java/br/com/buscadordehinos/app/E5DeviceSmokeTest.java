@@ -7,6 +7,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import java.security.MessageDigest;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
@@ -55,8 +56,8 @@ public class E5DeviceSmokeTest {
             assertTrue("Interface or E5 native bridge did not load",ready);
             String metadata=evaluate(web,
                 "(()=>{try{const a=JSON.parse(window.NativeHinos.buildInfo());" +
-                "return a.versionName==='2.6.8' && a.developer==='Pablo Erlis' && " +
-                "a.versionCode===27;}catch(e){return false}})()");
+                "return a.versionName==='2.6.9' && a.developer==='Pablo Erlis' && " +
+                "a.versionCode===28;}catch(e){return false}})()");
             assertEquals("Installed app metadata does not match About view","true",metadata);
             assertEquals("RRF default or controls were not loaded in WebView","true",
                 evaluate(web,"Boolean(typeof FusionRRF!=='undefined' && " +
@@ -88,7 +89,7 @@ public class E5DeviceSmokeTest {
                     "window.__e5QaOriginalComplete=window.VectorNative.complete;" +
                     "window.VectorNative.complete=function(answer){" +
                     "window.__e5QaReply=answer;window.__e5QaOriginalComplete(answer);};" +
-                    "window.NativeVector.embed('e5-qa','mulher doente tocou nas vestes de Cristo');true;"));
+                    "window.NativeVector.embed('e5-qa','Uma mulher enferma tocou nas vestes de Jesus e foi curada');true;"));
             boolean completed=false;
             limit=System.currentTimeMillis()+180_000;
             while(System.currentTimeMillis()<limit){
@@ -109,6 +110,69 @@ public class E5DeviceSmokeTest {
                     "if(!e.vector.every(Number.isFinite))return false;" +
                     "const n=e.vector.reduce((s,x)=>s+x*x,0);" +
                     "return n>.97&&n<1.03;})()"));
+            // Canonical UINT8 semantic query (not a hymn lyric).
+            // The check compares 384 real Android ONNX dimensions to CPU-probed
+            // ONNX outputs from AMD EPYC 7763/9V45 and Intel Xeon 6975P-C.
+            String arrayJSON=evaluate(web,"JSON.stringify(window.__e5QaReply.vector)");
+            String decoded=(String)new org.json.JSONTokener(arrayJSON).nextValue();
+            org.json.JSONArray values=new org.json.JSONArray(decoded);
+            assertEquals("Android native E5 vector dimension changed",384,values.length());
+            byte[] q8=new byte[384];
+            for(int i=0;i<384;i++){
+                double value=values.getDouble(i);
+                assertTrue("Nonfinite Android E5 dimension",Double.isFinite(value));
+                q8[i]=(byte)Math.max(-127,Math.min(127,(int)Math.rint(value*127)));
+            }
+            // The reference is generated from the same actual ONNX vectors as
+            // Agent 9 and is included ONLY in the instrumentation APK.
+            // Architecture-dependent quantized kernels need numeric, not binary,
+            // parity. The measured x86 emulator difference had cosine 0.9958
+            // and max q8 component delta 2; tests fail for material divergence.
+            java.io.ByteArrayOutputStream buffer=new java.io.ByteArrayOutputStream();
+            try(java.io.InputStream input=InstrumentationRegistry.getInstrumentation()
+                    .getContext().getAssets().open("e5-query-canary.json")){
+                byte[] tmp=new byte[4096];int n;
+                while((n=input.read(tmp))!=-1)buffer.write(tmp,0,n);
+            }
+            org.json.JSONObject golden=new org.json.JSONObject(
+                new String(buffer.toByteArray(),java.nio.charset.StandardCharsets.UTF_8));
+            assertEquals(1,golden.getInt("schema_version"));
+            assertEquals("actual_pinned_e5_onnx_inference",golden.getString("source"));
+            assertEquals("ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1",
+                golden.getString("model_sha256"));
+            assertEquals("Uma mulher enferma tocou nas vestes de Jesus e foi curada",
+                golden.getString("query"));
+            org.json.JSONArray reference=golden.getJSONArray("vector");
+            assertEquals("Android reference dimension mismatch",384,reference.length());
+            byte[] expectedQ8=new byte[384];
+            int altered=0,maxDelta=0;
+            double dot=0,normActual=0,normExpected=0;
+            for(int i=0;i<384;i++){
+                double v=reference.getDouble(i);
+                assertTrue("Invalid pinned E5 QA vector",Double.isFinite(v));
+                expectedQ8[i]=(byte)Math.max(-127,Math.min(127,(int)Math.rint(v*127)));
+                int a=q8[i],b=expectedQ8[i],delta=Math.abs(a-b);
+                if(delta>0)altered++;
+                maxDelta=Math.max(maxDelta,delta);
+                dot+=(double)a*b;normActual+=(double)a*a;normExpected+=(double)b*b;
+            }
+            byte[] expectedDigest=MessageDigest.getInstance("SHA-256").digest(expectedQ8);
+            StringBuilder canonicalSha=new StringBuilder();
+            for(byte x:expectedDigest)canonicalSha.append(
+                String.format(java.util.Locale.US,"%02x",x&255));
+            assertEquals("Golden vector was not generated from approved ONNX source",
+                golden.getString("expected_q8_sha256"),canonicalSha.toString());
+            assertEquals("Golden vector SHA does not match the approved E5 canary",
+                "555bda01cdc0f22dcc4864d75303562e5f7cbb539530aeabc476218b5f0eb26d",
+                canonicalSha.toString());
+            double cosine=dot/Math.sqrt(normActual*normExpected);
+            String metrics="cosine="+cosine+", max_q8_delta="+maxDelta+
+                ", changed_components="+altered+"/384";
+            android.util.Log.i("E5_CANARY_QA",metrics);
+            assertTrue("Android E5 vector differs materially from pinned ONNX: "+metrics,
+                Double.isFinite(cosine) && cosine>=0.992 && maxDelta<=3 &&
+                altered<=154);
+
         }
     }
 }
