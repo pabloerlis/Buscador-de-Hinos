@@ -132,7 +132,7 @@ O APK padrão desativa GGUF e E5. O GitHub Actions compila com `gradle assembleD
 2. Toque em **Testar modelo**. O app executa uma geração curta e mostra o tempo de preparação, de processamento da entrada e até o primeiro token.
 3. Faça uma pesquisa com pelo menos dois hinos e toque em **Comparar com IA**. O modelo recebe até cinco trechos do índice local, junto dos temas e da passagem bíblica quando disponíveis. O app mostra até duas escolhas com a justificativa da IA e o trecho da coletânea.
 
-A busca e a comparação pelo índice continuam disponíveis durante a geração. A comparação via GGUF tem um prazo de até 60 segundos. Todas as consultas e inferências são executadas no aparelho após a importação. O motor incluído é `llama.cpp b8201` e não suporta arquivos GGUF com arquitetura `gemma4`.
+A busca e a comparação pelo índice continuam disponíveis durante a geração. A comparação via GGUF tem um prazo de até 60 segundos. Todas as consultas e inferências são executadas no aparelho após a importação. O motor incluído a partir da v2.6.12 é `llama.cpp b11960` (suporte declarado ao LFM3-1.7B e à variante QAD-Q4_0). A compatibilidade de outras arquiteturas GGUF precisa ser verificada modelo a modelo; o tempo de inferência em ARM64 depende do hardware.
 
 Para verificar cancelamento durante o uso, inicie uma comparação e toque em **Interromper IA**. Para verificar o descarte de respostas antigas, inicie uma comparação e faça uma nova busca antes da conclusão.
 
@@ -210,7 +210,7 @@ Aplicativo Android ARM64 com busca offline, ranking estimado e motor GGUF opcion
 
 Memória livre indicada em Configurações é a memória do sistema, **não garantia de alocação dentro de um único processo**. O motor pode recusar modelos por quantização, arquitetura GGUF, permissões do provedor de arquivos ou RAM. A nova versão mostra a mensagem do motor em vez de assumir falta de RAM.
 
-Como primeira tentativa, usar um GGUF *Instruct* de ~0,8B a 2B em Q4, armazenado localmente em `Downloads`. Alguns modelos multimodais, como variantes do Gemma 4 E2B, exigem mais memória que seu número de parâmetros sugere. Não há garantia de compatibilidade com qualquer GGUF: o motor compilado está fixado no `llama.cpp b8201`.
+Como primeira tentativa, usar um GGUF *Instruct* de ~0,8B a 2B em Q4, armazenado localmente em `Downloads`. Alguns modelos multimodais, como variantes do Gemma 4 E2B, exigem mais memória que seu número de parâmetros sugere. Não há garantia de compatibilidade com qualquer GGUF: o motor compilado está fixado no `llama.cpp b11960` a partir da v2.6.12.
 
 ## Compilação
 
