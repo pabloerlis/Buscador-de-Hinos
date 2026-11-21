@@ -322,6 +322,16 @@ def audit_semantic_search_agent():
           stability.get("fresh_session_equal") is True and
           stability.get("recomputed_index_passages_equal",0)>=64,
           "Estabilidade E5 entre builds não comprovada pelos agentes 5/9")
+    drift=stability.get("cross_cpu_drift",{})
+    check(stability.get("pinned_index_used") is True and
+          stability.get("all_generated_passages_compared")==10496 and
+          drift.get("passages_compared")==10496 and
+          drift.get("golden_index_sha256")==stability.get("fingerprint",{}).get("index_sha256") and
+          drift.get("min_cosine",0)>=0.992 and drift.get("p01_cosine",0)>=0.995 and
+          drift.get("median_cosine",0)>=0.9975 and
+          drift.get("max_absolute_q8_component_delta",100)<=3 and
+          drift.get("fraction_changed_q8_components",1)<=0.20,
+          "Índice E5 não comprova reprodutibilidade do APK com desvio CPU delimitado")
     check(data.get("catalog_sha256")==ref.get("catalog_sha256") and
           data.get("model_sha256")==ref.get("e5_coverage",{}).get("model_sha256"),
           "Agente 9 usou catálogo ou modelo diferente")
