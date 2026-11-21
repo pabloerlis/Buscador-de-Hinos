@@ -63,13 +63,20 @@ assert.ok(workflow.includes('needs: [build_apk, device_smoke]'));
 assert.ok(workflow.includes('-PenableLocalModels=true'),'Final APK must retain the GGUF C++ motor');
 assert.ok(workflow.includes('EXPECT_GGUF_ENGINE: \'true\''),'APK audit must reject missing GGUF runtime');
 assert.ok(build.includes("gradleProperty('enableLocalEmbeddings')"));
-assert.match(js,/MAX_AI_MS=16000/);
+assert.match(js,/MAX_AI_MS=60000/);
 assert.match(js,/OfflineAPI\.validateHints/);
 assert.match(cpp,/nativeCancel/);
 assert.match(cpp,/cp\.abort_callback=shouldCancel/);
 assert.match(java,/nativeGenerate\(prompt\.getBytes\(StandardCharsets\.UTF_8\),grammar\.getBytes\(StandardCharsets\.UTF_8\)/);
 assert.match(cpp,/llama_sampler_init_grammar/);
 assert.match(cpp,/cp\.abort_callback_data=&deadline/);
+assert.match(cpp,/g_context=llama_init_from_model/);
+assert.match(cpp,/llama_memory_clear\(llama_get_memory\(g_context\),true\)/);
+assert.match(cpp,/llama_set_abort_callback\(g_context,shouldCancel,&deadline\)/);
+assert.match(cpp,/nativeGenerationStats/);
+assert.match(java,/nativeGenerationStats\(\)/);
+assert.match(java,/timeoutMs>120000/);
+assert.match(java,/value\+=" \[etapa: "/);
 assert.match(html,/id="gguf-auto"/);
 assert.doesNotMatch(html,/id="gguf-auto" checked/);
 assert.match(html,/Percentuais|percentuais/);
@@ -93,6 +100,14 @@ for(const lookup of [null,{term:'a'.repeat(64),added:2}]){
   assert.match(bounded.prompt,/trecho/);
 }
 assert.match(request.grammar,/hymn-id ::= "1" \| "2" \| "3" \| "4" \| "5"/);
+const compactThemes=ai.prepareThemes('Voltar para Deus',[],['Arrependimento','Fé','Consolo'],60000);
+assert.equal(compactThemes.maxTokens,24);
+assert.equal(compactThemes.timeoutMs,60000);
+assert.match(compactThemes.grammar,/theme ::= "1" \| "2" \| "3"/);
+assert.match(compactThemes.prompt,/1:Arrependimento/);
+assert.equal(compactThemes.themeLabels[0],'Arrependimento');
+assert.ok(request.maxTokens<=72,'Comparação deve limitar tokens de saída');
+assert.ok(request.prompt.length<1250,'Prompt curto para reduzir prefill ARM64');
 const withoutCandidates=ai.prepareComparison('Voltar para Deus',[],[],null);
 assert.equal(withoutCandidates.candidates.size,0);
 assert.match(withoutCandidates.grammar,/^root ::= lookup\n/);
@@ -177,7 +192,7 @@ async function checkBridge(){
   assert.equal(extra.state.effectiveQuery,'Voltar para Deus');
   assert.equal(extra.state.lastResults,hymns);
   assert.equal(extra.calls.length,2);
-  assert.equal(extra.calls[1][4],48000);
+  assert.equal(extra.calls[1][4],78000);
   assert.notEqual(extra.calls[1][1],extra.calls[0][1]);
   assert.doesNotMatch(extra.calls[1][2],/\bbuscar_hinos\b/);
   extra.complete(extra.calls[1][1],'[{"id":6,"motivo":"Mostra reconciliação."}]');
@@ -206,7 +221,7 @@ async function checkBridge(){
 
   const expired=setup({additionalSearch:async()=>({results:[hymns[5]]})});
   expired.$('gguf-compare-model').click();
-  expired.setTime(60500);
+  expired.setTime(90500);
   expired.complete(expired.calls[0][1],toolCall);
   await tick();
   assert.equal(expired.calls.length,1);
@@ -228,8 +243,9 @@ async function checkBridge(){
 
   const enrichment=setup();
   enrichment.$('gguf-improve').click();
-  assert.match(enrichment.calls[0][2],/Arrependimento/);
-  enrichment.complete(enrichment.calls[0][1],'["Arrependimento"]');
+  assert.match(enrichment.calls[0][2],/theme ::= "1"/);
+  assert.match(enrichment.calls[0][0],/Arrependimento/);
+  enrichment.complete(enrichment.calls[0][1],'[1]');
   await tick();
   assert.equal(enrichment.requests[0].exclude[0],'tristeza');
   assert.equal(enrichment.requests[0].vector_query,enrichment.vector);
