@@ -227,6 +227,7 @@ def main():
         'query: Salmo 23',
         'query: Marcos 5:25-34',
         'query: Mulher do fluxo de sangue',
+        'query: Uma mulher enferma tocou nas vestes de Jesus e foi curada',
         'query: Jesus acalma a tempestade',
         'query: Lázaro foi ressuscitado',
         'query: João 11:1-44',
