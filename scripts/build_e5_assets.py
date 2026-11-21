@@ -258,6 +258,9 @@ def opt():
     o.inter_op_num_threads=1
     o.execution_mode=ort.ExecutionMode.ORT_SEQUENTIAL
     o.use_deterministic_compute=True
+    # Avoid AVX2/AVX512 U8S8 saturation on x64 without VNNI (documented ORT flag).
+    # No effect on ARM64. Requires cross-build hash and relevance verification.
+    o.add_session_config_entry("session.x64quantprecision","1")
     o.graph_optimization_level=ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     return o
 
