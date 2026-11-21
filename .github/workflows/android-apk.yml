@@ -130,7 +130,7 @@ jobs:
           curl --fail --location --retry 3 --max-time 120 \
             'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
             --output .tmp/catalog-2018.json
-      - name: Tres agentes independentes: texto integral, casos negativos e ranking
+      - name: "Tres agentes independentes: texto integral, casos negativos e ranking"
         run: node tests/agents/run-validation.js .tmp/catalog-2018.json
       - name: Guardar laudos tecnico e resumido sem publicar letras
         if: always()
