@@ -214,7 +214,7 @@ def audit_expanded():
           coverage.get("semantic_paraphrase_vectors") == 12 and
           coverage.get("semantic_legacy_vectors") == 7 and
           coverage.get("source_kind") == "actual_e5_onnx_inference" and
-          coverage.get("model_sha256") == "4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c",
+          coverage.get("model_sha256") == "ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1",
           "Paráfrases foram avaliadas sem inferência E5 real integral")
     vectors=load_json("e5-paraphrase-vectors.json")
     check(vectors.get("schema_version") == 1 and
