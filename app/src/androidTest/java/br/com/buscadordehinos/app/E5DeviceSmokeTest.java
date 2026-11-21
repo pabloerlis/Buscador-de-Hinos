@@ -56,8 +56,10 @@ public class E5DeviceSmokeTest {
             assertTrue("Interface or E5 native bridge did not load",ready);
             String metadata=evaluate(web,
                 "(()=>{try{const a=JSON.parse(window.NativeHinos.buildInfo());" +
-                "return a.versionName==='2.6.10' && a.developer==='Pablo Erlis' && " +
-                "a.versionCode===29;}catch(e){return false}})()");
+                "return a.versionName==='" + BuildConfig.VERSION_NAME +
+                "' && a.developer==='Pablo Erlis' && " +
+                "a.versionCode===" + BuildConfig.VERSION_CODE +
+                ";}catch(e){return false}})()");
             assertEquals("Installed app metadata does not match About view","true",metadata);
             assertEquals("RRF default or controls were not loaded in WebView","true",
                 evaluate(web,"Boolean(typeof FusionRRF!=='undefined' && " +
@@ -81,8 +83,12 @@ public class E5DeviceSmokeTest {
                     "engine.setCorpus([hymn]);" +
                     "return engine.evaluate(hymn,{narrative:'Uma viagem'}).score>=8;" +
                     "}catch(e){return false}})()"));
-            assertEquals("GGUF must not be enabled in E5-only variant","true",
-                evaluate(web,"typeof window.NativeGGUF==='undefined'"));
+            // Esta é a variante completa: ONNX e llama.cpp devem estar
+            // disponíveis simultaneamente no Android, sem carregar pesos GGUF.
+            assertEquals("Native GGUF bridge/library missing from full-feature APK","true",
+                evaluate(web,"(()=>{try{const m=window.NativeGGUF;" +
+                    "return Boolean(m && typeof m.status==='function' && " +
+                    "JSON.parse(m.status()).available===true);}catch(e){return false}})()"));
             assertEquals("Native embedding request was not dispatched","true",
                 evaluate(web,
                     "window.__e5QaReply=null;" +
