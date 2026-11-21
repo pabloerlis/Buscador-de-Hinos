@@ -584,6 +584,16 @@ jobs:
         with:
           name: semantic-search-agent-qa
           path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-build-evidence-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: lfm3-android-evidence-qa
+          path: qa-report
+      - name: Agente independente - validar flags reais e benchmark LFM3
+        run: python3 scripts/qa_native_performance_gate.py
       - name: Testar novamente casos narrativos negativos e fusao
         shell: bash
         run: |
