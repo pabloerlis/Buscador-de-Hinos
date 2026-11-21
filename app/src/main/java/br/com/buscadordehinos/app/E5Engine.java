@@ -63,6 +63,7 @@ final class E5Engine {
         try{
             options.setIntraOpNumThreads(1);
             options.addConfigEntry("session.use_deterministic_compute","1");
+            options.addConfigEntry("session.x64quantprecision","1");
             options.setInterOpNumThreads(1);
             options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
             session=env.createSession(model.getAbsolutePath(),options);
