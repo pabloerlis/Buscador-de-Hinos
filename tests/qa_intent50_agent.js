@@ -61,7 +61,7 @@ function audit({manifest,manifestBytes,vectors,packet,sealed}){
     Math.abs(Math.hypot(...vector.vector)-1)<.03,'Invalid or missing 384D E5 vector '+i);
   for(const n of ['without_e5','with_e5']){
    check(Array.isArray(secret[n])&&secret[n].length<=20&&isStrings(secret[n])&&
-     new Set(secret[n]).size===20,'Incorrect genuine top20 '+n+'/'+i);
+     new Set(secret[n]).size===secret[n].length,'Incorrect genuine top20 '+n+'/'+i);
   }
   const a=secret.without_e5||[],b=secret.with_e5||[],set=new Set([...a,...b]);
   const candidates=publicRow.candidates||[];

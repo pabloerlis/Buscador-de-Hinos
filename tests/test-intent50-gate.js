@@ -28,6 +28,13 @@ function fixture(){
  return {manifest,manifestBytes,vectors,packet,sealed};
 }
 assert.equal(audit(fixture()).decision,'approved','Positive QA fixture failed');
+// Genuine retrieval can provide fewer than 20 entries. Never pad with fake candidates.
+const short=fixture();
+short.sealed.rows[0].without_e5=short.sealed.rows[0].without_e5.slice(0,3);
+short.sealed.rows[0].with_e5=short.sealed.rows[0].with_e5.slice(0,2);
+const observed=new Set([...short.sealed.rows[0].without_e5,...short.sealed.rows[0].with_e5]);
+short.packet.rows[0].candidates=short.packet.rows[0].candidates.filter(c=>observed.has(c.blind_id));
+assert.equal(audit(short).decision,'approved','Short genuine topN must not be padded');
 const mutants=[
  x=>{x.packet.rows.pop();},
  x=>{x.packet.rows[0].candidates.pop();},
@@ -44,4 +51,4 @@ for(let i=0;i<mutants.length;i++){
  const f=fixture();mutants[i](f);
  assert.equal(audit(f).decision,'rejected','Mutant '+(i+1)+' escaped independent agent');
 }
-console.log('AGENT 12 SELFTEST: 1 positive + '+mutants.length+' negative fixtures PASS; human review pending');
+console.log('AGENT 12 SELFTEST: 2 positive + '+mutants.length+' negative fixtures PASS; human review pending');
