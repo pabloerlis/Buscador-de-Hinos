@@ -56,8 +56,8 @@ public class E5DeviceSmokeTest {
             assertTrue("Interface or E5 native bridge did not load",ready);
             String metadata=evaluate(web,
                 "(()=>{try{const a=JSON.parse(window.NativeHinos.buildInfo());" +
-                "return a.versionName==='2.6.10' && a.developer==='Pablo Erlis' && " +
-                "a.versionCode===29;}catch(e){return false}})()");
+                "return a.versionName==='2.6.11' && a.developer==='Pablo Erlis' && " +
+                "a.versionCode===30;}catch(e){return false}})()");
             assertEquals("Installed app metadata does not match About view","true",metadata);
             assertEquals("RRF default or controls were not loaded in WebView","true",
                 evaluate(web,"Boolean(typeof FusionRRF!=='undefined' && " +

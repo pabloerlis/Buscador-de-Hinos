@@ -150,6 +150,8 @@ jobs:
         run: node tests/qa_e5_hybrid.js /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json
       - name: Vetorizar com ONNX real todas as 12 paráfrases (QA, nunca no APK)
         run: python3 scripts/qa_paraphrase_e5.py
+      - name: Gerar embeddings E5 ONNX reais para 50 intenções independentes (somente QA)
+        run: python3 scripts/qa_intent50_vectors.py
       - name: Agente 5 - repetibilidade entre sessoes e entre builds
         run: python3 scripts/qa_e5_stability.py
       - uses: actions/download-artifact@v4
@@ -193,6 +195,7 @@ jobs:
             qa-report/event-variant-matrix.json
             qa-report/relevance-50.json
             qa-report/e5-paraphrase-vectors.json
+            qa-report/intent50-vectors.json
             qa-report/e5-stability.json
           retention-days: 30
           if-no-files-found: ignore
@@ -299,9 +302,68 @@ jobs:
           retention-days: 90
           if-no-files-found: ignore
 
+  intent50_review_qa:
+    name: "Agente 12 | Recuperacao semantica real para 50 intenções cegas"
+    needs: [sources, embeddings]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          path: app/src/main/assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: e5-stanza-assets-qa
+          path: app/src/main/assets
+      - uses: actions/download-artifact@v4
+        with:
+          name: e5-stanza-metrics
+          path: qa-report
+      - name: Fonte temporaria pinada para o top20 real (nao empacotar letras)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --max-time 90 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output /tmp/intent50-source-catalog.json
+          test "$(wc -c < /tmp/intent50-source-catalog.json)" -gt 100000
+      - name: Gerar pacote cego a partir do OfflineAPI E5 ONNX real
+        run: node tests/qa_intent50_packet.js /tmp/intent50-source-catalog.json qa-report/intent50-vectors.json
+      - name: Agente 12 - auditar pacote cego e ranking reservado
+        run: node tests/qa_intent50_agent.js
+      - name: Entregar pacote sem scores para revisores
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: intent50-blind-review-qa
+          path: qa-report/intent50-blind-packet.json
+          retention-days: 90
+          if-no-files-found: ignore
+      - name: Selar posicoes separadas do pacote cego
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: intent50-sealed-ranking-qa
+          path: qa-report/intent50-sealed-ranking.json
+          retention-days: 90
+          if-no-files-found: ignore
+      - name: Publicar parecer do agente 12
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: intent50-agent-qa
+          path: qa-report/intent50-independent-agent.json
+          retention-days: 90
+          if-no-files-found: ignore
+
   build_apk:
     name: "Compilar apenas se agentes de testes aprovarem"
-    needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
+    needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa, intent50_review_qa]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -427,7 +489,7 @@ jobs:
 
   independent_review:
     name: "Agente 8 | Testes independentes e analise critica da entrega"
-    needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]
+    needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa, intent50_review_qa]
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
@@ -459,6 +521,20 @@ jobs:
         with:
           name: semantic-search-agent-qa
           path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: intent50-blind-review-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: intent50-sealed-ranking-qa
+          path: qa-report
+      - uses: actions/download-artifact@v4
+        with:
+          name: intent50-agent-qa
+          path: qa-report
+      - name: Auditoria independente Python 50 intenções sem julgamentos fabricados
+        run: python3 scripts/qa_intent50_independent_review.py
       - name: Testar novamente casos narrativos negativos e fusao
         shell: bash
         run: |
@@ -480,7 +556,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: independent-review-qa
-          path: qa-report/independent-review.json
+          path: |
+            qa-report/independent-review.json
+            qa-report/intent50-review-audit.json
           retention-days: 90
           if-no-files-found: ignore
 
@@ -524,6 +602,8 @@ jobs:
           assert audit['passed'] is True and review['apk']['sha256']==audit['sha256']
           gate=json.loads(Path('qa-report/semantic-crossversion-agent.json').read_text())
           assert gate['decision']=='approved' and not gate['errors'], 'Agente 10 reprovou'
+          intent=json.load(open('qa-report/intent50-review-audit.json'))
+          assert intent['decision']=='approved' and intent['reviewed_intents']==0 and not intent['errors'], 'Agente 8 reprovou pacote cego'
           assert Path('apk-candidate/app-debug.apk').is_file()
           PY
       - name: Identificar a versao do artefato
@@ -541,6 +621,7 @@ jobs:
             apk-candidate/app-debug.apk
             qa-report/apk-audit.json
             qa-report/independent-review.json
+            qa-report/intent50-review-audit.json
             qa-report/semantic-crossversion-agent.json
             qa-report/android-device-evidence.log
           retention-days: 90
