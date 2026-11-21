@@ -55,8 +55,11 @@ async function run(){
       const contained=source.includes(norm(piece).replace(/\s+/g,' '))||norm(piece).split(' ').filter(t=>t.length>3).every(t=>source.includes(t));
       checks.push({name:'Trecho rastreável na letra: '+s.query,pass:contained});
     }
-    if(decoy>0&&position>0&&decoy<position)
-      warnings.push('Distrator acima da letra narrativa em '+s.query+' (posição '+decoy+' contra '+position+').');
+    if(decoy>0&&position>0){
+      checks.push({name:'Prioridade do sentido integral sobre distrator: '+s.query,
+        pass:position<decoy,details:'hino='+position+'; distrator='+decoy});
+      if(decoy<position)warnings.push('Distrator acima da letra narrativa em '+s.query+' (posição '+decoy+' contra '+position+').');
+    }
   }
   return {agent:'agente-casos-integrais',scenarioCount:scenarios.length,checks,warnings,passed:checks.every(c=>c.pass)};
 }
