@@ -64,7 +64,9 @@ Esta versão implementa **Reciprocal Rank Fusion (RRF, k=60)** para combinar ran
 
 A versão **2.6.2 (build 21)** habilita embeddings semânticos reais no Android, offline e sem GGUF. O índice guarda até oito vetores por hino, cobrindo trechos distribuídos pela letra (não apenas início/fim). O aplicativo compara a consulta ao vetor de cada trecho e mostra a passagem encontrada na letra importada; a semelhança não representa certeza.
 
-**Modelo:** `Xenova/multilingual-e5-small`, ONNX int8 (~118 MB), dimensionalidade 384, revisão e SHA-256 pinados. A inferência da consulta usa ONNX Runtime no aparelho. O APK completo será significativamente maior que a versão sem modelo. O primeiro uso também requer espaço extra para preparar o modelo local.
+**Modelo:** `Xenova/multilingual-e5-small`, 384 dimensões, revisão e SHA-256 pinados. Até v2.6.8 foi usado ONNX INT8 (~118 MB); na v2.6.9 o encoder passou para ONNX **UINT8 (~118 MB)** do mesmo fornecedor e revisão para evitar divergências de precisão entre arquiteturas x64. O índice ainda armazena vetores normalizados em INT8; a inferência da consulta usa ONNX Runtime no aparelho. O primeiro uso requer espaço extra para preparar o modelo local.
+
+**Controle de estabilidade v2.6.9:** três CPUs de teste (AMD EPYC 7763/9V45 e Intel Xeon 6975P-C) geraram embeddings UINT8 quantizados idênticos para 12 consultas; duas reconstruções completas independentes produziram os mesmos SHA-256 para o índice de 10.496 trechos e consultas. A geração de cada release exige recomputação sem cache, agente 9 e teste Android offline. A estabilidade em ARM64 físico e a relevância semântica geral ainda não foram demonstradas.
 
 **Privacidade/direitos:** o APK contém pesos do modelo, vocabulário e vetores compactados com posição das linhas, **não as letras**. Cada vetor só é associado à letra quando título e hash da letra importada correspondem exatamente ao índice. Hinos de outra edição continuam pesquisáveis pelo motor lexical e bíblico.
 
