@@ -43,7 +43,7 @@ final class E5Engine {
         if(session!=null)return;
         File dir=new File(app.getFilesDir(),"e5");
         if(!dir.exists()&&!dir.mkdirs())throw new IOException("Diretório do E5 não pôde ser criado");
-        File model=new File(dir,"model-int8.onnx");
+        File model=new File(dir,"model-uint8.onnx");
         if(!model.isFile()||model.length()<100_000_000){
             status.send("Preparando modelo vetorial E5 Small (primeiro uso)…");
             File tmp=new File(dir,"download.tmp");long done=0,last=0;
