@@ -1,0 +1,314 @@
+{
+  "schema_version": 1,
+  "kind": "semantic_intent_panel",
+  "authoring_status": "draft_unjudged",
+  "human_review_status": "pending",
+  "intent_count": 50,
+  "distribution": {
+    "biblical_event": 25,
+    "thematic": 25
+  },
+  "policy": "50 editorially distinct draft intents; 0 independent relevance judgments. Top20 ranking evidence must not be shown to blinded reviewers. No hymn lyrics in Git/CI/APK.",
+  "intents": [
+    {
+      "id": "N01",
+      "category": "biblical_event",
+      "query": "Samuel ouviu seu nome durante a noite e aprendeu a responder ao chamado de Deus",
+      "split": "holdout"
+    },
+    {
+      "id": "N02",
+      "category": "biblical_event",
+      "query": "Moisés viu uma sarça em chamas que não se consumia e recebeu uma missão",
+      "split": "development"
+    },
+    {
+      "id": "N03",
+      "category": "biblical_event",
+      "query": "O povo atravessou o mar aberto enquanto fugia do exército",
+      "split": "development"
+    },
+    {
+      "id": "N04",
+      "category": "biblical_event",
+      "query": "No deserto o povo recebeu alimento que aparecia pela manhã",
+      "split": "holdout"
+    },
+    {
+      "id": "N05",
+      "category": "biblical_event",
+      "query": "As muralhas da cidade caíram depois de sete dias de caminhada e trombetas",
+      "split": "development"
+    },
+    {
+      "id": "N06",
+      "category": "biblical_event",
+      "query": "Um pequeno grupo de guerreiros venceu um exército muito maior com Gideão",
+      "split": "holdout"
+    },
+    {
+      "id": "N07",
+      "category": "biblical_event",
+      "query": "Uma estrangeira recolheu espigas para sustentar a sogra",
+      "split": "development"
+    },
+    {
+      "id": "N08",
+      "category": "biblical_event",
+      "query": "Um jovem pastor enfrentou um gigante com uma pedra e uma funda",
+      "split": "development"
+    },
+    {
+      "id": "N09",
+      "category": "biblical_event",
+      "query": "Um profeta enfrentou os adoradores de Baal e fogo desceu sobre o altar",
+      "split": "holdout"
+    },
+    {
+      "id": "N10",
+      "category": "biblical_event",
+      "query": "O azeite de uma viúva não acabou enquanto ela enchia os vasos",
+      "split": "development"
+    },
+    {
+      "id": "N11",
+      "category": "biblical_event",
+      "query": "Um comandante estrangeiro mergulhou sete vezes no rio e ficou curado",
+      "split": "holdout"
+    },
+    {
+      "id": "N12",
+      "category": "biblical_event",
+      "query": "Um homem foi lançado na cova dos leões por continuar orando",
+      "split": "development"
+    },
+    {
+      "id": "N13",
+      "category": "biblical_event",
+      "query": "Três jovens recusaram a idolatria e sobreviveram ao forno de fogo",
+      "split": "development"
+    },
+    {
+      "id": "N14",
+      "category": "biblical_event",
+      "query": "Um profeta fugiu de sua missão e passou três dias dentro de um grande peixe",
+      "split": "holdout"
+    },
+    {
+      "id": "N15",
+      "category": "biblical_event",
+      "query": "Uma rainha arriscou a vida para pedir proteção ao seu povo",
+      "split": "development"
+    },
+    {
+      "id": "N16",
+      "category": "biblical_event",
+      "query": "Um profeta viu o trono do Senhor e reconheceu sua necessidade de purificação",
+      "split": "holdout"
+    },
+    {
+      "id": "N17",
+      "category": "biblical_event",
+      "query": "Um anjo anunciou a Maria que ela teria um filho",
+      "split": "development"
+    },
+    {
+      "id": "N18",
+      "category": "biblical_event",
+      "query": "Pastores receberam durante a noite o anúncio do nascimento do Salvador",
+      "split": "development"
+    },
+    {
+      "id": "N19",
+      "category": "biblical_event",
+      "query": "Sábios seguiram uma estrela até encontrar o menino",
+      "split": "holdout"
+    },
+    {
+      "id": "N20",
+      "category": "biblical_event",
+      "query": "Numa festa de casamento Jesus transformou água em vinho",
+      "split": "development"
+    },
+    {
+      "id": "N21",
+      "category": "biblical_event",
+      "query": "Um mestre religioso visitou Jesus à noite e ouviu sobre nascer de novo",
+      "split": "holdout"
+    },
+    {
+      "id": "N22",
+      "category": "biblical_event",
+      "query": "Cinco pães e dois peixes alimentaram uma grande multidão",
+      "split": "development"
+    },
+    {
+      "id": "N23",
+      "category": "biblical_event",
+      "query": "Jesus conversou junto ao poço com uma mulher samaritana sobre água viva",
+      "split": "development"
+    },
+    {
+      "id": "N24",
+      "category": "biblical_event",
+      "query": "Um viajante ferido recebeu cuidados de um estrangeiro compassivo",
+      "split": "holdout"
+    },
+    {
+      "id": "N25",
+      "category": "biblical_event",
+      "query": "Um cobrador de impostos subiu numa árvore e decidiu mudar de vida",
+      "split": "development"
+    },
+    {
+      "id": "T01",
+      "category": "thematic",
+      "query": "Aprender a escutar a direção de Deus no silêncio da oração",
+      "split": "holdout"
+    },
+    {
+      "id": "T02",
+      "category": "thematic",
+      "query": "Ser grato mesmo quando os recursos parecem insuficientes",
+      "split": "development"
+    },
+    {
+      "id": "T03",
+      "category": "thematic",
+      "query": "Confiar em Deus quando o futuro está incerto",
+      "split": "development"
+    },
+    {
+      "id": "T04",
+      "category": "thematic",
+      "query": "Perdoar quem nos feriu sem alimentar o ressentimento",
+      "split": "holdout"
+    },
+    {
+      "id": "T05",
+      "category": "thematic",
+      "query": "Continuar firme após muitas tentativas frustradas",
+      "split": "development"
+    },
+    {
+      "id": "T06",
+      "category": "thematic",
+      "query": "Construir unidade entre irmãos de origens diferentes",
+      "split": "holdout"
+    },
+    {
+      "id": "T07",
+      "category": "thematic",
+      "query": "Servir com humildade sem buscar reconhecimento",
+      "split": "development"
+    },
+    {
+      "id": "T08",
+      "category": "thematic",
+      "query": "Levar esperança e ajuda a pessoas esquecidas",
+      "split": "development"
+    },
+    {
+      "id": "T09",
+      "category": "thematic",
+      "query": "Aprender paciência quando a resposta demora",
+      "split": "holdout"
+    },
+    {
+      "id": "T10",
+      "category": "thematic",
+      "query": "Encontrar paz interior em meio à ansiedade",
+      "split": "development"
+    },
+    {
+      "id": "T11",
+      "category": "thematic",
+      "query": "Ter esperança quando se enfrenta a perda de alguém",
+      "split": "holdout"
+    },
+    {
+      "id": "T12",
+      "category": "thematic",
+      "query": "Defender a justiça e cuidar de quem sofre opressão",
+      "split": "development"
+    },
+    {
+      "id": "T13",
+      "category": "thematic",
+      "query": "Recomeçar depois de falhar e abandonar velhos hábitos",
+      "split": "development"
+    },
+    {
+      "id": "T14",
+      "category": "thematic",
+      "query": "Expressar alegria coletiva em adoração a Deus",
+      "split": "holdout"
+    },
+    {
+      "id": "T15",
+      "category": "thematic",
+      "query": "Manter a fé enquanto surgem perguntas e dúvidas",
+      "split": "development"
+    },
+    {
+      "id": "T16",
+      "category": "thematic",
+      "query": "Cuidar com responsabilidade dos recursos da criação",
+      "split": "holdout"
+    },
+    {
+      "id": "T17",
+      "category": "thematic",
+      "query": "Acolher estrangeiros e praticar hospitalidade",
+      "split": "development"
+    },
+    {
+      "id": "T18",
+      "category": "thematic",
+      "query": "Demonstrar coragem em meio à perseguição por causa da fé",
+      "split": "development"
+    },
+    {
+      "id": "T19",
+      "category": "thematic",
+      "query": "Buscar sabedoria para tomar decisões difíceis",
+      "split": "holdout"
+    },
+    {
+      "id": "T20",
+      "category": "thematic",
+      "query": "Escolher a verdade e a integridade mesmo com prejuízo pessoal",
+      "split": "development"
+    },
+    {
+      "id": "T21",
+      "category": "thematic",
+      "query": "Permanecer espiritualmente atento e preparado",
+      "split": "holdout"
+    },
+    {
+      "id": "T22",
+      "category": "thematic",
+      "query": "Restaurar relacionamentos após conflitos na comunidade",
+      "split": "development"
+    },
+    {
+      "id": "T23",
+      "category": "thematic",
+      "query": "Viver com santidade nas pequenas escolhas do cotidiano",
+      "split": "development"
+    },
+    {
+      "id": "T24",
+      "category": "thematic",
+      "query": "Amar e abençoar até mesmo quem age como inimigo",
+      "split": "holdout"
+    },
+    {
+      "id": "T25",
+      "category": "thematic",
+      "query": "Entregar a Deus o desejo de controlar todos os resultados",
+      "split": "development"
+    }
+  ]
+}

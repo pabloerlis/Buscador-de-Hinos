@@ -79,9 +79,9 @@ require(re.search(r"\bversionCode\s+\d+\b", gradle), "versionCode inválido")
 require(re.search(r"\bversionName\s+'[\d.]+(?:-[a-z0-9.]+)?'", gradle), "versionName inválido")
 
 workflow = (ROOT / ".github/workflows/android-apk.yml").read_text(encoding="utf-8")
-for gate in ("sources", "static", "regressions", "relevance", "embeddings", "semantic_search_qa", "semantic_crossversion_qa", "build_apk", "device_smoke", "audit_apk", "independent_review", "publish_apk"):
+for gate in ("sources", "static", "regressions", "relevance", "embeddings", "semantic_search_qa", "semantic_crossversion_qa", "intent50_review_qa", "build_apk", "device_smoke", "audit_apk", "independent_review", "publish_apk"):
     require(re.search(r"^  " + gate + r":", workflow, re.M), "Agente ou etapa obrigatória ausente: " + gate)
-require("needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
+require("needs: [sources, static, regressions, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa, intent50_review_qa]" in workflow,
         "Compilação não depende de todos os agentes de pré-build")
 require("needs: [build_apk, device_smoke]" in workflow,
         "APK deve depender dos testes instrumentados Android antes da auditoria")
@@ -90,7 +90,7 @@ require(re.search(r"^  independent_review:", workflow, re.M),
         "Agente 8 de teste e análise independente não está no workflow")
 require(re.search(r"^  publish_apk:", workflow, re.M),
         "Job de entrega condicionada não está no workflow")
-require("needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
+require("needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa, intent50_review_qa]" in workflow,
         "Agente 8 deve esperar relatórios de relevância, E5, Android e auditoria")
 require("needs: [audit_apk, independent_review]" in workflow,
         "O APK final deve depender da aprovação do agente 8")
@@ -146,6 +146,17 @@ require("retention-days: 1" in workflow, "Artefatos intermediários sem prazo cu
 
 for forbidden in ("data/data.json", "colecao.json", "e5-model.onnx", "e5-vocab.bin"):
     require(not (ASSETS / forbidden).is_file(), "Arquivo proibido no APK padrão: " + forbidden)
+require("scripts/qa_intent50_vectors.py" in workflow and
+        "tests/qa_intent50_packet.js" in workflow and
+        "tests/qa_intent50_agent.js" in workflow and
+        "intent50-blind-review-qa" in workflow and
+        "intent50-sealed-ranking-qa" in workflow and
+        "scripts/qa_intent50_independent_review.py" in workflow,
+        "Agente 12 e auditoria 8 devem bloquear o build e manter ranking em pacote separado")
+panel=json.loads((ROOT/"qa/semantic-intents-50.json").read_text(encoding="utf-8"))
+require(panel.get("authoring_status")=="draft_unjudged" and
+        panel.get("human_review_status")=="pending" and len(panel.get("intents",[]))==50,
+        "Não falsificar julgamentos humanos da etapa 6B4c")
 if ERRORS:
     print("AGENTE ESTÁTICO — REPROVADO")
     for error in ERRORS:
