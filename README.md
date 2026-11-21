@@ -1,3 +1,15 @@
+# Buscador de Hinos Android v2.6.6 — cobertura de testes ampliada (etapa 6A)
+
+**Mudança entregue nesta versão:** inclusão de uma avaliação exploratória pareada com **50 consultas** e auditoria independente de categorias e métricas antes de publicar o APK. **O algoritmo de recomendações é o mesmo da v2.6.5**; não reivindicamos aumento de qualidade da busca nem instalação de cross-encoder nesta etapa.
+
+A nova suíte `tests/qa_relevance_50.js` compara RRF e EventFrameEngine no mesmo catálogo público (1.557 hinos) e nas mesmas condições de cada consulta. São 14 consultas de referência anteriores, 12 paráfrases novas de relatos bíblicos, 16 consultas de título exato extraídas deterministicamente do catálogo pinado e 8 controles por número; total de **26 consultas narrativas/bíblicas e 24 controles exatos**. As paráfrases são rótulos provisórios ligados a passagens conhecidas, **ainda não revisados por pessoas**; contar essas 50 consultas como 50 julgamentos humanos seria incorreto.
+
+O relatório `qa-report/relevance-50.json` mantém Recall@10/20, nDCG@5, MRR@20, métricas por categoria, posições, casos piorados e os hashes do catálogo, sem incorporar letras. O agente 8 lê o próprio relatório, recalcula as métricas, confere os 14 casos originais e detecta alterações de rótulos entre variantes. O build é bloqueado se o novo teste ou os oito agentes falharem.
+
+**Versão:** 2.6.6, `versionCode=25`, variante Android offline E5. Manter a PR em draft, sem merge automático. O benchmark ampliado não substitui o teste com dispositivo ARM64 nem a revisão humana das paráfrases. Próxima decisão: validar julgamentos semânticos e só então experimentar reranking contextual fora do APK.
+
+---
+
 # Buscador de Hinos Android v2.6.5 — consolidação medida do motor narrativo
 
 **Decisão da etapa 5:** manter exclusivamente o `EventFrameEngine` (variante A, PR #5); não mesclar o `EventAlignment` alternativo (PR #6). O ranking de produção permanece o da A 2.6.4: a mudança desta versão é a **consolidação versionada e o bloqueio de publicação por comparação independente** antes de gerar o APK. Não é anunciada uma melhoria semântica adicional sobre a A.

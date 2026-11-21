@@ -191,6 +191,14 @@ jobs:
             /tmp/hinos-rrf/app/src/main/assets \
             "$PWD/app/src/main/assets" \
             /tmp/hinos-event-b/app/src/main/assets
+      - name: Avaliar 50 consultas e comparar RRF com eventos sem misturar categorias
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/qa_relevance_50.js \
+            /tmp/e5-catalogo-verificado.json qa-report/e5-query-vectors.json \
+            /tmp/hinos-rrf/app/src/main/assets \
+            "$PWD/app/src/main/assets"
       - name: Registrar métricas de recuperação sem letras
         if: always()
         uses: actions/upload-artifact@v4
@@ -201,6 +209,7 @@ jobs:
             qa-report/e5-hybrid.json
             qa-report/event-ranking.json
             qa-report/event-variant-matrix.json
+            qa-report/relevance-50.json
           retention-days: 30
           if-no-files-found: ignore
       - name: Preservar apenas os artefatos que entram no APK E5
