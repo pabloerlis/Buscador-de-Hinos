@@ -252,7 +252,12 @@ def main():
     (ASSETS/'e5-source.txt').write_text('Modelo: https://huggingface.co/Xenova/multilingual-e5-small\nBase: https://huggingface.co/intfloat/multilingual-e5-small\nLicença: MIT; ver arquivos do projeto original\n\nEste APK redistribui apenas vetores codificados das três coleções 2018; as letras são importadas pelo usuário no dispositivo.\n',encoding='utf8')
 
 def opt():
-    o=ort.SessionOptions();o.intra_op_num_threads=4;o.inter_op_num_threads=1
+    # Single-thread deterministic CPU inference for reproducible E5 embeddings.
+    o=ort.SessionOptions()
+    o.intra_op_num_threads=1
+    o.inter_op_num_threads=1
+    o.execution_mode=ort.ExecutionMode.ORT_SEQUENTIAL
+    o.use_deterministic_compute=True
     o.graph_optimization_level=ort.GraphOptimizationLevel.ORT_ENABLE_ALL
     return o
 
