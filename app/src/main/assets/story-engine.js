@@ -26,6 +26,10 @@ const StoryEngine = (() => {
         const groupHits=s.matchGroups.map(g=>g.filter(c=>c.re.test(normTitle)||c.re.test(normLyrics)).map(c=>c.text).slice(0,3));
         const groups=groupHits.filter(x=>x.length);
         if(!phraseHits.length && groups.length<2)continue;
+        // Filho Pródigo exige retorno real ao Pai; "pai" e "perdão" isolados
+        // não descrevem a parábola. As três etapas podem estar em estrofes diferentes.
+        if(s.id==='filho_prodigo'&&!phraseHits.length&&
+          (!groupHits[0]?.length || !groupHits[1]?.length || !groupHits[2]?.length))continue;
         // Com apenas dois sinais independentes, exigir ao menos um sinal contextual específico.
         const evidence=[...new Set([...phraseHits,...groupHits.flat()])];
         const groupQuality=groups.length>=3?3:groups.length===2?1.5:0;
