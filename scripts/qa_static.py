@@ -5,6 +5,8 @@ Executado ANTES do Gradle. Apenas stdlib, sem rede e sem IA generativa.
 """
 from html.parser import HTMLParser
 from pathlib import Path
+import hashlib
+import json
 import re
 import sys
 
@@ -111,6 +113,14 @@ require("tests/qa_relevance_50.js" in workflow and "qa-report/relevance-50.json"
 require("scripts/qa_independent_review.py" in workflow,
         "Agente 8 de revisão independente obrigatório")
 require("scripts/qa_e5.py" in workflow, "Agente de embeddings E5 ausente")
+golden=ROOT/"qa/e5-index-golden.json"
+reference=json.loads((ROOT/"qa/e5-stability-reference.json").read_text(encoding="utf-8"))
+require(reference.get("status")=="locked" and golden.is_file(),
+        "Índice E5 de referência não foi fixado no repositório")
+if golden.is_file():
+    require(hashlib.sha256(golden.read_bytes()).hexdigest() ==
+            reference.get("fingerprint",{}).get("index_sha256"),
+            "Índice E5 do pacote não corresponde ao SHA congelado")
 require("scripts/qa_e5_stability.py" in workflow and "qa-report/e5-stability.json" in workflow and
         "tests/qa_e5_crossbuild_agent.js" in workflow,
         "Agentes 5/9 sem prova cross-build do E5")
