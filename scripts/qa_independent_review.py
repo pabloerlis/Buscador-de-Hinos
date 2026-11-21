@@ -205,6 +205,82 @@ def audit_events():
             "limitation": "14 buscas e 19 alvos rotulados, insuficientes para medir generalização."}
 
 
+def audit_expanded():
+    """Confere novamente as 50 posições e categorias sem confiar nos totais JS."""
+    source = load_json("relevance-50.json")
+    check(source.get("schema_version") == 1, "Schema inválido da avaliação 50")
+    check(source.get("case_count") == 50, "Avaliação ampliada não contém 50 consultas")
+    check(source.get("catalog_count", 0) >= 1500, "Avaliação ampliada não importou o catálogo real")
+    expected_counts = {"semantic_legacy": 14, "semantic_paraphrase": 12,
+                       "exact_title": 16, "exact_number": 8}
+    check(source.get("category_counts") == expected_counts,
+          "Grupos de avaliação de 50 consultas divergentes")
+    check(source.get("human_review_status") == "pending",
+          "Paráfrases não podem ser declaradas revisadas automaticamente")
+    collected = {}
+    for name in ("baseline", "current"):
+        variant = source.get(name, {})
+        rows = variant.get("rows", [])
+        check(len(rows) == 50, "Relatório de " + name + " sem 50 casos")
+        check(len({row.get("query") for row in rows}) >= 47,
+              "Consultas insuficientemente diversas: " + name)
+        grades = [hit.get("rank") for row in rows for hit in row.get("positives", [])]
+        for rank in grades:
+            check(rank is None or (isinstance(rank, int) and not isinstance(rank, bool) and rank > 0),
+                  "Posição de avaliação 50 inválida: " + name)
+        rr10 = metric_from_ranks(grades, 10)
+        rr20 = metric_from_ranks(grades, 20)
+        ndcg = sum(ndcg_for_one(rank) for rank in grades) / len(grades) if grades else 0
+        expected = variant.get("metrics", {})
+        for key, calc in (("recall_at_10", rr10), ("recall_at_20", rr20), ("ndcg_at_5", ndcg)):
+            check(abs(finite_score(expected.get(key), name+"/"+key)-calc) < 1e-7,
+                  "Métrica ampliada adulterada: " + name + "/" + key)
+        check(expected.get("queries") == 50 and expected.get("targets") == len(grades),
+              "Contagens ampliadas inválidas: " + name)
+        bycategory = {}
+        for category, count in expected_counts.items():
+            subset = [r for r in rows if r.get("category") == category]
+            check(len(subset) == count, "Grupo de 50 casos inválido: " + category)
+            cat_ranks = [hit.get("rank") for row in subset for hit in row.get("positives", [])]
+            wanted = variant.get("categories", {}).get(category, {})
+            check(wanted.get("queries") == count and wanted.get("targets") == len(cat_ranks),
+                  "Grupo de categorias não confere: " + category)
+            for key, observed in (("recall_at_10", metric_from_ranks(cat_ranks, 10)),
+                                  ("recall_at_20", metric_from_ranks(cat_ranks, 20)),
+                                  ("ndcg_at_5", sum(ndcg_for_one(x) for x in cat_ranks) / len(cat_ranks))):
+                check(abs(finite_score(wanted.get(key), category+"/"+key)-observed) < 1e-7,
+                      "Métrica de categoria inválida: " + category + "/" + key)
+            bycategory[category] = {"queries": count, "recall_at_10": round(metric_from_ranks(cat_ranks, 10), 6)}
+        collected[name] = {"recall_at_10": round(rr10, 6), "recall_at_20": round(rr20, 6),
+                           "ndcg_at_5": round(ndcg, 6), "categories": bycategory}
+    before, after = source.get("baseline", {}).get("rows", []), source.get("current", {}).get("rows", [])
+    if len(before) == len(after) == 50:
+        for a, b in zip(before, after):
+            check(a.get("query") == b.get("query") and a.get("category") == b.get("category")
+                  and [(h.get("collection"), h.get("number"), h.get("title")) for h in a.get("positives", [])] ==
+                  [(h.get("collection"), h.get("number"), h.get("title")) for h in b.get("positives", [])],
+                  "Alvos diferentes entre as versões comparadas")
+    legacy = load_json("event-variant-matrix.json")
+    maps = {x.get("name"): x for x in legacy.get("variants", [])}
+    for key, label in (("baseline", "rrf_2_6_3"), ("current", "frames_2_6_4_on")):
+        expanded_rows = source.get(key, {}).get("rows", [])[:14]
+        original_rows = maps.get(label, {}).get("rows", [])
+        if len(expanded_rows) == 14 and len(original_rows) == 14:
+            for a, b in zip(expanded_rows, original_rows):
+                check(a.get("query") == b.get("query") and
+                      [p.get("rank") for p in a.get("positives", [])] ==
+                      [p.get("rank") for p in b.get("positives", [])],
+                      "Matriz antiga não reproduzida em 50 casos: " + label)
+        else:
+            check(False, "Casos legados ausentes em 50: " + label)
+    if collected.get("current", {}).get("categories", {}).get("exact_title", {}).get("recall_at_10", 0) < .90:
+        WARNINGS.append("Controle de título abaixo de 90% no top10")
+    if collected.get("current", {}).get("categories", {}).get("exact_number", {}).get("recall_at_10", 0) < .90:
+        WARNINGS.append("Controle de número abaixo de 90% no top10")
+    return {"queries": 50, "group_metrics": collected,
+            "review_status": "pending_human_semantic_review",
+            "note": "26 consultas narrativas/bíblicas (12 novas paráfrases) e 24 controles exatos; sem alegar 50 juízos humanos independentes"}
+
 def audit_apk_and_device():
     audit = load_json("apk-audit.json")
     log_file = REPORT_DIR / "android-device-evidence.log"
@@ -258,13 +334,14 @@ def main():
     rank = audit_metrics()
     hybrid = audit_hybrid()
     events = audit_events()
+    extended = audit_expanded()
     package = audit_apk_and_device()
     review = {"schema_version": 1, "agent": "8-independent-qa-review",
               "decision": "approved" if not ERRORS else "rejected",
               "apk": package, "ranking_suites": rank,
-              "e5_hybrid": hybrid, "event_variants": events, "warnings": WARNINGS, "errors": ERRORS,
+              "e5_hybrid": hybrid, "event_variants": events, "relevance_50": extended, "warnings": WARNINGS, "errors": ERRORS,
               "checked": ["regression_metrics_recomputed", "e5_case_ranks_recomputed",
-                          "negative_event_and_rrf_tests", "event_AB_metrics_recomputed", "android_instrumentation_evidence",
+                          "negative_event_and_rrf_tests", "event_AB_metrics_recomputed", "expanded_50_metrics_recomputed", "android_instrumentation_evidence",
                           "signed_apk_report_crosschecked", "packaged_scripts_equal_tested_sources"]}
     REPORT_DIR.mkdir(exist_ok=True)
     output = REPORT_DIR / "independent-review.json"

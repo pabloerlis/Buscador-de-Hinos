@@ -84,3 +84,13 @@ Nota: o emulador testa o APK x86_64; dispositivos reais arm64-v8a podem apresent
 - Manter a cobertura de negação e sequência dos testes de `EventFrameEngine`; a avaliação atual não prova extração correta de papéis sintáticos, sujeito/objeto nem generalização a narrativas não rotuladas. Estender rótulos antes de alterar pesos.
 - Não considerar nDCG/latência de runner x86_64 suficientes para decisão de desempenho em dispositivos ARM64. Usar o teste instrumentado no emulador como gate e documentar limitação física.
 - APK versionado 2.6.5/code24 somente após pré-build, build, Android offline e auditoria final. Próxima etapa sempre registrada em issue do GitHub.
+
+## Etapa 6A — 50 consultas e auditoria independente (v2.6.6)
+
+- Preservar os oito agentes da PR #11 e a publicação condicionada ao agente 8.
+- Rodar `tests/qa_relevance_50.js` no agente E5 com os mesmos vetores e índices das condições RRF e eventos A; salvar `qa-report/relevance-50.json`.
+- Recalcular no agente 8 todas as métricas, por consulta e categoria, e garantir correspondência integral dos 14 casos anteriores.
+- **Diferenciar 26 casos semânticos/bíblicos de 24 controles de número/título.** Os 12 novos rótulos de paráfrases são provisórios e exigem revisão humana antes de treino ou ajuste de pesos. Os casos do mesmo relato não são independentes.
+- Os relatórios não podem incluir letras, e nenhum caso de teste pode determinar regra especial para uma história ou hino.
+- Sem reranker em produção até avaliação fora do APK, orçamento de memória, licença e teste ARM64.
+- Uma versão nova só pode ser declarada concluída quando CI, instrumentação e auditoria do APK v2.6.6/code25 aprovarem, o arquivo entregue tiver SHA verificado e a próxima issue estiver documentada.

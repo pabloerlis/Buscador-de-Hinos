@@ -106,6 +106,10 @@ require("E5DeviceSmokeTest" in runner_script and "FAILURES!!!" in runner_script 
         "INSTRUMENTATION_STATUS_CODE: 0" in runner_script,
         "Testes Android não verificam explicitamente o resultado da instrumentação")
 require("node tests/qa-metrics.js" in workflow, "Avaliação quantitativa não está no CI")
+require("tests/qa_relevance_50.js" in workflow and "qa-report/relevance-50.json" in workflow,
+        "Matriz de 50 consultas deve executar no pré-build e ser preservada")
+require("scripts/qa_independent_review.py" in workflow,
+        "Agente 8 de revisão independente obrigatório")
 require("scripts/qa_e5.py" in workflow, "Agente de embeddings E5 ausente")
 require("continue-on-error: true" not in workflow, "Um dos agentes ignora falhas")
 require("retention-days: 1" in workflow, "Artefatos intermediários sem prazo curto")
