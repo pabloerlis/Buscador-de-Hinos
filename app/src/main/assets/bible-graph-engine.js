@@ -10,6 +10,14 @@ const BibleGraphEngine=(()=>{
   // Cenas narrativas discriminativas: os termos precisam coexistir na
   // letra completa, e não somente em um versículo isolado ou no título.
   const SCENE_CUES={
+    'filho_pródigo':{
+      groups:[
+        ['abandonei','parti','deixei','longe','perdido','perdi','afastei'],
+        ['voltei','voltou','voltando','voltar','retornei','regressei'],
+        ['pai','casa do pai','meu lar'],
+        ['abraçaste','abraçou','abraço','acolheu','recebeu','festa','herança']
+      ],required:[0,1,2,3],minGroups:4
+    },
     mulher_do_fluxo_de_sangue:{
       groups:[
         ['multidão','multidao','multidão te oprime','muitos ao redor'],
@@ -117,9 +125,9 @@ const BibleGraphEngine=(()=>{
         const groups=scene.groups.map(group=>group.filter(term=>matches(text,term)));
         const coverage=groups.filter(group=>group.length).length;
         if(coverage>=scene.minGroups&&scene.required.every(i=>groups[i].length)){
-          // A menção genérica a "sangue" não prova que o hino aborda
-          // a mulher que tocou Jesus. Exigimos multidão e toque,
-          // juntamente com outra evidência do episódio.
+          // Em Marcos 5, sangue isolado não indica o toque da mulher.
+          // Em Lucas 15, são necessários afastamento, retorno e acolhimento.
+          // As cenas são verificadas em todas as estrofes da letra.
           sceneCues=groups.flatMap(group=>group.slice(0,1));
           score=Math.min(38,score)+(coverage===4?30:23);
           reasons.push('Cena bíblica reconhecida na letra completa ('+sceneCues.join(', ')+')');
