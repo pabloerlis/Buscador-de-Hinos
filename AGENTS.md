@@ -47,8 +47,10 @@ A compilação `build_apk` depende de `sources`, `static`, `regressions`, `relev
 - O agente 5 verifica novamente 12 consultas em sessões ONNX diferentes e 64 trechos de índice recomputados a partir da fonte pinada, sem registrar letras.
 - O manifesto `qa/e5-stability-reference.json` só é travado após medir uma execução diagnóstica e confirmar a mesma assinatura em outra execução com índice reconstruído. `pending` é falha bloqueante.
 - Agente 9 recalcula hashes dos arquivos E5 de entrega e da avaliação e exige identidade com a referência travada; agente 8 verifica os laudos. Alteração entre builds REPROVA antes do Gradle.
+- No x64, avaliar a opção ONNX Runtime `session.x64quantprecision=1`: evita saturação U8S8 em AVX2/AVX512 sem VNNI, quando aplicável; NÃO assumir efeito em ARM64 ou estabilidade comprovada sem teste real.
 - Não ajustar ranking para casos de teste; divergência de hashes se investiga, não se mascara. Um APK somente após 9 agentes e Android offline aprovar; ainda falta teste físico ARM64.
- Aprovação do pipeline não equivale a validação semântica exaustiva.
+
+Aprovação do pipeline não equivale a validação semântica exaustiva.
 
 ## Etapa 2 — embeddings semânticos E5 por trechos
 
