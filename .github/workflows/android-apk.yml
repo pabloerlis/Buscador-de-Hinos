@@ -1,7 +1,7 @@
 name: Android APK - verificacao por agentes
 on:
   push:
-    branches: ['**']
+    branches-ignore: ['delivery/apk-2.6.15-87090a7']
   pull_request:
     branches: [main]
   workflow_dispatch:
