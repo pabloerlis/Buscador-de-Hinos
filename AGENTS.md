@@ -58,3 +58,12 @@ Nota: o emulador testa o APK x86_64; dispositivos reais arm64-v8a podem apresent
 - Preservar `eventEvidence:false` para auditoria pareada com o motor desligado; defaults ativados só em busca contextual e narrativa. Até obter avaliação humana maior, preservar o conjunto dos dez hinos conhecidos no topo de cada pesquisa narrativa, permitindo apenas reordenação interna e melhorias além dessa faixa.
 - O CI deve executar `tests/test-event-frames.js` e `tests/qa_event_ranking.js`, comparando Recall@10/20 e nDCG@5 em consultas reais, incluindo narrativas e referências. Os resultados devem ser registrados sem letras.
 - Dispositivo: inspecionar `EventFrameEngine` e controle `event-toggle` dentro da WebView Android offline e executar classificação de texto sintético antes da auditoria e publicação do APK.
+
+## Etapa 5 — consolidação por benchmark de variantes (v2.6.5)
+
+- Somente a implementação A `EventFrameEngine` é mantida. A variante B `EventAlignment` demonstrou nDCG@5 menor e falso positivo sintético com ações negadas; **não** juntar sinais de ambas e não aumentar bônus narrativo sem evidência.
+- Executar `tests/qa_event_variant_matrix.js` no job `embeddings`, após gerar o mesmo E5 de consulta e índices bíblicos, com o catálogo público pinado e três árvores fixadas por commit. Quatro condições: RRF original, A desligado, A ligado, B ligado.
+- Exigir A desligado idêntico ao RRF; A ligado não piorar Recall@10, não reduzir nDCG@5 em mais de 0,04 e não ser inferior à B nessa amostra; reportar Recall@20, falsos positivos e posições por consulta.
+- Manter a cobertura de negação e sequência dos testes de `EventFrameEngine`; a avaliação atual não prova extração correta de papéis sintáticos, sujeito/objeto nem generalização a narrativas não rotuladas. Estender rótulos antes de alterar pesos.
+- Não considerar nDCG/latência de runner x86_64 suficientes para decisão de desempenho em dispositivos ARM64. Usar o teste instrumentado no emulador como gate e documentar limitação física.
+- APK versionado 2.6.5/code24 somente após pré-build, build, Android offline e auditoria final. Próxima etapa sempre registrada em issue do GitHub.

@@ -1,3 +1,23 @@
+# Buscador de Hinos Android v2.6.5 — consolidação medida do motor narrativo
+
+**Decisão da etapa 5:** manter exclusivamente o `EventFrameEngine` (variante A, PR #5); não mesclar o `EventAlignment` alternativo (PR #6). O ranking de produção permanece o da A 2.6.4: a mudança desta versão é a **consolidação versionada e o bloqueio de publicação por comparação independente** antes de gerar o APK. Não é anunciada uma melhoria semântica adicional sobre a A.
+
+**Benchmark pareado real — mesmo catálogo público pinado, 14 consultas / 19 alvos, vetores E5 e índices idênticos:**
+
+| Motor | Recall@10 | Recall@20 | nDCG@5 |
+|---|---:|---:|---:|
+| RRF 2.6.3 | 78,95% | 84,21% | 0,50053 |
+| A 2.6.4 / 2.6.5 (eventos ligados) | 78,95% | 84,21% | **0,51107** |
+| B 2.6.4 (alternativo) | 78,95% | 84,21% | 0,48111 |
+
+A desligado reproduz **exatamente** as posições do RRF. A melhora foi concentrada em um alvo de Marcos 10:46–52, que passou da posição 4 à 2. Os casos de Lázaro e tempestade não foram solucionados. No runner x86_64 do CI, latência média por consulta foi 104 ms (RRF), 143 ms (A) e 103 ms (B); **não são medidas em ARM64 real**. A B atribuiu tier 3 a eventos explicitamente negados no teste sintético; 0 falso positivo ocorreu nos controles rotulados específicos do catálogo. São apenas 19 alvos revisados, não uma medição de precisão geral.
+
+**Gate obrigatório:** `tests/qa_event_variant_matrix.js` é executado no job de embeddings **antes do Gradle**. Compara quatro estados (RRF, A desligado, A ligado e B) e guarda `qa-report/event-variant-matrix.json` com posições individuais, métricas, casos negativos e medição de latência. O build depende de sucesso dos agentes, e o APK só é publicável após emulador Android offline e auditoria da assinatura e dos recursos. Os commits de referência do RRF e da B estão fixados no workflow; alterar a comparação exige revisão explícita.
+
+**Escopo e licença:** sem letras empacotadas, sem exceções por história/hino, sem merge automático. Versão `2.6.5`, `versionCode=24`. O próximo avanço é avaliar um reranker contextual leve offline, com conjunto de relevância ampliado, memória/latência ARM64 e comparação contra este baseline. Referências: [issue #7](https://github.com/pabloerlis/Buscador-de-Hinos/issues/7), [PR #8](https://github.com/pabloerlis/Buscador-de-Hinos/pull/8).
+
+---
+
 # Buscador de Hinos Android v2.6.4 — ações e sequência narrativa
 
 Esta versão acrescenta um **motor determinístico de acontecimentos bíblicos** ao ranking existente. O aplicativo compara a sequência de ações e o contexto dos personagens/cenários na **Bíblia Livre offline** com trechos de cada hino importado. Não precisa de serviço remoto, modelo generativo nem distribui letras.

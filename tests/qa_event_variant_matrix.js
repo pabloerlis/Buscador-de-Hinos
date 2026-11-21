@@ -125,7 +125,7 @@ async function evaluate(name,assetDir,eventEvidence){
     });
   }
   const grades=rows.flatMap(x=>x.positives.map(p=>p.rank));
-  return {name,source:assetDir,events_enabled:eventEvidence,metrics:metric(grades),
+  return {name,source:assetDir,events_enabled:eventEvidence,imported_count:imported.count,metrics:metric(grades),
     false_positive_top10:rows.flatMap(x=>x.negatives.filter(p=>p.rank!==null&&p.rank<=10)
       .map(p=>({query:x.query,collection:p.collection,number:p.number,rank:p.rank}))),
     rows,
@@ -156,7 +156,7 @@ async function evaluate(name,assetDir,eventEvidence){
     'Mesma biblioteca, mesmos vetores E5, mesmos arquivos de índices',
     'Nenhuma versão A/B deve ser mesclada sem revisão das posições individuais',
     'O probe de negação é diagnóstico e não altera os resultados de produção'
-  ],catalog_count:corpus?.length||baseline.rows.length,cases:cases.length,
+  ],catalog_count:baseline.imported_count,cases:cases.length,
     source_commit:{baseline:'fda52c2fe548f5fcbcdd2bd9ea2359f02c774bcf',
       alignment:'1dda4aeeab7d7de4941736f34eb5a86240840b79'},
     summary,variants:variants.map(x=>({...x,source:undefined}))};
@@ -173,5 +173,7 @@ async function evaluate(name,assetDir,eventEvidence){
     'A prejudicou excessivamente nDCG@5 em relação ao RRF');
   // B pode superar A; comparar números e casos no relatório antes de selecionar.
   assert.equal(alignment.metrics.targets,frames.metrics.targets);
+  assert.ok(frames.metrics.ndcg_at_5+1e-9>=alignment.metrics.ndcg_at_5,
+    'A variante B superou a A em nDCG@5; revisão obrigatória antes do APK');
   console.log('MATRIZ DE VARIANTES: gerada e validada; decisão exige inspeção do relatório.');
 })().catch(err=>{console.error(err);process.exitCode=1;});
