@@ -2,6 +2,23 @@
 
 Este projeto utiliza **agentes automatizados do GitHub Actions** (jobs independentes de validação), não agentes de IA que substituem testes.
 
+## Regra obrigatória de conclusão, testes e entrega ao usuário
+
+**Não declarar uma tarefa concluída nem solicitar que o usuário teste uma build não auditada.** Ao terminar **cada subtarefa de implementação**:
+
+1. Criar **um APK distinto e identificável** para aquela funcionalidade, com `versionCode` maior que o da versão anterior e `versionName` coerente; não reutilizar APK anterior como se contivesse a nova alteração. Mudanças somente em documentação/processos podem referenciar o último APK aprovado, identificando-o explicitamente como anterior.
+2. Executar **testes funcionais reais e automatizados antes de qualquer declaração de conclusão**, incluindo casos positivos, negativos, regressões, métricas de relevância, E5 (quando presente) e instrumentação na WebView do próprio APK em emulador Android **offline**. O fato de compilar não é teste suficiente.
+3. Exigir **sucesso de todos os agentes e do novo agente 8** antes de publicar. O agente 8 deve *testar e analisar independentemente*: reexecutar casos narrativos e RRF, recalcular por caso Recall/nDCG, inspecionar scripts efetivamente embalados, conferir hash/assinatura/versão, rastrear regressões e exigir prova de aprovação da instrumentação Android. Emissão de relatório JSON sem letras. Qualquer falha bloqueia o job `publish_apk`. Nenhum `continue-on-error`, `|| true` nem aprovação inferida apenas do exit code de `adb`.
+4. **Entregar no chat ao usuário o novo APK gerado e aprovado**, por link de download real e acessível (não apenas link para PR ou artefato do CI), com versão, `versionCode`, SHA-256, resultado dos testes e limitações. Conferir o hash dos bytes baixados antes de entregar. Se o download falhar ou testes não passarem, declarar **pendente/reprovado**, corrigir e testar novamente: não alegar conclusão nem inventar link.
+5. **Registrar a próxima tarefa no GitHub**, antes de encerrar a resposta: issue de continuidade com contexto, base e dependências, PR/branch, SHA, pipeline, métricas antes/depois, casos que pioraram, checklist e próximo primeiro passo. Vincular no PR anterior e fornecer link ao usuário, para a retomada em outro chat.
+6. Testes no emulador x86_64 **não equivalem** a testes físicos ARM64; registrar a limitação. Não fazer merge automático.
+
+**Definição de concluído:** código + testes automatizados + instrumentação Android + agente 8 aprovado + auditoria/assinatura + **APK novo entregue ao usuário** + próxima etapa documentada. Um resultado parcial deve ser descrito como parcial, não como finalizado.
+
+### Agente 8 — análise independente (bloqueante)
+
+Job `independent_review`, que depende de `audit_apk`, `device_smoke`, `relevance` e `embeddings`. O script `scripts/qa_independent_review.py` avalia o APK real e os relatórios originais (não apenas seus sinais de sucesso), recalcula métricas e registra pioras por consulta; `publish_apk` só libera a versão se o agente 8 aprovar. Guardar os relatórios `apk-audit.json`, `independent-review.json` e a evidência Android juntamente com o APK aprovado.
+
 ## Papéis obrigatórios
 
 1. **Fontes e licenças** — gerar índices bíblicos a partir de fontes pinadas, verificar hashes, atribuição, integridade, 66 livros, 31.102 versículos, narrativas e referências cruzadas.
@@ -12,7 +29,7 @@ Este projeto utiliza **agentes automatizados do GitHub Actions** (jobs independe
 
 ## Ordem e bloqueio
 
-A compilação `build_apk` depende de `sources`, `static`, `regressions` e `relevance` concluídos com sucesso. O artefato **aprovado** só existe se `audit_apk` também passar. Nunca adicionar `continue-on-error`, `|| true` para testes, nem remover `needs`.
+A compilação `build_apk` depende de `sources`, `static`, `regressions`, `relevance` e `embeddings` concluídos com sucesso. `audit_apk` depende de `build_apk` e `device_smoke`. O novo agente `independent_review` depende de `audit_apk`, `device_smoke`, `relevance` e `embeddings`. **Somente `publish_apk`, dependente de `audit_apk` e `independent_review`, publica a versão final.** Nunca adicionar `continue-on-error`, `|| true` para testes, nem remover `needs`.
 
 ## Regras para cada funcionalidade futura
 
