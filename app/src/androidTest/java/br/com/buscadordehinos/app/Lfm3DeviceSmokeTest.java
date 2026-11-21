@@ -66,7 +66,7 @@ public class Lfm3DeviceSmokeTest {
                 +"4 Manhã gloriosa: descreve a ressurreição. "
                 +"5 Gratidão: expressa agradecimento geral. "
                 +"Responda JSON com id do hino mais correspondente e motivo curto em letras minúsculas sem acentos.";
-            String gbnf="root ::= \"{\\\"id\\\":\" (\"1\" | \"2\" | \"3\" | \"4\" | \"5\") \",\\\"motivo\\\":\\\"\" [a-z ]{8,48} \"\\\"}\"\n";
+            String gbnf="root ::= \"{\\\"id\\\":\" (\"1\" | \"2\" | \"3\" | \"4\" | \"5\") \",\\\"motivo\\\":\\\"\" [a-z ]{8,48} \"\\\"\"\n";
             long[] compareMetrics=new long[4];
             long start=SystemClock.elapsedRealtime();
             byte[] compare=(byte[])generate.invoke(null,new Object[]{

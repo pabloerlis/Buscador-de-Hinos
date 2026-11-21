@@ -485,6 +485,10 @@ jobs:
         with:
           name: apk-baseline-native-qa
           path: apk-baseline
+      - uses: actions/download-artifact@v4
+        with:
+          name: native-build-evidence-qa
+          path: qa-report
       - name: Baixar GGUF LFM3 oficial para teste, jamais para APK
         shell: bash
         run: |
