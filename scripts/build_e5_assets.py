@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Baixa E5-small int8, exporta vocabulário e índices vetoriais de hinos.
+"""Baixa E5-small UINT8, exporta vocabulário e índices vetoriais de hinos.
 Os textos de hinos NÃO são distribuídos: apenas vetores normalizados em int8.
 Uso: pip install huggingface_hub tokenizers onnxruntime numpy requests
 """
@@ -28,7 +28,7 @@ ASSETS.mkdir(parents=True,exist_ok=True)
 REPO='Xenova/multilingual-e5-small'
 REVISION='761b726dd34fb83930e26aab4e9ac3899aa1fa78'
 SOURCE='https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json'
-MODEL_SHA256='4d24e2bc01a447951524466ef533e52944bf48509e6552810bcee1a2711cb02c'
+MODEL_SHA256='ee13574a23e4384619a172d4c0c8c6b825528fde30258c56130d5e3efcc9c8f1'
 
 class Markup(HTMLParser):
     def __init__(self): super().__init__(convert_charrefs=True);self.parts=[]
@@ -169,8 +169,8 @@ def passage_spans(lyrics, max_segments=8):
 
 
 def main():
-    print('Downloading quantized ONNX model...',flush=True)
-    model=Path(hf_hub_download(repo_id=REPO,filename='onnx/model_int8.onnx',revision=REVISION))
+    print('Downloading UINT8 quantized ONNX model...',flush=True)
+    model=Path(hf_hub_download(repo_id=REPO,filename='onnx/model_uint8.onnx',revision=REVISION))
     tokenizer=Path(hf_hub_download(repo_id=REPO,filename='tokenizer.json',revision=REVISION))
     digest=hashlib.sha256(model.read_bytes()).hexdigest()
     if digest != MODEL_SHA256:
@@ -210,7 +210,7 @@ def main():
         records.append({'id':h['id'],'n':h['number'],'t':normalize(h['title']),'f':h['fingerprint'],'c':h['collection'],
                         's':spans,'v':[compress(x) for x in vectors_here]})
     assert offset==len(vectors)
-    payload={'version':3,'model':'Xenova/multilingual-e5-small:onnx/model_int8.onnx',
+    payload={'version':3,'model':'Xenova/multilingual-e5-small:onnx/model_uint8.onnx',
              'model_sha256':MODEL_SHA256,'dimension':384,'max_passages_per_hymn':8,
              'passage_strategy':'local windows up to five non-empty lines, selected across hymn',
              'source_sha256':source_digest,'source_url':SOURCE,'collections':collections,'count':len(records),
