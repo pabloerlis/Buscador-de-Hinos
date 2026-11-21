@@ -38,6 +38,7 @@ public class Lfm3DeviceSmokeTest {
             assertNotNull("A arquitetura LFM3 não carregou",result);
             assertTrue("Modelo não reportou carregamento: "+result,
                 result.contains("GGUF pronto"));
+            long simpleStarted=SystemClock.elapsedRealtime();
             byte[] output;
             try {
                 output=(byte[])generate.invoke(null,new Object[]{
@@ -54,7 +55,7 @@ public class Lfm3DeviceSmokeTest {
                 new String(output,StandardCharsets.UTF_8));
             assertTrue("Não houve geração de tokens",metrics[3]>0);
             android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=simple total_ms="
-                +(metrics[0]+metrics[1]+Math.max(metrics[2],0))+" setup_ms="+metrics[0]
+                +(SystemClock.elapsedRealtime()-simpleStarted)+" setup_ms="+metrics[0]
                 +" prefill_ms="+metrics[1]+" first_token_ms="+metrics[2]
                 +" generated="+metrics[3]);
             String narrative="Contexto: Lucas 15:11-32. O filho abandona a casa, sofre, arrepende-se e volta ao pai. "
@@ -65,7 +66,7 @@ public class Lfm3DeviceSmokeTest {
                 +"4 Manhã gloriosa: descreve a ressurreição. "
                 +"5 Gratidão: expressa agradecimento geral. "
                 +"Responda JSON com id do hino mais correspondente e motivo curto em letras minúsculas sem acentos.";
-            String gbnf="root ::= \"{\\\"id\\\":\" (\"1\" | \"2\" | \"3\" | \"4\" | \"5\") \",\\\"motivo\\\":\\\"\" [a-z ]{8,48} \"\\\"}\"\\n";
+            String gbnf="root ::= \"{\\\"id\\\":\" (\"1\" | \"2\" | \"3\" | \"4\" | \"5\") \",\\\"motivo\\\":\\\"\" [a-z ]{8,48} \"\\\"}\"\n";
             long[] compareMetrics=new long[4];
             long start=SystemClock.elapsedRealtime();
             byte[] compare=(byte[])generate.invoke(null,new Object[]{
