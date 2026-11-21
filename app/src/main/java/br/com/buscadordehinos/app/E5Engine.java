@@ -61,7 +61,8 @@ final class E5Engine {
         env=OrtEnvironment.getEnvironment();
         OrtSession.SessionOptions options=new OrtSession.SessionOptions();
         try{
-            options.setIntraOpNumThreads(Math.max(1,Math.min(3,Runtime.getRuntime().availableProcessors()-1)));
+            options.setIntraOpNumThreads(1);
+            options.addConfigEntry("session.use_deterministic_compute","1");
             options.setInterOpNumThreads(1);
             options.setOptimizationLevel(OrtSession.SessionOptions.OptLevel.ALL_OPT);
             session=env.createSession(model.getAbsolutePath(),options);
