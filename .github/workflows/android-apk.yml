@@ -1,7 +1,9 @@
 name: Build Android APK
 on:
   push:
-    branches: [main, android-apk]
+    branches: [main, android-apk, 'test/**']
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 jobs:
   build:
@@ -31,6 +33,24 @@ jobs:
         run: node tests/test-offline.js && node tests/test-gguf.js && node tests/test-v14.js && node tests/test-v15.js && node tests/test-v16.js && node tests/test-v17.js && node tests/test-v18.js && node tests/test-v19.js && node tests/test-v20.js && node tests/test-v21.js
       - name: Evaluate offline semantic ranking
         run: node tests/test-stanza-ranking.js
+      - name: Download real hymn catalog for independent agents
+        run: |
+          mkdir -p .tmp
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/master/data/data.json' \
+            --output .tmp/catalog-2018.json
+      - name: Three agents validate complete lyrics before APK
+        run: node tests/agents/run-validation.js .tmp/catalog-2018.json
+      - name: Upload complete and simple semantic test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Relatorios-Testes-Semanticos-Letra-Inteira
+          path: |
+            reports/validation/relatorio-completo.md
+            reports/validation/relatorio-simples.md
+            reports/validation/resultado-agentes.json
+          if-no-files-found: warn
       - name: Build APK
         run: gradle --no-daemon --stacktrace assembleDebug
       - name: Verify model-free APK contents

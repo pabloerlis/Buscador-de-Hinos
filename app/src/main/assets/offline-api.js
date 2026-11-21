@@ -538,6 +538,15 @@ const OfflineAPI = (() => {
           semanticResult=semantic.evaluate(song.semantic_profile||[],opts.related?intent:{direct:intent.direct,related:[]});
           score+=semanticResult.score*semanticWeight;
           if(semanticResult.proof.length)evidence.push(...semanticResult.proof.slice(0,2));
+          // Temas múltiplos devem estar presentes na letra integral: títulos
+          // sugestivos não bastam para provar a mensagem de um hino.
+          const directLyricTopics=intent.direct.filter(topic=>(song.semantic_profile||[]).some(profile=>
+            profile.id===topic.id && profile.evidence.some(cue=>hasWord(lyrics,normalizeLyrics(cue)))));
+          if(intent.direct.length>=2&&directLyricTopics.length>=2){
+            const bonus=Math.min(17,11+3*(directLyricTopics.length-2))*Math.min(semanticWeight,1);
+            score+=bonus;
+            evidence.unshift('Temas combinados comprovados na letra inteira: '+directLyricTopics.slice(0,3).map(t=>t.label.toLowerCase()).join(' e '));
+          }
         }else{
           const matching=selectedTopics.filter(t=>song.topics.includes(t));
           score+=matching.length*6.5*semanticWeight;
@@ -563,8 +572,14 @@ const OfflineAPI = (() => {
           storyResult=narratives.evaluate(song.story_profile||[],storyIntent);
           score+=storyResult.score*semanticWeight;
           if(storyResult.reasons.length)evidence.unshift(...storyResult.reasons);
+          // Narrativa completa prevalece sobre afinidades com tópicos genéricos.
+          if(storyResult.score>0)score+=Math.min(30,13+storyResult.score*.42)*Math.min(semanticWeight,1);
         }
       }
+      // Uma consulta exclusivamente narrativa requer evidência daquela
+      // narrativa na letra, sem confundir histórias bíblicas diferentes.
+      if(storyIntent?.matches.length && !(storyResult?.score>0) &&
+         !storyIntent.residual?.trim())continue;
       if(score<(semanticResult?.score>0||storyResult?.score>0||graphResult?.score>=7||vectorScores.get(song.id)>0.76||spelling.length?4.7:7))continue;
       const sharedPassage=passageTopics.size>=2?findSharedPassage(song,indexedText,passageTopics):null;
       if(sharedPassage){
