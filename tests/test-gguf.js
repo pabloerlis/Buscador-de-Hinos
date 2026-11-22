@@ -174,7 +174,27 @@ assert.equal(ai.applyReview(reviewHymns.slice(1),judgments),null);
 assert.equal(ai.applyReview(reviewHymns,review.requests.map(({candidate})=>ai.readReview('não',candidate))),reviewHymns);
 assert.equal(ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns.slice(0,3)),null);
 
+const chatRequest=ai.prepareChat({query:'Consolo',rootQuery:'Luto',message:'Quais destes?',
+  previous:'Sem foco em sofrimento',hymns:reviewHymns,constraints:'excluir medo',canPick:true});
+assert.match(chatRequest.prompt,/Busca atual: Consolo/);
+assert.match(chatRequest.prompt,/Pedido anterior: Sem foco em sofrimento/);
+assert.match(chatRequest.prompt,/Novo pedido: Quais destes/);
+assert.match(chatRequest.prompt,/4 \| Deus acolhe/);
+assert.doesNotMatch(chatRequest.prompt,/5 \|/);
+assert.match(chatRequest.grammar,/\(picks\)/);
+assert.throws(()=>ai.readChat('["Consolo, fé e esperança"]',chatRequest));
+assert.deepEqual(Array.from(ai.readChat('[4]',chatRequest).ids),[4]);
+assert.equal(ai.readChat('[]',chatRequest),null);
+for(const response of ['[1,1]','[5]','[1,2,3]','{"query":"fé"}','["https://exemplo.com"]','["123"]'])
+  assert.throws(()=>ai.readChat(response,chatRequest));
+const scoped=ai.prepareChat({query:'Paz',message:'Somente fé',hymns:reviewHymns,canPick:false});
+assert.equal(scoped.candidates.size,0);
+assert.equal(ai.readChat('["Consolo, fé e esperança"]',scoped).query,'Consolo, fé e esperança');
+assert.throws(()=>ai.readChat('["https://exemplo.com"]',scoped));
+assert.throws(()=>ai.readChat('[1]',scoped));
+
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
+const turnSource=js.slice(js.indexOf('async function submitRefinement('),js.indexOf("$('refine-form').addEventListener"));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
 function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,embeddingTask=null}={}){
   const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];
@@ -183,7 +203,7 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
     if(!elements.has(id)){
       const classes=new Set(['hidden']);
       elements.set(id,{classes,textContent:'',children:[],classList:{add:c=>classes.add(c),remove:c=>classes.delete(c),toggle(){}},
-        addEventListener(name,handler){if(name==='click')this.click=handler;},replaceChildren(){this.children=[];},appendChild(child){this.children.push(child);},insertAdjacentHTML(){}});
+        addEventListener(name,handler){if(name==='click')this.click=handler;},setAttribute(){},replaceChildren(){this.children=[];},appendChild(child){this.children.push(child);},insertAdjacentHTML(){}});
     }
     return elements.get(id);
   };
@@ -192,17 +212,17 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
   const vector=Array(384).fill(0.1);
   const settings={mode:'balanced',vectorMode:nativeModel?'balanced':'off',collections:{principal:true,avulsos:false}};
   const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector};
-  const {gguf,search}=vm.runInNewContext(aiSource+searchSource+ggufSource+'\n({gguf:GGUF,search:performSearch})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>messages.push(text),showResults(){},
+  const {gguf,search,refine}=vm.runInNewContext(aiSource+searchSource+turnSource+ggufSource+'\n({gguf:GGUF,search:performSearch,refine:submitRefinement})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>{messages.push(text);return $('conversation');},showResults(){},
     document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
-    OfflineAPI:{normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
+    OfflineAPI:{chatSearchIntent:text=>({eligible:true,canPick:true,list:/entre esses|desses/i.test(text)}),normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
     jsonRequest:async(url,payload)=>{
       if(url.startsWith('/api/hymns/'))return {lyrics:reviewLyrics.get(Number(url.split('/').at(-1)))};
       requests.push(payload);
       if(additionalSearch&&payload.settings.pageSize===10)return additionalSearch();
-      return {results:hymns,effective_query:payload.query,excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
+      return {results:hymns,effective_query:payload.model_query||payload.query,model_refinement:payload.model_query||'',excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
     },
     busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>{embeddings.push(args);return embeddingTask?.();}}});
-  return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
+  return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,refine,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
 }
 
 async function checkBridge(){
@@ -352,6 +372,49 @@ async function checkBridge(){
   const exactTitle=setup({auto:true,initialResults:[{...hymns[0],match_type:'titulo_exato'},...hymns.slice(1)]});
   await exactTitle.gguf.maybeAuto('Hino de teste 1');
   assert.equal(exactTitle.calls.length,0);
+
+  const chat=setup({initialResults:reviewHymns});
+  const firstTurn=chat.refine('Prefiro hinos de reconciliação');
+  assert.equal(chat.calls.length,1);
+  assert.deepEqual(chat.state.lastResults,reviewHymns);
+  chat.complete(chat.calls[0][1],'["Voltar para Deus e reconciliação"]');
+  assert.equal(await firstTurn,true);
+  assert.equal(chat.requests[0].query,'Prefiro hinos de reconciliação');
+  assert.equal(chat.requests[0].model_query,'Voltar para Deus e reconciliação');
+  assert.equal(chat.requests[0].exclude[0],'tristeza');
+  assert.match(chat.messages.at(-1),/IA acrescentou/);
+  const highlight=chat.refine('Qual desses se encaixa melhor?');
+  assert.match(chat.calls[1][0],/Pedido anterior: Prefiro hinos/);
+  chat.complete(chat.calls[1][1],'[2]');
+  assert.equal(await highlight,true);
+  assert.equal(chat.requests.length,1);
+  chat.$('conversation').children.at(-1).click();
+  assert.deepEqual(chat.opened,[2]);
+
+  const expiredChat=setup();
+  const expiredTurn=expiredChat.refine('Quero esperança');
+  expiredChat.complete(expiredChat.calls[0][1],'Tempo limite',false);
+  assert.equal(await expiredTurn,true);
+  assert.equal(expiredChat.requests[0].model_query,undefined);
+  assert.match(expiredChat.messages.at(-1),/Busca local refinada/);
+
+  const staleChat=setup();
+  const staleTurn=staleChat.refine('Agora mais sobre vigiar');
+  staleChat.state.searchEpoch++;
+  staleChat.gguf.cancelSearchTask();
+  staleChat.complete(staleChat.calls[0][1],'["Vigilância"]');
+  assert.equal(await staleTurn,false);
+  assert.equal(staleChat.requests.length,0);
+
+  const prefersChat=setup({auto:true,initialResults:reviewHymns});
+  await prefersChat.gguf.maybeAuto('Paz');
+  const reviewId=prefersChat.calls[0][1];
+  const chatTurn=prefersChat.refine('E entre esses?');
+  assert.deepEqual(prefersChat.cancelled,[reviewId]);
+  prefersChat.complete(reviewId,'sim');
+  prefersChat.complete(prefersChat.calls[1][1],'[1]');
+  assert.equal(await chatTurn,true);
+  assert.match(prefersChat.messages.at(-1),/destacou estes hinos/);
 
   const literal=setup({auto:true});
   literal.state.searchSettings.mode='literal';

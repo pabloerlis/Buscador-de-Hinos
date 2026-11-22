@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,lastRefinement:'',
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -42,7 +42,7 @@ async function refreshStatus(){
   return result;
 }
 function busySearch(value){
-  state.busy=value; $('search-button').disabled=value;$('refine-send').disabled=value;$('load-more').disabled=value;
+  state.busy=value; $('search-button').disabled=value;$('refine-send').disabled=value||Boolean(state.chatPending);$('load-more').disabled=value;
   $('search-button').textContent=value?'Buscando…':'Buscar';
   if(!value)$('search-button').innerHTML='Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
 }
@@ -70,7 +70,7 @@ function setRefineOpen(open) {
   $('refine-toggle').setAttribute('aria-expanded', String(open));
   $('refine-panel').classList.toggle('hidden', !open);
 }
-async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false}={}){
+async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false,modelQuery}={}){
   if(state.busy)return false;
   if(!state.ready){toast('Importe a coletânea para começar.');$('import-panel').scrollIntoView({behavior:'smooth',block:'center'});return false;}
   if(!String(query).trim())return false;
@@ -80,7 +80,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     $('gguf-comparison').classList.add('hidden');
     if(!preserveContext){
       state.vectorQuery=null;
-      if(!refine)state.searchRootQuery=query;
+      if(!refine){state.searchRootQuery=query;state.lastRefinement='';}
       state.originalQuery=query;
       state.hymnTrail=[];
     }
@@ -91,18 +91,20 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     let data;
     if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
     else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),semantic_hints:semanticHints,settings:state.searchSettings});
+    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),model_query:refine?modelQuery:undefined,semantic_hints:semanticHints,settings:state.searchSettings});
     if(page===1){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.deprioritize=data.deprioritized||[];state.requiredTerms=data.required||[];state.semanticHints=semanticHints;
       if(data.reset_context||(!refine&&!preserveContext))state.searchRootQuery=state.effectiveQuery;
       state.lastResults=data.results.slice();
       state.aiContext=data.ai_context;
+      state.modelRefinement=data.model_refinement||'';
       state.exactNumber=Boolean(data.exact_number);
       $('results-list').innerHTML='';$('results-title').textContent=refine?'Pesquisa refinada':'Hinos encontrados';
       $('results-subtitle').textContent=`${data.total} resultado${data.total===1?'':'s'} para “${query}”`;
       const fragments=[];
-      if(data.used_ai)fragments.push('IA local sugeriu conceitos; a classificação foi conferida na letra original.');
+      if(data.model_refinement)fragments.push('Consulta reformulada pela IA local.');
+      else if(data.used_ai)fragments.push('IA local sugeriu conceitos; a classificação foi conferida na letra original.');
       else if(refine)fragments.push('Critérios contextuais aplicados localmente.');
       if(data.summary)fragments.push(data.summary);
       if(data.excluded?.length)fragments.push('Excluindo: '+data.excluded.join(', ')+'.');
@@ -145,7 +147,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
 function searchRestrictions(){
   return {exclude:state.exclude,deprioritize:state.deprioritize,require:state.requiredTerms};
 }
-function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;}
+function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;return el;}
 function relatedCard(hymn,{unlearned=false}={}){
   const percent=Math.min(100,Math.max(0,Number(hymn.compatibility_percent)||0));
   const components=Number.isFinite(hymn.similarity_percent)?`<span>${Math.round(hymn.similarity_percent)}% com a letra</span>${Number.isFinite(hymn.query_percent)?`<span>${Math.round(hymn.query_percent)}% com a busca</span>`:''}`:'';
@@ -242,6 +244,8 @@ async function submitSearch(query) {
     $('search-diagnostics').open=false;
     setRefineOpen(false);
     $('conversation').replaceChildren();
+    state.chatPending=null;
+    $('refine-form').setAttribute('aria-busy','false');
   }
   if (await performSearch(query)) $('results-title').focus({preventScroll:true});
 }
@@ -251,22 +255,72 @@ $('refine-toggle').addEventListener('click',()=>{
   setRefineOpen(open);
   if(open)$('refine-input').focus();
 });
+async function submitRefinement(message){
+  if(!message||state.busy||state.chatPending)return false;
+  const turn={epoch:state.searchEpoch};
+  state.chatPending=turn;
+  $('refine-send').disabled=true;
+  $('refine-form').setAttribute('aria-busy','true');
+  appendConversation('user',message);
+  try{
+    const intent=OfflineAPI.chatSearchIntent(message);
+    const response=await GGUF.refineChat(message,intent);
+    if(state.chatPending!==turn||turn.epoch!==state.searchEpoch)return false;
+    if(response?.cancelled){
+      appendConversation('assistant','Refinamento interrompido.');
+      return false;
+    }
+    if(response?.ids){
+      const byId=new Map(state.lastResults.map(hymn=>[hymn.id,hymn]));
+      const picks=response.ids.map(id=>byId.get(id));
+      if(picks.every(Boolean)){
+        const bubble=appendConversation('assistant','A IA destacou estes hinos pelos trechos exibidos.');
+        for(const hymn of picks){
+          const button=document.createElement('button');
+          button.className='secondary-btn';button.type='button';
+          button.textContent=hymn.number?'Hino '+hymn.number+' · '+hymn.title:hymn.title;
+          button.addEventListener('click',()=>openHymn(hymn.id));
+          bubble.appendChild(button);
+        }
+        state.lastRefinement=message;
+        return true;
+      }
+    }
+    if(response?.noAction&&!intent.list){
+      appendConversation('assistant','Que tema ou detalhe você gostaria de acrescentar à busca?');
+      return false;
+    }
+    if(intent.list){
+      appendConversation('assistant','Não consegui destacar um hino desta lista para esse pedido.');
+      return false;
+    }
+    const success=await performSearch(message,{refine:true,autoAI:false,modelQuery:response?.query});
+    if(state.chatPending!==turn)return success;
+    if(success){
+      state.lastRefinement=message;
+      const detail=state.modelRefinement?'A IA acrescentou “'+state.modelRefinement+'” à busca.':'Busca local refinada.';
+      appendConversation('assistant',detail+' '+state.total+(state.total===1?' resultado.':' resultados.'));
+    }else appendConversation('assistant','Não foi possível refinar a busca.');
+    return success;
+  }finally{
+    if(state.chatPending===turn){
+      state.chatPending=null;
+      $('refine-send').disabled=state.busy;
+      $('refine-form').setAttribute('aria-busy','false');
+    }
+  }
+}
 $('refine-form').addEventListener('submit',async ev=>{
   ev.preventDefault();
-  const message=$('refine-input').value.trim();
-  if(!message||state.busy)return;
-  appendConversation('user',message);
-  $('refine-input').value='';
-  const success=await performSearch(message,{refine:true});
-  appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados.`:'Não consegui refinar a pesquisa.');
-  if(success){
-    setRefineOpen(false);
-    $('results-title').focus({preventScroll:true});
-  }
+  const input=$('refine-input');
+  const message=input.value.trim();
+  if(!message||state.busy||state.chatPending)return;
+  input.value='';
+  await submitRefinement(message);
 });
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.chatPending=null;state.lastRefinement='';$('refine-form').setAttribute('aria-busy','false');$('refine-send').disabled=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
 
 const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
@@ -577,7 +631,7 @@ const EmbeddingSearch=(()=>{
 const GGUF=(()=>{
   const native=()=>window.NativeGGUF||null;
   const selectedState={ready:false,busy:false,task:null};
-  let nextRequest=0,queuedAuto=null;
+  let nextRequest=0,queuedAuto=null,queuedChat=null;
   const aiCache=new Map();
   const MAX_AI_MS=12000;
   const canUseTopics=()=>!state.exactNumber&&state.searchSettings.mode!=='literal';
@@ -632,17 +686,28 @@ const GGUF=(()=>{
     $('gguf-banner').classList.toggle('hidden',!state.ready||!selectedState.ready);
     $('ai-workspace').classList.toggle('hidden',!selectedState.ready&&!selectedState.busy);
     $('gguf-banner-text').textContent=selectedState.ready?'IA local disponível':'Carregue um GGUF em Configurações para usar a IA.';
+    $('refine-mode').textContent=selectedState.ready?'Chat com IA local':'Refinamento pela busca local';
     updateIndicator(status);
     return status;
   }
-  function resetTask(message,failed=false){
-    selectedState.task=null;setActivity(false);
+  function resetTask(message,failed=false,chatResult=null){
+    const completed=selectedState.task;
+    selectedState.task=null;
+    if(completed?.chatResolve)completed.chatResolve(chatResult||
+      (completed.cancelled||completed.epoch!==state.searchEpoch?{cancelled:true}:null));setActivity(false);
     $('ai-timer').textContent='';$('ai-last').textContent=message;
     if(failed){toast(message);showTask('IA encontrou um erro','A pesquisa local permanece disponível. Veja o erro nas configurações.');}
     else showTask('Análise concluída',message);
     info();
     const next=queuedAuto;
     queuedAuto=null;
+    if(queuedChat){
+      const chat=queuedChat;
+      queuedChat=null;
+      if(chat.epoch===state.searchEpoch)startChat(chat);
+      else chat.resolve({cancelled:true});
+      return;
+    }
     if(next?.epoch===state.searchEpoch)void maybeAuto(next.query);
   }
   function cancelIfBusy(){
@@ -655,6 +720,7 @@ const GGUF=(()=>{
   }
   function cancelSearchTask(){
     queuedAuto=null;
+    if(queuedChat){queuedChat.resolve({cancelled:true});queuedChat=null;}
     if(selectedState.task?.type!=='diagnostic')cancelIfBusy();
   }
   function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired,themeLabels}){
@@ -666,7 +732,7 @@ const GGUF=(()=>{
     setActivity(true,generationStages[0]);
     try{native().generate(prompt,task.id,grammar,maxTokens,timeoutMs);}
     catch(error){
-      if(task.type==='review')resetTask('Busca inicial preservada. Não foi possível iniciar a revisão.');
+      if(task.type==='review'||task.type==='chat')resetTask('Busca local disponível. Não foi possível iniciar a IA.');
       else resetTask('Não foi possível iniciar a IA: '+error.message,true);
       return false;
     }
@@ -679,6 +745,31 @@ const GGUF=(()=>{
     selectedState.task=task;
     $('ai-last').textContent='';
     return sendTask(task,request);
+  }
+  function startChat(chat){
+    if(startTask('chat',chat.request,{chatResolve:chat.resolve})){
+      showTask('Refinando pelo chat','Você pode continuar consultando os resultados enquanto a IA responde.');
+    }else chat.resolve(null);
+  }
+  function refineChat(message,intent){
+    if(!state.effectiveQuery||state.searchSettings.mode==='literal'||!intent.eligible||!selectedState.ready||
+        (intent.list&&!intent.canPick))
+      return Promise.resolve(null);
+    const constraints=[
+      state.exclude.length&&'excluir '+state.exclude.join(', '),
+      state.deprioritize?.length&&'menos foco em '+state.deprioritize.join(', '),
+      state.requiredTerms?.length&&'obrigatório '+state.requiredTerms.join(', ')
+    ].filter(Boolean).join('; ');
+    const request=LocalHymnAI.prepareChat({query:state.effectiveQuery,rootQuery:state.searchRootQuery,
+      message,previous:state.lastRefinement,hymns:state.lastResults,constraints,canPick:intent.list});
+    if(intent.list&&!request.candidates.size)return Promise.resolve(null);
+    return new Promise(resolve=>{
+      const chat={request,resolve,epoch:state.searchEpoch};
+      if(selectedState.task?.type==='review'){
+        queuedChat=chat;
+        cancelIfBusy();
+      }else startChat(chat);
+    });
   }
   function hintsFromJson(answer,task){
     try{
@@ -883,6 +974,12 @@ const GGUF=(()=>{
       resetTask(message,!passed);return;
     }
     if(task.type==='review'){finishReview(task,ok,answer);return;}
+    if(task.type==='chat'){
+      let result=null;
+      try{if(ok)result=LocalHymnAI.readChat(answer,task)||{noAction:true};}catch(error){ /* A busca local continua disponível. */ }
+      resetTask(result?'Resposta do chat pronta.':'Aplicando refinamento pela busca local.',false,result);
+      return;
+    }
     if(!ok){resetTask('IA falhou: '+value,true);return;}
     if(task.type==='compare'){
       try{
@@ -915,6 +1012,6 @@ const GGUF=(()=>{
     if(!auto&&selectedState.task?.type==='review')cancelIfBusy();
   });
   if(native())setInterval(info,1250);
-  info();return {info,maybeAuto,cancelSearchTask};
+  info();return {info,maybeAuto,cancelSearchTask,refineChat};
 })();
 refreshStatus().catch(e=>toast('Não foi possível acessar a base local: '+e.message));

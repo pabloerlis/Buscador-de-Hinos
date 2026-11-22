@@ -88,6 +88,7 @@ public class Lfm3DeviceSmokeTest {
 
             if (!"baseline".equals(InstrumentationRegistry.getArguments().getString("benchmarkMode"))) {
                 verifyReview(generate);
+                verifyChat(generate);
             }
             android.util.Log.i("LFM3_SMOKE_SUCCESS","official QAD Q4_0, tokens="
                 +metrics[3]+", prefill_ms="+metrics[1]+", first_token_ms="+metrics[2]);
@@ -145,6 +146,29 @@ public class Lfm3DeviceSmokeTest {
             for (int size; (size=input.read(chunk))!=-1;) data.write(chunk,0,size);
             return new JSONObject(new String(data.toByteArray(),StandardCharsets.UTF_8));
         }
+    }
+
+    private static void verifyChat(Method generate) throws Exception {
+        JSONArray requests=fixture("lfm3-chat.json").getJSONArray("requests");
+        long start=SystemClock.elapsedRealtime();
+        for(int i=0;i<requests.length();i++){
+            JSONObject item=requests.getJSONObject(i);
+            long[] metrics=new long[4];
+            byte[] answer=(byte[])generate.invoke(null,new Object[]{
+                item.getString("prompt").getBytes(StandardCharsets.UTF_8),
+                item.getString("grammar").getBytes(StandardCharsets.UTF_8),
+                item.getInt("maxTokens"),item.getInt("timeoutMs"),metrics
+            });
+            assertNotNull(answer);
+            assertTrue("O chat precisa gerar tokens",metrics[3]>0);
+            JSONArray result=new JSONArray(new String(answer,StandardCharsets.UTF_8).trim());
+            assertEquals(1,result.length());
+            if(i==0) {
+                String query=result.getString(0).toLowerCase(java.util.Locale.ROOT);
+                assertTrue("O chat deve entender o contexto de perda: "+query,query.contains("perda")||query.contains("luto"));
+            }else assertEquals("O destaque deve corresponder ao trecho direto",2,result.getInt(0));
+        }
+        android.util.Log.i("LFM3_BENCH","CHAT_RESULT rewrite=true grounded_pick=true total_ms="+(SystemClock.elapsedRealtime()-start));
     }
 
     private static void verifyReview(Method generate) throws Exception {

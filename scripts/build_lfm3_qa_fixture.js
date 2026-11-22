@@ -39,3 +39,18 @@ fs.writeFileSync('app/src/androidTest/assets/lfm3-review.json',JSON.stringify({
   requests:review.requests.map(({prompt,grammar,maxTokens})=>({prompt,grammar,maxTokens})),
   timeoutMs:review.timeoutMs
 })+'\n');
+
+const chatHymns=[
+  {id:27,snippet:'Cristo disse ao vento que se aquietasse.'},
+  {id:38,snippet:'Deixei meu pai, me arrependi e voltei para casa.'},
+  {id:49,snippet:'Os filhos entram no céu e os anjos cantam.'}
+];
+const chatRequests=[
+  ai.prepareChat({query:'Consolo e fé',rootQuery:'Consolo',message:'Quero consolo depois de uma perda.',
+    previous:'No luto',hymns:[],constraints:'excluir medo',canPick:false}),
+  ai.prepareChat({query:'Consolo e fé',message:'Entre esses, qual hino fala de voltar ao pai depois de se afastar?',
+    hymns:chatHymns,canPick:true})
+];
+fs.writeFileSync('app/src/androidTest/assets/lfm3-chat.json',JSON.stringify(
+  {requests:chatRequests.map(({prompt,grammar,maxTokens,timeoutMs})=>({prompt,grammar,maxTokens,timeoutMs}))}
+)+'\n');

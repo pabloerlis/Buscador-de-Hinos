@@ -183,5 +183,63 @@ const LocalHymnAI = (() => {
     return [...reviewed,...hymns.slice(reviewed.length)];
   }
 
-  return { REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  const CHAT_LIMIT=4;
+  const CHAT_QUERY_CHARACTERS=String.raw`A-Za-zÀ-ÖØ-öø-ÿ0-9 .,:;!?()/'’–\-`;
+  const invalidChatQuery=new RegExp('[^'+CHAT_QUERY_CHARACTERS+']');
+
+  function prepareChat({query, rootQuery, message, previous, hymns, constraints, canPick}) {
+    const candidates=new Map();
+    if(canPick)for(const hymn of hymns.slice(0,CHAT_LIMIT)){
+      if(!Number.isSafeInteger(hymn.id)||!hymn.snippet||hymn.snippet==='Nenhum trecho disponível')continue;
+      candidates.set(candidates.size+1,hymn.id);
+    }
+    const prompt=(candidates.size?[
+      'Qual hino se encaixa exatamente no novo pedido? Responda só com a posição ou [].',
+      'Novo pedido: '+promptText(message,165),
+      message.length<=44&&'Busca atual: '+promptText(query,115),
+      message.length<=44&&previous&&'Pedido anterior: '+promptText(previous,85),
+      ...[...candidates].map(([position,id])=>{
+        const hymn=hymns.find(item=>item.id===id);
+        return position+' | '+promptText(hymn.snippet,95);
+      })
+    ]:[
+      'Use o pedido para refinar a pesquisa de hinos. Responda só com uma lista JSON.',
+      'Para pesquisar, escreva uma frase curta com o contexto que continua valendo.',
+      'Use uma lista vazia se o pedido não for uma pesquisa ou estiver ambíguo.',
+      rootQuery&&rootQuery!==query&&'Tema inicial: '+promptText(rootQuery,80),
+      'Busca atual: '+promptText(query,115),
+      previous&&'Pedido anterior: '+promptText(previous,85),
+      constraints&&'Filtros da pesquisa: '+promptText(constraints,105),
+      'Novo pedido: '+promptText(message,165)
+    ]).filter(Boolean).join('\n');
+    const grammar=[
+      'root ::= "[" ws ('+(candidates.size?'picks':'query')+')? ws "]"',
+      ...(candidates.size?[
+        'picks ::= id',
+        'id ::= '+[...candidates.keys()].map(key=>JSON.stringify(String(key))).join(' | ')
+      ]:[
+        String.raw`query ::= "\"" query-text "\""`,
+        'query-text ::= ['+CHAT_QUERY_CHARACTERS+']{3,116}'
+      ]),
+      'ws ::= " "?'
+    ].join('\n');
+    return {prompt,grammar,maxTokens:52,timeoutMs:30000,candidates};
+  }
+
+  function readChat(answer,{candidates}) {
+    const result=JSON.parse(answer);
+    if(!Array.isArray(result)||result.length>1)throw Error('Formato de refinamento inválido.');
+    if(!result.length)return null;
+    if(!candidates.size&&result.length===1&&typeof result[0]==='string'){
+      const query=result[0].trim().replace(/\s+/g,' ');
+      if(query.length>=3&&result[0].length<=116&&!invalidChatQuery.test(result[0])&&!query.includes('://')&&/[a-zÀ-ÿ]/i.test(query))
+        return {query};
+      throw Error('Consulta proposta inválida.');
+    }
+    const ids=result.map(id=>candidates.get(id));
+    if(ids.some(id=>id===undefined)||new Set(ids).size!==ids.length)throw Error('Posição de hino inválida.');
+    return {ids};
+  }
+
+  return { prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
 })();
