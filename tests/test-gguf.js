@@ -137,9 +137,42 @@ const merged=ai.mergeCandidates(hymns.slice(0,5),[hymns[0],hymns[5],hymns[5]]);
 assert.equal(merged.added,1);
 assert.equal(merged.hymns.at(-1).id,6);
 
+
+const storyDb = JSON.parse(read('app/src/main/assets/semantic-stories.json'));
+const stories = vm.runInNewContext(read('app/src/main/assets/story-engine.js')+'\nStoryEngine').create(storyDb);
+assert.equal(stories.interpret('Filho Pródigo').matches[0].reviewFocus,storyDb.stories[0].review_focus);
+assert.ok(storyDb.stories.every(story=>story.review_focus?.length>=8));
+
+const reviewLyrics=new Map([
+  [1,'O Pai acolhe os seus no céu.\nCantaremos na glória.'],
+  [2,'Eu me afastei de ti, meu pai.\nHoje volto ao teu lar.\nTu me recebes e me perdoas.'],
+  [3,'O sol nasceu sobre as montanhas.'],
+  [4,'Em ti confio na noite.\n\nCantarei tua misericórdia.']
+]);
+const reviewHymns=hymns.map(hymn=>({...hymn,snippet:hymn.id===2?'Hoje volto ao teu lar.':hymn.snippet}));
+const review=ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns,{
+  context:{narrative:'voltar ao pai depois de se afastar'}
+});
+assert.match(review.requests[1].prompt,/voltar ao pai depois de se afastar/);
+assert.match(review.requests[1].prompt,/Eu me afastei.*Hoje volto.*Tu me recebes/);
+assert.match(review.requests[3].prompt,/Em ti confio.*Cantarei tua misericórdia/);
+assert.equal(review.requests.length,4);
+assert.equal(review.timeoutMs,30000);
+const grades=['não','sim','não','não'];
+const judgments=review.requests.map(({candidate},i)=>ai.readReview(grades[i],candidate));
+assert.deepEqual(Array.from(ai.applyReview(reviewHymns,judgments),x=>x.id),[2,1,3,4,5,6]);
+assert.match(judgments[1].excerpt,/Hoje volto ao teu lar/);
+assert.equal(judgments[3].excerpt,'');
+for(const invalid of ['talvez','sim\nnão','','sim 2']){
+  assert.throws(()=>ai.readReview(invalid,review.requests[0].candidate));
+}
+assert.equal(ai.applyReview(reviewHymns.slice(1),judgments),null);
+assert.equal(ai.applyReview(reviewHymns,review.requests.map(({candidate})=>ai.readReview('não',candidate))),reviewHymns);
+assert.equal(ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns.slice(0,3)),null);
+
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
-function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true}={}){
+function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,embeddingTask=null}={}){
   const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];
   let now=0;
   const $=id=>{
@@ -159,11 +192,12 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
     document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
     OfflineAPI:{normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
     jsonRequest:async(url,payload)=>{
+      if(url.startsWith('/api/hymns/'))return {lyrics:reviewLyrics.get(Number(url.split('/').at(-1)))};
       requests.push(payload);
       if(additionalSearch&&payload.settings.pageSize===10)return additionalSearch();
       return {results:hymns,effective_query:payload.query,excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
     },
-    busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>embeddings.push(args)}});
+    busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>{embeddings.push(args);return embeddingTask?.();}}});
   return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
 }
 
@@ -270,15 +304,50 @@ async function checkBridge(){
   assert.equal(enrichment.requests[0].vector_query,enrichment.vector);
   assert.equal(enrichment.embeddings.length,0);
 
+  const automatic=setup({auto:true,initialResults:reviewHymns});
+  await automatic.gguf.maybeAuto('Filho Pródigo');
+  assert.equal(automatic.calls.length,1);
+  assert.match(automatic.calls[0][0],/Filho Pródigo/);
+  assert.deepEqual(automatic.state.lastResults.map(x=>x.id),[1,2,3,4,5,6]);
+  for(const [index,grade] of grades.entries()){
+    if(index===1)automatic.setTime(3000);
+    automatic.complete(automatic.calls[index][1],grade);
+    if(index<grades.length-1)assert.equal(automatic.state.lastResults,reviewHymns);
+  }
+  assert.equal(automatic.calls[2][4],27000);
+  assert.deepEqual(Array.from(automatic.state.lastResults,x=>x.id),[2,1,3,4,5,6]);
+  assert.match(automatic.state.lastResults[0].aiReview.excerpt,/Hoje volto/);
+
+  for(const [value,ok] of [['Tempo limite',false],['resposta inválida',true]]){
+    const aborted=setup({auto:true,initialResults:reviewHymns});
+    await aborted.gguf.maybeAuto('Filho Pródigo');
+    aborted.complete(aborted.calls[0][1],value,ok);
+    assert.equal(aborted.state.lastResults,reviewHymns);
+  }
   const queued=setup({auto:true});
-  queued.gguf.maybeAuto(queued.state.effectiveQuery);
+  await queued.gguf.maybeAuto(queued.state.effectiveQuery);
   const first=queued.calls[0][1];
   queued.state.searchEpoch++;
   queued.gguf.cancelSearchTask();
-  queued.gguf.maybeAuto('Paz na dificuldade');
-  queued.complete(first,'["Arrependimento"]');
+  await queued.gguf.maybeAuto('Paz na dificuldade');
+  queued.complete(first,'sim');
+  await tick();
   assert.equal(queued.calls.length,2);
+  assert.equal(queued.state.lastResults,hymns);
   assert.match(queued.calls[1][0],/Paz na dificuldade/);
+
+  let finishEmbedding;
+  const immediateSearch=setup({auto:true,embeddingTask:()=>new Promise(resolve=>{finishEmbedding=resolve;})});
+  immediateSearch.state.vectorQuery=null;
+  assert.equal(await immediateSearch.search('Filho Pródigo'),true);
+  assert.equal(immediateSearch.state.lastResults.length,6);
+  assert.equal(immediateSearch.calls.length,0);
+  finishEmbedding();
+  await tick();
+  assert.equal(immediateSearch.calls.length,1);
+  const exactTitle=setup({auto:true,initialResults:[{...hymns[0],match_type:'titulo_exato'},...hymns.slice(1)]});
+  await exactTitle.gguf.maybeAuto('Hino de teste 1');
+  assert.equal(exactTitle.calls.length,0);
 
   const literal=setup({auto:true});
   literal.state.searchSettings.mode='literal';
