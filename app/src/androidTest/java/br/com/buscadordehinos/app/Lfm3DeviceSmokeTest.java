@@ -89,6 +89,49 @@ public class Lfm3DeviceSmokeTest {
             String compareText=new String(compare,StandardCharsets.UTF_8);
             android.util.Log.i("LFM3_BENCH","MODEL_RESPONSE case=compare-five output="+compareText);
             JSONObject resultJson=new JSONObject(compareText);
+
+            // PROVA DIAGNÓSTICA SEPARADA: verificar se o modelo consegue
+            // avaliar TODOS os candidatos, sem o viés do primeiro ID.
+            // Não substituir nem relaxar o assert do reranking original.
+            String scorePrompt="Tarefa de relevância narrativa. Para CADA candidato, atribua nota "
+                +"0: outro assunto, 1: apenas tema comum, 2: parte da história, "
+                +"3: a sequência completa de acontecimentos. "
+                +"História alvo: o filho sai da casa do pai; arrepende-se; regressa; "
+                +"o pai o acolhe e perdoa. Compare os cinco candidatos. "
+                +"Candidatos: 1 nascimento do menino em manjedoura com anjos; "
+                +"2 gratidão geral, sem história de saída e retorno; "
+                +"3 um filho deixa o lar e se afasta, na última estrofe se arrepende, "
+                +"retorna e recebe acolhimento e perdão do pai; "
+                +"4 tempestade e socorro no mar; 5 ressurreição e esperança eterna. "
+                +"Retorne SOMENTE as notas 0,1,2 ou 3 para TODOS os cinco IDs no JSON. "
+                +"Cada nota deve avaliar seu próprio candidato, não a posição.";
+            String scoreGrammar="root ::= \"{\\\"1\\\":\" score \",\\\"2\\\":\" score "
+                +\",\\\"3\\\":\" score \",\\\"4\\\":\" score \",\\\"5\\\":\" score \"}\"\\n"
+                +"score ::= \"0\" | \"1\" | \"2\" | \"3\"\\n";
+            long[] scoreMetrics=new long[4];
+            long scoreStart=SystemClock.elapsedRealtime();
+            try {
+                byte[] scores=(byte[])generate.invoke(null,new Object[]{
+                    scorePrompt.getBytes(StandardCharsets.UTF_8),
+                    scoreGrammar.getBytes(StandardCharsets.UTF_8),64,180_000,scoreMetrics
+                });
+                String scoreText=new String(scores,StandardCharsets.UTF_8);
+                android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=score-five total_ms="
+                    +(SystemClock.elapsedRealtime()-scoreStart)+" setup_ms="+scoreMetrics[0]
+                    +" prefill_ms="+scoreMetrics[1]+" first_token_ms="+scoreMetrics[2]
+                    +" generated="+scoreMetrics[3]);
+                android.util.Log.i("LFM3_BENCH","MODEL_RESPONSE case=score-five output="+scoreText);
+                JSONObject scoreJson=new JSONObject(scoreText);
+                int winningId=1;
+                for(int i=2;i<=5;i++)if(scoreJson.getInt(String.valueOf(i))>
+                    scoreJson.getInt(String.valueOf(winningId)))winningId=i;
+                android.util.Log.i("LFM3_BENCH","SCORE_DIAGNOSTIC chosen="+winningId
+                    +" expected=3 (non-blocking; original direct-selection assertion stays blocking)");
+            } catch (Exception scoringError) {
+                android.util.Log.e("LFM3_BENCH","SCORE_DIAGNOSTIC_ERROR "
+                    +scoringError.toString());
+            }
+
             assertEquals("Reranking errou a narrativa do filho pródigo",3,resultJson.getInt("id"));
             assertTrue("Justificativa curta ausente",resultJson.getString("motivo").trim().length()>=8);
             assertTrue("Não houve geração real",compareMetrics[3]>0);

@@ -33,7 +33,7 @@ for mode in optimized baseline; do
     br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$log"
   instrument_rc=${PIPESTATUS[0]}
   set -e
-  adb logcat -d -v brief -s 'LFM3_BENCH:I' '*:S' | tee -a "$log"
+  adb logcat -d -v brief -s 'LFM3_BENCH:I' 'LFM3_TEMPLATE:I' '*:S' | tee -a "$log"
   # Sempre preservar a prova da execução antes dos asserts bloqueantes.
   cat "$log" >> qa-report/lfm3-device-evidence.log
   echo "INSTRUMENT_RUN_RC mode=$mode code=$instrument_rc" | tee -a qa-report/lfm3-device-evidence.log
