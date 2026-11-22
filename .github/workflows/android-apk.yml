@@ -375,7 +375,7 @@ jobs:
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PoptimizeGgufNative=false
+          gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PqaSidecar=true -PoptimizeGgufNative=false
           mkdir -p qa-baseline
           cp app/build/outputs/apk/debug/app-debug.apk qa-baseline/app-debug.apk
           python3 scripts/qa_native_compile_flags.py --mode baseline
@@ -389,7 +389,7 @@ jobs:
       - name: Compilar APK debug com os kernels nativos otimizados
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PoptimizeGgufNative=true
+        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PqaSidecar=true -PoptimizeGgufNative=true
       - name: Auditar compile_commands.json REAL ARM64 e x86_64 (bloqueante)
         run: python3 scripts/qa_native_compile_flags.py --mode optimized
       - name: Publicar comandos e flags efetivos de ambas as compilações
@@ -418,6 +418,8 @@ jobs:
 
   device_smoke:
     name: "Agente 6 | Android real: WebView, sobre e E5 ONNX"
+    env:
+      HINOS_PACKAGE: br.com.buscadordehinos.app.qa
     needs: build_apk
     runs-on: ubuntu-latest
     timeout-minutes: 35
@@ -459,6 +461,8 @@ jobs:
 
   lfm3_model_qa:
     name: "Agente 12 | GGUF LFM3 oficial no Android JNI"
+    env:
+      HINOS_PACKAGE: br.com.buscadordehinos.app.qa
     needs: [build_apk, device_smoke]
     runs-on: ubuntu-latest
     timeout-minutes: 55
@@ -552,6 +556,7 @@ jobs:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           EXPECT_E5_EMBEDDINGS: 'true'
           EXPECT_GGUF_ENGINE: 'true'
+          EXPECTED_APPLICATION_ID: br.com.buscadordehinos.app.qa
         run: python3 scripts/qa_apk.py apk-candidate/app-debug.apk
       - name: Preservar laudo de assinatura para revisão independente
         uses: actions/upload-artifact@v4
@@ -632,6 +637,7 @@ jobs:
       - name: Revisar realmente o APK e recalcular metricas caso a caso
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          EXPECTED_APPLICATION_ID: br.com.buscadordehinos.app.qa
         run: python3 scripts/qa_independent_review.py apk-candidate/app-debug.apk
       - name: Publicar relatorio da decisao independente
         if: always()
@@ -694,6 +700,7 @@ jobs:
           assert audit['passed'] is True and review['apk']['sha256']==audit['sha256']
           assert audit.get('local_e5_embedded') is True, 'E5 removido do APK'
           assert audit.get('local_gguf_engine_embedded') is True, 'Motor GGUF removido do APK'
+          assert audit.get('application_id')=='br.com.buscadordehinos.app.qa', 'APK QA usaria o pacote original e poderia afetar instalação existente'
           gate=json.loads(Path('qa-report/semantic-crossversion-agent.json').read_text())
           assert gate['decision']=='approved' and not gate['errors'], 'Agente 10 reprovou'
           assert Path('apk-candidate/app-debug.apk').is_file()

@@ -392,6 +392,8 @@ def audit_apk_and_device():
     data = APK.read_bytes()
     actual_hash = hashlib.sha256(data).hexdigest()
     check(audit.get("passed") is True, "Auditoria do APK não aprovada")
+    expected_package=os.environ.get("EXPECTED_APPLICATION_ID","br.com.buscadordehinos.app")
+    check(audit.get("application_id")==expected_package,"applicationId auditado não confere com o APK de QA esperado")
     check(audit.get("signed") is True, "Assinatura do APK não validada")
     check(audit.get("sha256") == actual_hash, "SHA256 do APK diverge da auditoria")
     check(audit.get("bytes") == len(data), "Tamanho do APK diverge da auditoria")
