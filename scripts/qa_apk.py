@@ -111,7 +111,8 @@ if aapt.is_file():
                             stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False)
     check(result.returncode==0,"AndroidManifest inválido: "+result.stderr.strip())
     manifest=result.stdout
-    check("name='br.com.buscadordehinos.app'" in manifest,"applicationId inesperado")
+    package_id=os.environ.get("QA_ANDROID_PACKAGE","br.com.buscadordehinos.app")
+    check(f"name='{package_id}'" in manifest,"applicationId inesperado")
     check("versionCode='"+version_code+"'" in manifest,"versionCode incompatível")
     check("versionName='"+version_name+"'" in manifest,"versionName incompatível")
 if apksigner.is_file():

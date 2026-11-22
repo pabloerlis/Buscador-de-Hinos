@@ -7,6 +7,8 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+env:
+  QA_ANDROID_PACKAGE: br.com.buscadordehinos.app.qa
 concurrency:
   group: verified-apk-${{ github.ref }}
   cancel-in-progress: true
@@ -376,7 +378,7 @@ jobs:
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PoptimizeGgufNative=false
+          gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PoptimizeGgufNative=false -PqaStandalone=true
           mkdir -p qa-baseline
           cp app/build/outputs/apk/debug/app-debug.apk qa-baseline/app-debug.apk
           python3 scripts/qa_native_compile_flags.py --mode baseline
@@ -390,7 +392,7 @@ jobs:
       - name: Compilar APK debug com os kernels nativos otimizados
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PoptimizeGgufNative=true
+        run: gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest -PenableLocalEmbeddings=true -PenableLocalModels=true -PoptimizeGgufNative=true -PqaStandalone=true
       - name: Auditar compile_commands.json REAL ARM64 e x86_64 (bloqueante)
         run: python3 scripts/qa_native_compile_flags.py --mode optimized
       - name: Publicar comandos e flags efetivos de ambas as compilações
@@ -432,6 +434,15 @@ jobs:
         with:
           name: apk-instrumentation-qa
           path: apk-instrumentation
+      - name: Baixar APK anterior para verificar instalação lado a lado
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh release download v2.6.15-qa --pattern Buscador-de-Hinos-2.6.15.apk --dir qa-previous
+          printf '%s  %s\n' 750fc47db77e061bbe5efc6f629dbac76e2fe831010afd35a824a296f804f86b qa-previous/Buscador-de-Hinos-2.6.15.apk | sha256sum --check --strict
       - name: Habilitar acesso à virtualização Android KVM
         shell: bash
         run: |

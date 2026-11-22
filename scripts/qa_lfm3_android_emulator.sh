@@ -6,7 +6,7 @@ baseline="apk-baseline/app-debug.apk"
 test -s "$baseline"
 test_apk="apk-instrumentation/app-debug-androidTest.apk"
 model="/tmp/LFM3-1.7B-QAD-Q4_0.gguf"
-pkg="br.com.buscadordehinos.app"
+pkg="${QA_ANDROID_PACKAGE:-br.com.buscadordehinos.app}"
 test -s "$apk"
 test -s "$test_apk"
 test -s "$model"
@@ -30,7 +30,7 @@ for mode in optimized baseline; do
   set +e
   timeout -k 10s 510s adb shell am instrument -w -r -e benchmarkMode "$mode" -e class \
     br.com.buscadordehinos.app.Lfm3DeviceSmokeTest \
-    br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$log"
+    "$pkg.test/androidx.test.runner.AndroidJUnitRunner" | tee "$log"
   instrument_rc=${PIPESTATUS[0]}
   set -e
   adb logcat -d -v brief -s 'LFM3_BENCH:I' '*:S' | tee -a "$log"

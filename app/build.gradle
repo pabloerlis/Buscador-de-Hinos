@@ -1,5 +1,6 @@
 plugins { id 'com.android.application' }
 def enableLocalModels = providers.gradleProperty('enableLocalModels').map { it.toBoolean() }.orElse(false).get()
+def qaStandalone = providers.gradleProperty('qaStandalone').map { it.toBoolean() }.orElse(false).get()
 def optimizeGgufNative = providers.gradleProperty('optimizeGgufNative').map { it.toBoolean() }.orElse(true).get()
 def enableLocalEmbeddings = providers.gradleProperty('enableLocalEmbeddings').map { it.toBoolean() }.orElse(false).get()
 // Valores incorporados ao APK: independentes de conexão e da biblioteca importada.
@@ -11,6 +12,8 @@ android {
     ndkVersion '27.2.12479018'
     defaultConfig {
         applicationId 'br.com.buscadordehinos.app'
+        if (qaStandalone) applicationIdSuffix '.qa'
+        manifestPlaceholders = [appLabel: qaStandalone ? 'Buscador de Hinos (Teste)' : 'Buscador de Hinos']
         minSdk 24
         targetSdk 34
         ndk {
@@ -26,8 +29,8 @@ android {
                 }
             }
         }
-        versionCode 36
-        versionName '2.6.17'
+        versionCode 37
+        versionName '2.6.18'
         buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
         buildConfigField 'boolean', 'ENABLE_LOCAL_EMBEDDINGS', enableLocalEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
