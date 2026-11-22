@@ -4,7 +4,7 @@ on:
     branches: ['diagnostics/filho-prodigo-ranking-2619']
 permissions:
   actions: read
-  contents: read
+  contents: write
 jobs:
   diagnosis:
     runs-on: ubuntu-latest
@@ -24,4 +24,14 @@ jobs:
           curl --fail --location --silent --show-error --retry 3 --max-time 90 \
             'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
             --output /tmp/hinos-avaliacao.json
-          node tests/diagnose-review-ranking.js /tmp/hinos-avaliacao.json
+          node tests/diagnose-review-ranking.js /tmp/hinos-avaliacao.json | tee /tmp/trace.json
+      - name: Salvar relatório sem letras apenas no ramo de diagnóstico
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/diagnostico-filho-prodigo-2619.json" \
+            -f branch="$GITHUB_REF_NAME" -f message='Registra diagnóstico de posição sem letras' \
+            -f content="$(base64 -w0 /tmp/trace.json)"
