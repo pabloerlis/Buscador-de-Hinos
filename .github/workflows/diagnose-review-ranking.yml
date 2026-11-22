@@ -1,0 +1,27 @@
+name: Diagnóstico de ranking Filho Pródigo
+on:
+  push:
+    branches: ['diagnostics/filho-prodigo-ranking-2619']
+permissions:
+  actions: read
+  contents: read
+jobs:
+  diagnosis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          run-id: 44967482176
+          github-token: ${{ github.token }}
+          path: app/src/main/assets
+      - name: Executar consulta usando o catálogo pinado sem publicar letras
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 --max-time 90 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output /tmp/hinos-avaliacao.json
+          node tests/diagnose-review-ranking.js /tmp/hinos-avaliacao.json
