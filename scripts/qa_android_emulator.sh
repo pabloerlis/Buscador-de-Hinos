@@ -4,6 +4,8 @@
 set -euo pipefail
 apk="apk-candidate/app-debug.apk"
 test_apk="apk-instrumentation/app-debug-androidTest.apk"
+pkg="${HINOS_PACKAGE:-br.com.buscadordehinos.app}"
+runner="${pkg}.test/androidx.test.runner.AndroidJUnitRunner"
 test -s "$apk"
 test -s "$test_apk"
 adb install -r "$apk"
@@ -14,7 +16,7 @@ log="$(mktemp)"
 trap 'rm -f "$log"' EXIT
 adb shell am instrument -w -r -e class \
   br.com.buscadordehinos.app.E5DeviceSmokeTest \
-  br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$log"
+  $runner | tee "$log"
 if grep -Eq 'FAILURES!!!|INSTRUMENTATION_STATUS_CODE: -2|Error in webViewLoads' "$log"; then
   echo "REPROVADO: Android instrumentation declarou falha."
   exit 1

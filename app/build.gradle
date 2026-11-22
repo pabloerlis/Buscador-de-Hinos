@@ -2,6 +2,8 @@ plugins { id 'com.android.application' }
 def enableLocalModels = providers.gradleProperty('enableLocalModels').map { it.toBoolean() }.orElse(false).get()
 def optimizeGgufNative = providers.gradleProperty('optimizeGgufNative').map { it.toBoolean() }.orElse(true).get()
 def enableLocalEmbeddings = providers.gradleProperty('enableLocalEmbeddings').map { it.toBoolean() }.orElse(false).get()
+// O APK QA usa pacote independente; não substitui nem acessa dados de instalações anteriores.
+def qaSidecar = providers.gradleProperty('qaSidecar').map { it.toBoolean() }.orElse(false).get()
 // Valores incorporados ao APK: independentes de conexão e da biblioteca importada.
 def sourceRevision = (System.getenv('BUILD_SOURCE_SHA') ?: System.getenv('GITHUB_SHA') ?: 'local').replaceAll('[^a-zA-Z0-9]', '')
 def buildDateUtc = java.time.Instant.now().toString()
@@ -11,6 +13,7 @@ android {
     ndkVersion '27.2.12479018'
     defaultConfig {
         applicationId 'br.com.buscadordehinos.app'
+        manifestPlaceholders = [hinosAppLabel: qaSidecar ? 'Buscador de Hinos QA' : 'Buscador de Hinos']
         minSdk 24
         targetSdk 34
         ndk {
@@ -26,12 +29,18 @@ android {
                 }
             }
         }
-        versionCode 33
-        versionName '2.6.14'
+        versionCode 34
+        versionName '2.6.15'
         buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
         buildConfigField 'boolean', 'ENABLE_LOCAL_EMBEDDINGS', enableLocalEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
         buildConfigField 'String', 'BUILD_DATE_UTC', '"' + buildDateUtc + '"'
+    }
+    buildTypes {
+        debug {
+            // A versão de QA é instalável lado a lado. Sem a propriedade, o app mantém o ID original.
+            if (qaSidecar) applicationIdSuffix '.qa'
+        }
     }
     buildFeatures { buildConfig true }
     if (enableLocalModels) {

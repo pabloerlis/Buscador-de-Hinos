@@ -32,6 +32,8 @@ version_code = re.search(r"\bversionCode\s+(\d+)",gradle)[1]
 expected_sha = os.environ.get("BUILD_SOURCE_SHA", "").strip()
 expect_e5 = os.environ.get('EXPECT_E5_EMBEDDINGS','false').lower()=='true'
 expect_gguf = os.environ.get('EXPECT_GGUF_ENGINE','false').lower()=='true'
+expected_application_id = os.environ.get('EXPECTED_APPLICATION_ID','br.com.buscadordehinos.app')
+expected_app_label = 'Buscador de Hinos QA' if expected_application_id.endswith('.qa') else 'Buscador de Hinos'
 check(len(expected_sha)==40 and re.fullmatch(r"[0-9a-f]{40}",expected_sha),
       "SHA do commit de origem ausente ou inválido")
 
@@ -111,7 +113,8 @@ if aapt.is_file():
                             stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False)
     check(result.returncode==0,"AndroidManifest inválido: "+result.stderr.strip())
     manifest=result.stdout
-    check("name='br.com.buscadordehinos.app'" in manifest,"applicationId inesperado")
+    check(("name='"+expected_application_id+"'") in manifest,"applicationId inesperado")
+    check(("application-label:'"+expected_app_label+"'") in manifest,"Rótulo QA ou app principal incorreto")
     check("versionCode='"+version_code+"'" in manifest,"versionCode incompatível")
     check("versionName='"+version_name+"'" in manifest,"versionName incompatível")
 if apksigner.is_file():
@@ -121,6 +124,7 @@ if apksigner.is_file():
 
 sha=hashlib.sha256(APK.read_bytes()).hexdigest()
 report={"apk":APK.name,"version_name":version_name,"version_code":int(version_code),
+        "application_id":expected_application_id,
         "source_sha":expected_sha,"sha256":sha,"bytes":APK.stat().st_size,
         "signed":apksigner.is_file() and not any("Assinatura" in e for e in errors),
         "local_e5_embedded":expect_e5,
