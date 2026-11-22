@@ -90,7 +90,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   try {
     let data;
     if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),curated_ids:[...state.chatAdded.keys()],semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
     else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),curated_ids:[...state.chatAdded.keys()],model_query:refine?modelQuery:undefined,semantic_hints:semanticHints,settings:state.searchSettings});
     if(page===1){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
@@ -257,11 +257,28 @@ $('search-form').addEventListener('submit',ev=>{ev.preventDefault();submitSearch
 $('refine-toggle').addEventListener('click',()=>{
   const open=$('refine-panel').classList.contains('hidden');
   setRefineOpen(open);
-  if(open){
-    if(!state.chatHistory.length)chatSay('assistant','Vamos escolher os hinos juntos. Qual é o momento do culto? Você também pode me dizer o tema ou o estilo que prefere.');
-    $('refine-input').focus();
-  }
+  if(open)openSelectionChat();
 });
+$('start-selection-chat').addEventListener('click',()=>{
+  if(!state.ready){toast('Importe a coletânea para escolher hinos.');return;}
+  $('results-title').textContent='Escolher hinos';
+  $('results-subtitle').textContent='';
+  $('results-list').replaceChildren();
+  $('load-more').classList.add('hidden');
+  $('notice').classList.add('hidden');
+  $('search-diagnostics').classList.add('hidden');
+  RepertoireUI.renderSearch({});
+  showResults();
+  openSelectionChat();
+});
+function openSelectionChat(){
+  setRefineOpen(true);
+  if(!state.chatHistory.length){
+    state.chatQuestion='ocasiao';
+    chatSay('assistant','Qual é o momento do culto? Você também pode me dizer o tema ou o estilo que prefere.');
+  }
+  $('refine-input').focus();
+}
 function clearChatContext(){
   state.chatHistory=[];
   state.chatAdded=new Map();
@@ -421,14 +438,16 @@ async function submitRefinement(message){
       }
       found=[...options.values()].slice(0,3);
     }
+    const pick=OfflineAPI.chatSearchIntent(message).list;
     const explaining=/\b(?:explique|por que|qual a diferen[cç]a)\b/i.test(message);
     const preference=!explaining&&(Boolean(state.chatQuestion&&state.chatQuestion!=='hino')||
       /^(?:mais|menos|prefiro|quero|gostaria|tamb[eé]m gostaria|priorize|com foco|para (?:o|a))\s+/i.test(message));
     state.chatQuestion=null;
-    const response=await GGUF.refineChat({message,history,shown,found,forced,editIntent:lookup.verb,preference,explaining});
+    const response=await GGUF.refineChat({message,history,shown,found,forced,editIntent:lookup.verb,preference,explaining,pick});
     if(!current())return false;
     if(response?.cancelled){chatSay('assistant','Conversa interrompida.');return false;}
     if(forced)return applyChatEdit(forced.verb,forced.hymn);
+    if(response?.verb==='destacar'&&pick)return applyChatEdit('destacar',response.hymn);
     if(response?.verb==='acrescentar'&&lookup.verb==='acrescentar'&&found.some(h=>h.id===response.hymn.id)){
       state.chatProposal=response.hymn;
       chatSay('assistant','Posso acrescentar '+chatHymnName(response.hymn)+'? Responda sim ou não.');
@@ -907,7 +926,7 @@ const GGUF=(()=>{
     }else chat.resolve(null);
   }
   function refineChat(context){
-    if(!state.effectiveQuery||!selectedState.ready)return Promise.resolve({unavailable:true});
+    if(!selectedState.ready)return Promise.resolve({unavailable:true});
     const constraints=[
       state.exclude.length&&'excluir '+state.exclude.join(', '),
       state.deprioritize?.length&&'menos foco em '+state.deprioritize.join(', '),

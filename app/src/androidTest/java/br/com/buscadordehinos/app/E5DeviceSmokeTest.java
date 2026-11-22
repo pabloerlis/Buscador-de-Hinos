@@ -200,6 +200,29 @@ public class E5DeviceSmokeTest {
                 Double.isFinite(cosine) && cosine>=0.992 && maxDelta<=3 &&
                 altered<=154);
 
+            assertEquals("Could not start offline chat scenario","true",evaluate(web,
+                "window.__chatQa=null;" +
+                "(async()=>{" +
+                "await OfflineAPI.request('/api/import',{data:[{name:'Coletânea 2018',songs:[" +
+                "{title:'101 - Consolo do viajante',content:'Na viagem encontro consolo em Deus.'}," +
+                "{title:'102 - Louvor da manhã',content:'Na manhã dou graças a Deus.'}]}]});" +
+                "await refreshStatus(); state.searchSettings.vectorMode='off';" +
+                "await submitSearch('hino 101'); document.getElementById('refine-toggle').click();" +
+                "const greeting=document.getElementById('conversation').textContent.includes('momento do culto');" +
+                "const added=await submitRefinement('Por favor, adicione o hino 102');" +
+                "const inclusion=added&&visibleHymns().some(h=>h.number==='102');" +
+                "const absent=await submitRefinement('Retire o hino sobre tempestade distante');" +
+                "const preserved=!absent&&visibleHymns().some(h=>h.number==='101');" +
+                "const removed=await submitRefinement('Retire o hino 102');" +
+                "window.__chatQa=greeting&&inclusion&&preserved&&removed&&!visibleHymns().some(h=>h.number==='102');" +
+                "})().catch(error=>{window.__chatQa=String(error);});true;"));
+            limit=System.currentTimeMillis()+45_000;
+            String chat="null";
+            while(System.currentTimeMillis()<limit&&"null".equals(chat)){
+                chat=evaluate(web,"window.__chatQa");
+                if("null".equals(chat))Thread.sleep(500);
+            }
+            assertEquals("Chat WebView scenario failed","true",chat);
         }
     }
 }

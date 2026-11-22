@@ -193,7 +193,7 @@ const LocalHymnAI = (() => {
     hino:'Qual hino você quer manter ou mudar? Pode me dizer o número ou o título.'
   };
 
-  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,preference=false,explaining=false,forced=null}) {
+  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,preference=false,explaining=false,pick=false,forced=null}) {
     const candidates=new Map();
     const addRow=(hymn,inList)=>{
       if(!Number.isSafeInteger(hymn.id)||[...candidates.values()].some(item=>item.id===hymn.id))return;
@@ -224,7 +224,7 @@ const LocalHymnAI = (() => {
     const uncertain=/\b(?:em dúvida|não sei|não tenho certeza|me ajude a decidir)\b/i.test(message);
     const edit=editIntent==='acrescentar'&&editKeys.acrescentar.length?'acrescentar':null;
     const actions=forcedPosition?[forced.verb]:edit?[edit,'perguntar']:uncertain?['perguntar']:
-      explaining?['falar']:preference?['buscar','perguntar']:['falar','perguntar','buscar'];
+      explaining?['falar']:pick&&editKeys.destacar.length?['destacar','perguntar','falar']:preference?['buscar','perguntar']:['falar','perguntar','buscar'];
     const prompt=[
       'Você ajuda a escolher hinos em português. Responda só com uma ação JSON.',
       forcedPosition
@@ -236,6 +236,7 @@ const LocalHymnAI = (() => {
             :preference
               ?'Aplique a preferência com buscar usando os temas pedidos. Pergunte se a preferência ainda estiver vaga.'
               :'Converse sobre a escolha. Use perguntar para entender tema, ocasião ou estilo, falar para explicar e buscar quando o usuário pedir outros resultados.',
+      pick&&'Para indicar um hino da lista atual, use destacar com a posição da opção mais adequada à preferência.',
       explaining&&'Explique as sugestões usando apenas os títulos e trechos apresentados. Não execute ações.',
       'Busca: '+promptText(query,90),
       constraints&&'Filtros: '+promptText(constraints,90),

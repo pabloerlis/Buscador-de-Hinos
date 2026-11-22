@@ -466,7 +466,7 @@ const OfflineAPI = (() => {
     const context=contextQuery(message,'',{refine:true});
     if(context.fresh||context.excluded.length||context.required.length||context.deprioritized.length)
       return {hymns:[],refine:true};
-    const command=norm.match(/^(?:(?:por favor|pode|quero(?: que)?)[,\s]+)?(acrescent(?:e|ar)|adicion(?:e|ar)|inclu(?:a|ir)|colo(?:que|car)|retir(?:e|ar)|remov(?:a|er)|tir(?:e|ar)|exclu(?:a|ir))\s+(?:(?:o|a)\s+)?(?:hino\s+)?(.+?)[.!?]*$/);
+    const command=norm.match(/(?:^|[.!?]\s+)(?:(?:por favor|pode|quero(?: que)?)[,\s]+)?(acrescent(?:e|ar)|adicion(?:e|ar)|inclu(?:a|ir)|colo(?:que|car)|retir(?:e|ar)|remov(?:a|er)|tir(?:e|ar)|exclu(?:a|ir))\s+(?:(?:o|a)\s+)?(?:hino\s+)?(.+?)[.!?]*$/);
     const opts=searchOptions(payload?.settings);
     if(command){
       const verb=/^(?:retir|remov|tir|exclu)/.test(command[1])?'retirar':'acrescentar';
@@ -556,9 +556,10 @@ const OfflineAPI = (() => {
     const requiredCriteria=required.map(term=>searchCriterion(term,allowTopics));
     const excludedCriteria=excluded.map(term=>searchCriterion(term,allowTopics));
     const lowerCriteria=deprioritized.map(term=>searchCriterion(term,allowTopics));
+    const matchesTopic=(song,criterion)=>song.semantic_profile?.find(topic=>criterion.topicIds.has(topic.id));
     const matchesCriterion=(song,{title,lyrics},criterion)=>criterion.normalized&&(
       hasWord(title,criterion.normalized)||hasWord(lyrics,criterion.normalized)||
-      (criterion.thematic&&(song.semantic_profile?.some(topic=>criterion.topicIds.has(topic.id))||
+      (criterion.thematic&&(matchesTopic(song,criterion)||
         song.topics.some(topic=>normalizeLyrics(topic)===criterion.normalized))));
     const meetsFilters=(song,indexed)=>requiredCriteria.every(term=>matchesCriterion(song,indexed,term))&&
       !excludedCriteria.some(term=>matchesCriterion(song,indexed,term));
@@ -692,7 +693,7 @@ const OfflineAPI = (() => {
       const selectedRef=numberMatch? song.collectionRefs.find(ref=>Number(ref.number)===Number(numberMatch[2])&&(!namedCollection||ref.id===namedCollection)) : song.collectionRefs.find(ref=>opts.collections[ref.id]!==false);
       ranked.push({id:song.id,number:selectedRef?.number||song.number,title:song.title,collection:selectedRef?.name||song.collection,collection_ids:song.collections.slice(),edition:selectedRef?.edition||song.edition,
         topics:[...new Set([...(graphResult?.matched||[]),...(storyResult?.matched||[]),...song.topics])].slice(0,7),
-        spelling,sharedPassage,cues:[...requiredCriteria.flatMap(criterion=>matchesTopic(criterion)?.evidence||[]),
+        spelling,sharedPassage,cues:[...requiredCriteria.flatMap(criterion=>matchesTopic(song,criterion)?.evidence||[]),
           ...(graphResult?.cues||[]),...(storyResult?.cues||[]),...(semanticResult?.cues||[])],
         reason:opts.showReasons?reason+(lowered.length?' Menor prioridade por '+lowered.join(', ')+'.':''):'',explanations:opts.showReasons?explanations:[],
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
