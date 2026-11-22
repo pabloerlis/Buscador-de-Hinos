@@ -193,7 +193,21 @@ const LocalHymnAI = (() => {
     hino:'Qual hino você quer manter ou mudar? Pode me dizer o número ou o título.'
   };
 
-  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,preference=false,explaining=false,pick=false,forced=null}) {
+  function chatSearchRequest(message,history=[],viaButton=false) {
+    const text=message.trim();
+    const command=text.match(/^(?:(?:por favor|agora|pode|voc[eê] pode|quero(?: que(?: voc[eê])?)?)[,\s]+)?(?:bus(?:car|ca|que)|pesquis(?:ar|a|e)|procur(?:ar|a|e)|encontr(?:ar|e|a)|(?:me\s+)?(?:mostre|sugira)(?=\s+(?:hinos|louvores|op[cç][õo]es)\b))(?:\s+|[:,.!?]+(?:\s+|$)|$)/iu);
+    if(!command&&!viaButton)return null;
+    const query=(command?text.slice(command[0].length):text)
+      .replace(/^(?:por|sobre)\s+/iu,'').replace(/^(?:o|a)\s+(?=(?:hino|louvor)\s+\d)/iu,'').replace(/\s*[,;]?\s+por favor[.!?]*$/iu,'').replace(/[.!?]+$/u,'').trim();
+    if(query&&!/^(?:(?:alguns?|mais|outros?)\s+)?(?:hinos|louvores|op[cç][õo]es)(?:\s+(?:assim|agora))?$|^(?:agora|mais|isso|por favor)$/iu.test(query))
+      return {query,refine:/^(?:s[oó]|somente|apenas|sem|mais|menos|agora|tamb[eé]m)\s+/iu.test(query)};
+    const recent=history.filter(item=>item.kind==='user'&&item.intent==='conversation')
+      .map(item=>item.text.replace(/^(?:prefiro|quero|gostaria de|[eé] para)\s+/iu,''))
+      .filter(item=>item.length>=5&&!/^(?:ol[aá]|obrigad[oa]|tudo bem|sim|n[aã]o)[.!?]*$/iu.test(item)).slice(-3);
+    return {query:recent.join('. ').slice(0,500),refine:false};
+  }
+
+  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,explaining=false,pick=false,forced=null}) {
     const candidates=new Map();
     const addRow=(hymn,inList)=>{
       if(!Number.isSafeInteger(hymn.id)||[...candidates.values()].some(item=>item.id===hymn.id))return;
@@ -213,8 +227,7 @@ const LocalHymnAI = (() => {
     const rules=[
       'falar ::= '+JSON.stringify('["falar",')+' text "]"',
       'perguntar ::= '+JSON.stringify('["perguntar",')+' preference "]"',
-      'preference ::= '+Object.keys(preferenceQuestions).map(key=>JSON.stringify(JSON.stringify(key))).join(' | '),
-      'buscar ::= '+JSON.stringify('["buscar",')+' query-text "]"'
+      'preference ::= '+Object.keys(preferenceQuestions).map(key=>JSON.stringify(JSON.stringify(key))).join(' | ')
     ];
     for(const [verb,keys] of Object.entries(editKeys)){
       if(!keys.length)continue;
@@ -224,33 +237,30 @@ const LocalHymnAI = (() => {
     const uncertain=/\b(?:em dúvida|não sei|não tenho certeza|me ajude a decidir)\b/i.test(message);
     const edit=editIntent==='acrescentar'&&editKeys.acrescentar.length?'acrescentar':null;
     const actions=forcedPosition?[forced.verb]:edit?[edit,'perguntar']:uncertain?['perguntar']:
-      explaining?['falar']:pick&&editKeys.destacar.length?['destacar','perguntar','falar']:preference?['buscar','perguntar']:['falar','perguntar','buscar'];
+      explaining?['falar']:pick&&editKeys.destacar.length?['destacar','falar','perguntar']:['falar','perguntar'];
     const prompt=[
-      'Você ajuda a escolher hinos em português. Responda só com uma ação JSON.',
+      'Você conversa em português para ajudar a escolher hinos. Responda só com uma ação JSON.',
       forcedPosition
         ?'Pedido explícito confirmado pelo catálogo. Use a ação '+forced.verb+' na posição '+forcedPosition+' para confirmar.'
         :edit
           ?'Escolha um hino do catálogo para propor. Se não houver boa opção, pergunte qual hino o usuário procura.'
           :uncertain
             ?'Escolha qual preferência perguntar: clima, ritmo, tema, ocasiao ou hino.'
-            :preference
-              ?'Aplique a preferência com buscar usando os temas pedidos. Pergunte se a preferência ainda estiver vaga.'
-              :'Converse sobre a escolha. Use perguntar para entender tema, ocasião ou estilo, falar para explicar e buscar quando o usuário pedir outros resultados.',
+            :'Use falar para responder à última mensagem, confirmar preferências ou propor uma ideia. Faça uma pergunta curta se precisar. A busca é acionada pelo usuário.',
       pick&&'Para indicar um hino da lista atual, use destacar com a posição da opção mais adequada à preferência.',
       explaining&&'Explique as sugestões usando apenas os títulos e trechos apresentados. Não execute ações.',
-      'Busca: '+promptText(query,90),
+      query&&'Última busca: '+promptText(query,76),
       constraints&&'Filtros: '+promptText(constraints,90),
-      ...history.slice(-5).map(item=>(item.kind==='user'?'Usuário: ':'Você: ')+promptText(item.text,80)),
+      ...history.slice(-7).map(item=>(item.kind==='user'?'Usuário: ':'Você: ')+promptText(item.text,105)),
       'Usuário agora: '+promptText(message,320),
       ...(candidates.size?[...candidates].map(([position,h])=>position+' '+(h.inList?'na lista':'catálogo')+
         ' · '+promptText(h.number,8)+' '+promptText(h.title,37)+' '+promptText(h.snippet,40)):[])
     ].filter(Boolean).join('\n');
     const grammar=[
       'root ::= '+actions.join(' | '),...rules,
-      'text ::= ' + JSON.stringify('"') + ' ['+CHAT_TEXT+']{4,132} ' +JSON.stringify('"'),
-      'query-text ::= '+JSON.stringify('"')+' ['+CHAT_TEXT+']{3,92} '+JSON.stringify('"')
+      'text ::= ' + JSON.stringify('"') + ' ['+CHAT_TEXT+']{4,300} ' +JSON.stringify('"')
     ].join('\n');
-    return {prompt,grammar,maxTokens:60,timeoutMs:35000,candidates,actions,editKeys};
+    return {prompt,grammar,maxTokens:105,timeoutMs:45000,candidates,actions,editKeys};
   }
 
   function cleanChatText(value,max) {
@@ -269,19 +279,14 @@ const LocalHymnAI = (() => {
       return {reply:preferenceQuestions[arg],question:arg};
     }
     if(verb==='falar'){
-      const text=cleanChatText(arg,132);
+      const text=cleanChatText(arg,300);
       if(/^(?:\/|(?:buscar|busca|perguntar|retirar|acrescentar|destacar|filtros|usu[aá]rio(?: agora)?)\s*:)/i.test(text))throw Error('Resposta sem conteúdo.');
       return {reply:text};
-    }
-    if(verb==='buscar'){
-      const query=cleanChatText(arg,92);
-      if(!/^[A-Za-zÀ-ÿ0-9]/.test(query)||/\b(?:query|theme|usu[aá]rio|user|remove):/i.test(query))throw Error('Consulta inválida.');
-      return {query};
     }
     const hymn=candidates.get(arg);
     if(!hymn||!editKeys[verb].includes(arg))throw Error('Hino fora do contexto.');
     return {verb,hymn};
   }
 
-  return { prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  return { chatSearchRequest, prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
 })();

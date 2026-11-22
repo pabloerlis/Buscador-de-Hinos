@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatProposal:null,chatQuestion:null,
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatProposal:null,
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -19,8 +19,8 @@ async function refreshStatus(){
   $('collection-label').textContent=result.ready?result.collection:'Coletânea não importada';
   $('data-count').textContent=result.ready?`${result.hymn_count} hinos disponíveis`:'Aguardando base';
   $('import-panel').classList.toggle('hidden',result.ready);
+  $('library-prompt').classList.toggle('hidden',result.ready);
   $('upgrade-panel').classList.toggle('hidden',!result.ready||((result.collections?.avulsos||0)>0&&(result.collections?.cia||0)>0));
-  $('refine-mode').textContent=result.semantic_ready?'Busca semântica offline':'Busca contextual local';
   $('settings-collection').textContent=result.collection||'Não importada';
   $('settings-count').textContent=result.hymn_count;
   RepertoireUI.renderManagement().catch(error=>console.warn('Repertório:',error.message));
@@ -42,7 +42,8 @@ async function refreshStatus(){
   return result;
 }
 function busySearch(value){
-  state.busy=value; $('search-button').disabled=value;$('refine-send').disabled=value||Boolean(state.chatPending);$('load-more').disabled=value;
+  state.busy=value; $('search-button').disabled=value;$('load-more').disabled=value;
+  updateChatControls();
   $('search-button').textContent=value?'Buscando…':'Buscar';
   if(!value)$('search-button').innerHTML='Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
 }
@@ -60,19 +61,15 @@ function resultCard(hymn,{unlearned=false}={}){
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
 }
-function showResults() {
+function showResults(scroll=true) {
   $('welcome-panel').classList.add('hidden');
   $('results-panel').classList.remove('hidden');
-  $('results-panel').scrollIntoView({block:'start'});
+  if(scroll)$('results-panel').scrollIntoView({block:'start'});
 }
 
-function setRefineOpen(open) {
-  $('refine-toggle').setAttribute('aria-expanded', String(open));
-  $('refine-panel').classList.toggle('hidden', !open);
-}
-async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false,modelQuery}={}){
+async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false,modelQuery,fromChat=false}={}){
   if(state.busy)return false;
-  if(!state.ready){toast('Importe a coletânea para começar.');$('import-panel').scrollIntoView({behavior:'smooth',block:'center'});return false;}
+  if(!state.ready){toast('Importe uma coletânea para começar.');selectWorkspace('library');return false;}
   if(!String(query).trim())return false;
   if(page===1){
     state.searchEpoch++;
@@ -80,11 +77,11 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     $('gguf-comparison').classList.add('hidden');
     if(!preserveContext){
       state.vectorQuery=null;
-      if(!refine){state.searchRootQuery=query;clearChatContext();}
+      if(!refine){state.searchRootQuery=query;if(!fromChat)clearChatEdits();}
       state.originalQuery=query;
       state.hymnTrail=[];
     }
-    if(!preserveContext){showResults();$('results-list').innerHTML=Array.from({length:3},()=>'<div class="loading-skeleton"></div>').join('');$('load-more').classList.add('hidden');}
+    if(!preserveContext){showResults(!fromChat);$('results-list').innerHTML=Array.from({length:3},()=>'<div class="loading-skeleton"></div>').join('');$('load-more').classList.add('hidden');}
   }
   busySearch(true);let succeeded=false;let isBibleSearch=false;
   try {
@@ -95,7 +92,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     if(page===1){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.deprioritize=data.deprioritized||[];state.requiredTerms=data.required||[];state.semanticHints=semanticHints;
-      if(data.reset_context)clearChatContext();
+      if(data.reset_context)clearChatEdits();
       if(data.curated_ids)state.chatEligible=new Set(data.curated_ids);
       if(data.reset_context||(!refine&&!preserveContext))state.searchRootQuery=state.effectiveQuery;
       state.lastResults=data.results.slice();
@@ -151,7 +148,14 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
 function searchRestrictions(){
   return {exclude:state.exclude,deprioritize:state.deprioritize,require:state.requiredTerms};
 }
-function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;return el;}
+function appendConversation(kind,text){
+  const bubble=document.createElement('div');
+  bubble.className=kind==='user'?'user-message':'assistant-message';
+  bubble.textContent=text;
+  $('conversation').appendChild(bubble);
+  scrollChat();
+  return bubble;
+}
 function relatedCard(hymn,{unlearned=false}={}){
   const percent=Math.min(100,Math.max(0,Number(hymn.compatibility_percent)||0));
   const components=Number.isFinite(hymn.similarity_percent)?`<span>${Math.round(hymn.similarity_percent)}% com a letra</span>${Number.isFinite(hymn.query_percent)?`<span>${Math.round(hymn.query_percent)}% com a busca</span>`:''}`:'';
@@ -243,55 +247,102 @@ async function importFile(input){const file=input.files?.[0];if(!file)return;if(
   try{const data=JSON.parse(await file.text());const response=await jsonRequest('/api/import',{data});toast(`Biblioteca: ${response.count} hinos únicos (${response.added} novos).`);await refreshStatus();closeLayer();}
   catch(e){toast('Falha ao importar JSON: '+e.message);}finally{input.value='';}}
 async function submitSearch(query) {
-  if (query && state.ready && !state.busy) {
+  if(query&&state.ready&&!state.busy){
     $('collection-picker').open=false;
     $('search-diagnostics').open=false;
-    setRefineOpen(false);
-    $('conversation').replaceChildren();
-    state.chatPending=null;
-    $('refine-form').setAttribute('aria-busy','false');
+    resetChatTurn();
   }
-  if (await performSearch(query)) $('results-title').focus({preventScroll:true});
+  if(await performSearch(query))$('results-title').focus({preventScroll:true});
 }
 $('search-form').addEventListener('submit',ev=>{ev.preventDefault();submitSearch($('search-input').value.trim());});
-$('refine-toggle').addEventListener('click',()=>{
-  const open=$('refine-panel').classList.contains('hidden');
-  setRefineOpen(open);
-  if(open)openSelectionChat();
-});
-$('start-selection-chat').addEventListener('click',()=>{
-  if(!state.ready){toast('Importe a coletânea para escolher hinos.');return;}
-  $('results-title').textContent='Escolher hinos';
-  $('results-subtitle').textContent='';
-  $('results-list').replaceChildren();
-  $('load-more').classList.add('hidden');
-  $('notice').classList.add('hidden');
-  $('search-diagnostics').classList.add('hidden');
-  RepertoireUI.renderSearch({});
-  showResults();
-  openSelectionChat();
-});
-function openSelectionChat(){
-  setRefineOpen(true);
-  if(!state.chatHistory.length){
-    state.chatQuestion='ocasiao';
-    chatSay('assistant','Qual é o momento do culto? Você também pode me dizer o tema ou o estilo que prefere.');
+
+const workspaceTabs=[...document.querySelectorAll('.workspace-tabs [role="tab"]')];
+function activateTab(tab,tabs){
+  for(const candidate of tabs){
+    const selected=candidate===tab;
+    candidate.setAttribute('aria-selected',String(selected));
+    candidate.tabIndex=selected?0:-1;
+    $(candidate.getAttribute('aria-controls')).hidden=!selected;
   }
+}
+function bindTabs(tabs,select){
+  for(const tab of tabs){
+    tab.addEventListener('click',()=>select(tab));
+    tab.addEventListener('keydown',event=>{
+      const visible=tabs.filter(candidate=>candidate.getClientRects().length);
+      const index=visible.indexOf(tab);
+      const next={ArrowLeft:(index+visible.length-1)%visible.length,
+        ArrowRight:(index+1)%visible.length,Home:0,End:visible.length-1}[event.key];
+      if(next===undefined)return;
+      event.preventDefault();
+      select(visible[next]);
+      visible[next].focus();
+    });
+  }
+}
+function selectWorkspace(name){
+  const tab=$('app-tab-'+name);
+  if(tab.getAttribute('aria-selected')!=='true'){
+    activateTab(tab,workspaceTabs);
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  if(name==='chat'){
+    if(!state.chatHistory.length)chatSay('assistant','Para qual momento você está escolhendo os hinos? Quando quiser sugestões, toque em Buscar hinos ou me peça uma busca.');
+    scrollChat();
+  }
+}
+bindTabs(workspaceTabs,tab=>selectWorkspace(tab.id.replace('app-tab-','')));
+$('search-open-library').addEventListener('click',()=>selectWorkspace('library'));
+$('chat-new').addEventListener('click',()=>{
+  resetChatTurn();
+  clearChatContext();
+  $('refine-input').value='';
+  selectWorkspace('chat');
   $('refine-input').focus();
+});
+$('chat-stop').addEventListener('click',()=>{
+  resetChatTurn();
+  chatSay('assistant','Resposta interrompida.');
+});
+function scrollChat(){
+  const feed=$('conversation').parentElement;
+  if(feed)feed.scrollTop=feed.scrollHeight;
+}
+function updateChatControls(){
+  const pending=state.chatPending;
+  $('refine-send').disabled=state.busy||Boolean(pending);
+  $('chat-search').disabled=state.busy||Boolean(pending);
+  $('chat-new').disabled=Boolean(pending?.searching);
+  $('refine-form').setAttribute('aria-busy',String(Boolean(pending)));
+  $('chat-progress').classList.toggle('hidden',!pending);
+  $('chat-stop').classList.toggle('hidden',Boolean(pending?.searching));
+  $('chat-progress-text').textContent=pending?.searching?'Buscando hinos…':'Respondendo…';
+  if(pending)scrollChat();
+}
+function resetChatTurn(){
+  if(!state.chatPending)return;
+  state.chatPending=null;
+  GGUF.cancelSearchTask();
+  updateChatControls();
 }
 function clearChatContext(){
   state.chatHistory=[];
+  $('conversation').replaceChildren();
+  const hadEdits=state.chatAdded.size||state.chatRemoved.size;
+  clearChatEdits();
+  if(hadEdits)$('results-list').innerHTML=state.lastResults.map(resultCard).join('');
+}
+function clearChatEdits(){
   state.chatAdded=new Map();
   state.chatEligible=null;
   state.chatRemoved=new Set();
   state.chatChoices=null;
   state.chatProposal=null;
-  state.chatQuestion=null;
   $('curation-status')?.classList.add('hidden');
 }
-function chatSay(kind,text){
-  state.chatHistory.push({kind,text});
-  if(state.chatHistory.length>10)state.chatHistory.shift();
+function chatSay(kind,text,intent){
+  state.chatHistory.push({kind,text,intent});
+  if(state.chatHistory.length>16)state.chatHistory.shift();
   return appendConversation(kind,text);
 }
 function visibleHymns(){
@@ -354,33 +405,66 @@ function contextualRemoval(selector,visible){
   if(phrase.length<4)return [];
   return visible.filter(hymn=>[hymn.title,hymn.snippet].some(value=>(' '+words(value)+' ').includes(' '+phrase+' ')));
 }
-async function refineChatSearch(message,turn,modelQuery){
-  const success=await performSearch(message,{refine:true,autoAI:false,modelQuery});
-  if(state.chatPending===turn)
-    chatSay('assistant',success?'Atualizei as sugestões com seu pedido. '+state.total+(state.total===1?' resultado.':' resultados.'):
-      'Não foi possível ajustar as sugestões.');
-  return success;
-}
-async function submitRefinement(message){
-  if(!message||state.busy||state.chatPending)return false;
-  if(message.length>320){
-    chatSay('assistant','Envie até 320 caracteres por mensagem para eu considerar o pedido inteiro.');
+async function refineChatSearch(request,turn){
+  if(!request.query){
+    chatSay('assistant','Qual tema, passagem ou hino você quer buscar?');
     return false;
   }
-  const turn={epoch:state.searchEpoch};
+  if(!state.ready){
+    chatSay('assistant','Importe uma coletânea na aba Biblioteca para buscar hinos.');
+    return false;
+  }
+  const success=await performSearch(request.query,{
+    refine:request.refine&&Boolean(state.effectiveQuery),autoAI:false,fromChat:true
+  });
+  if(state.chatPending!==turn)return false;
+  if(!success){
+    chatSay('assistant','Não foi possível buscar hinos.');
+    return false;
+  }
+  const bubble=chatSay('assistant',state.total?
+    'Encontrei '+state.total+(state.total===1?' hino.':' hinos.'):
+    'Não encontrei hinos para esse pedido. Podemos ajustar o tema.');
+  if(state.total){
+    const button=document.createElement('button');
+    button.className='secondary-btn';button.type='button';button.textContent='Ver resultados';
+    button.addEventListener('click',()=>{
+      selectWorkspace('search');
+      $('results-title').focus({preventScroll:true});
+    });
+    bubble.appendChild(button);
+    scrollChat();
+  }
+  return true;
+}
+async function submitRefinement(message,{viaButton=false}={}){
+  if((!message&&!viaButton)||state.busy||state.chatPending)return false;
+  if(message.length>320){
+    chatSay('assistant','Envie até 320 caracteres por mensagem.');
+    return false;
+  }
   const history=state.chatHistory.slice();
+  const pick=!viaButton&&OfflineAPI.chatSearchIntent(message).list;
+  const request=pick?null:LocalHymnAI.chatSearchRequest(message,history,viaButton);
+  const editCommand=!request&&OfflineAPI.chatEditCommand(message);
+  const editTurn=Boolean(editCommand||state.chatProposal||state.chatChoices);
+  const turn={epoch:state.searchEpoch,searching:Boolean(request)};
   state.chatPending=turn;
-  $('refine-send').disabled=true;
-  $('refine-form').setAttribute('aria-busy','true');
-  chatSay('user',message);
+  chatSay('user',message||(request?.query?'Buscar hinos para o que conversamos':'Buscar hinos'),request?'search':editTurn?'edit':'conversation');
+  updateChatControls();
   const current=()=>state.chatPending===turn&&turn.epoch===state.searchEpoch;
   try{
+    if(request){
+      state.chatChoices=null;
+      state.chatProposal=null;
+      return await refineChatSearch(request,turn);
+    }
     const proposal=state.chatProposal;
     state.chatProposal=null;
     if(proposal&&/^(?:sim|pode (?:adicionar|incluir|acrescentar)|confirmo|aceito)[.!]?$/i.test(message))
       return applyChatEdit('acrescentar',proposal);
     if(proposal&&/^(?:não|nao|não quero)[.!]?$/i.test(message)){
-      chatSay('assistant','Mantive a lista. Posso procurar outro hino se você me disser o que prefere.');
+      chatSay('assistant','Mantive a lista.');
       return true;
     }
     const explaining=/\b(?:explique|por que|qual a diferen[cç]a)\b/i.test(message);
@@ -389,17 +473,12 @@ async function submitRefinement(message){
       chatSay('assistant','Mantive a lista como está.');
       return true;
     }
-    const lookup=explaining?{hymns:[]}:
-      await jsonRequest('/api/chat-candidates',{message,settings:state.searchSettings,...searchRestrictions()});
+    const lookup=editCommand&&!explaining?
+      await jsonRequest('/api/chat-candidates',{message,settings:state.searchSettings,...searchRestrictions()}):{hymns:[]};
     if(!current())return false;
-    if(lookup.refine){
-      state.chatQuestion=null;
-      return await refineChatSearch(message,turn);
-    }
     const visible=visibleHymns();
-    let shown=visible.slice(0,6);
+    const shown=visible.slice(0,6);
     let found=[];
-    let forced=null;
     const clarified=state.chatChoices&&resolveChatChoice(message,state.chatChoices.hymns);
     const contextual=lookup.verb==='retirar'&&!lookup.exact?contextualRemoval(lookup.selector,visible):null;
     if(contextual&&!contextual.length&&!clarified){
@@ -432,10 +511,7 @@ async function submitRefinement(message){
           'Não encontrei esse hino nas coletâneas selecionadas. Você pode indicar o título ou a coletânea.');
         return false;
       }
-      const target=matches[0];
-      forced={verb:reference.verb,id:target.id,hymn:target};
-      if(wantsOnList)shown=[target,...shown.filter(h=>h.id!==target.id)].slice(0,6);
-      else found=[target];
+      return applyChatEdit(reference.verb,matches[0]);
     }else{
       state.chatChoices=null;
       const onList=new Set(visible.map(h=>h.id));
@@ -445,14 +521,9 @@ async function submitRefinement(message){
       }
       found=[...options.values()].slice(0,3);
     }
-    const pick=OfflineAPI.chatSearchIntent(message).list;
-    const preference=!explaining&&(Boolean(state.chatQuestion&&state.chatQuestion!=='hino')||
-      /^(?:mais|menos|prefiro|quero|gostaria|tamb[eé]m gostaria|priorize|com foco|para (?:o|a))\s+/i.test(message));
-    state.chatQuestion=null;
-    const response=await GGUF.refineChat({message,history,shown,found,forced,editIntent:lookup.verb,preference,explaining,pick});
+    const response=await GGUF.refineChat({message,history,shown,found,editIntent:lookup.verb,explaining,pick});
     if(!current())return false;
     if(response?.cancelled){chatSay('assistant','Conversa interrompida.');return false;}
-    if(forced)return applyChatEdit(forced.verb,forced.hymn);
     if(response?.verb==='destacar'&&pick)return applyChatEdit('destacar',response.hymn);
     if(response?.verb==='acrescentar'&&lookup.verb==='acrescentar'&&found.some(h=>h.id===response.hymn.id)){
       state.chatProposal=response.hymn;
@@ -460,21 +531,20 @@ async function submitRefinement(message){
       return true;
     }
     if(response?.reply){
-      state.chatQuestion=response.question;
       chatSay('assistant',response.reply);
       return true;
     }
     if(explaining){
-      chatSay('assistant',visible.length?'A lista atual inclui '+visible.slice(0,3).map(chatHymnName).join(', ')+'. Abra um hino para ver o trecho que motivou a sugestão.':'A lista está vazia. Diga o tema ou o momento do culto para eu procurar opções.');
+      chatSay('assistant',visible.length?'A lista atual inclui '+visible.slice(0,3).map(chatHymnName).join(', ')+'. Abra um hino para ver o trecho que motivou a sugestão.':'Ainda não há resultados. Peça uma busca quando quiser ver as opções.');
       return true;
     }
-    if(!lookup.verb&&(response?.query||response?.unavailable||preference))
-      return await refineChatSearch(message,turn,response?.query);
     if(lookup.verb==='acrescentar'){
       chatSay('assistant','Qual hino você quer acrescentar? Informe o número ou o título.');
       return false;
     }
-    chatSay('assistant','A IA local não respondeu. Você pode tentar novamente ou indicar um hino pelo número ou título.');
+    chatSay('assistant',response?.unavailable?
+      'Carregue um modelo GGUF em Ajustes › IA local para conversar. A busca pelo catálogo está disponível no botão Buscar hinos.':
+      'O modelo local não respondeu. Você pode reenviar a mensagem.');
     return false;
   }catch(error){
     if(current())chatSay('assistant','Não foi possível continuar a conversa.');
@@ -482,56 +552,38 @@ async function submitRefinement(message){
   }finally{
     if(state.chatPending===turn){
       state.chatPending=null;
-      $('refine-send').disabled=state.busy;
-      $('refine-form').setAttribute('aria-busy','false');
+      updateChatControls();
     }
   }
 }
-$('refine-form').addEventListener('submit',async ev=>{
-  ev.preventDefault();
+function sendChatInput(viaButton){
   const input=$('refine-input');
   const message=input.value.trim();
-  if(!message||state.busy||state.chatPending)return;
+  if((!message&&!viaButton)||state.busy||state.chatPending)return;
   if(message.length<=320)input.value='';
-  await submitRefinement(message);
-});
+  void submitRefinement(message,{viaButton});
+}
+$('refine-form').addEventListener('submit',event=>{event.preventDefault();sendChatInput(false);});
+$('chat-search').addEventListener('click',()=>sendChatInput(true));
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.chatPending=null;clearChatContext();$('refine-form').setAttribute('aria-busy','false');$('refine-send').disabled=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;resetChatTurn();clearChatEdits();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
 
 const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
-function selectSettingsTab(tab) {
-  for (const candidate of settingsTabs) {
-    const selected = candidate === tab;
-    candidate.setAttribute('aria-selected', String(selected));
-    candidate.tabIndex = selected ? 0 : -1;
-    $(candidate.getAttribute('aria-controls')).hidden = !selected;
-  }
-  $('settings-scroll').scrollTop = 0;
-  if (tab.id === 'settings-tab-about') BuildAbout.render();
+function selectSettingsTab(tab){
+  activateTab(tab,settingsTabs);
+  if(tab.id==='settings-tab-about')BuildAbout.render();
+  window.scrollTo({top:0,behavior:'instant'});
 }
-for (const tab of settingsTabs) {
-  tab.addEventListener('click',()=>selectSettingsTab(tab));
-  tab.addEventListener('keydown',event=>{
-    const visible = settingsTabs.filter(candidate=>candidate.getClientRects().length);
-    const index = visible.indexOf(tab);
-    const next = {ArrowLeft:(index+visible.length-1)%visible.length,
-      ArrowRight:(index+1)%visible.length, Home:0, End:visible.length-1}[event.key];
-    if (next === undefined) return;
-    event.preventDefault();
-    selectSettingsTab(visible[next]);
-    visible[next].focus();
-  });
-}
-$('open-settings').addEventListener('click',()=>{
-  selectSettingsTab($('settings-tab-library'));
-  openLayer('settings');
-});
-$('ai-indicator').addEventListener('click',()=>{
+bindTabs(settingsTabs,selectSettingsTab);
+function showModelSettings(){
+  selectWorkspace('settings');
   selectSettingsTab($('settings-tab-ai'));
-  openLayer('settings');
-});
+  $('settings-tab-ai').focus();
+}
+$('ai-indicator').addEventListener('click',showModelSettings);
+$('chat-model-settings').addEventListener('click',showModelSettings);
 $('about-app').addEventListener('toggle',()=>{if($('about-app').open)BuildAbout.render();});
 $('import-remote').addEventListener('click',importRemote);$('settings-import').addEventListener('click',importRemote);$('upgrade-import').addEventListener('click',importRemote);
 $('import-file').addEventListener('change',ev=>importFile(ev.target));$('settings-file').addEventListener('change',ev=>importFile(ev.target));
@@ -864,7 +916,7 @@ const GGUF=(()=>{
     $('gguf-banner').classList.toggle('hidden',!state.ready||!selectedState.ready);
     $('ai-workspace').classList.toggle('hidden',!selectedState.ready&&!selectedState.busy);
     $('gguf-banner-text').textContent=selectedState.ready?'IA local disponível':'Carregue um GGUF em Configurações para usar a IA.';
-    $('refine-mode').textContent=selectedState.ready?'Chat com IA local':'Refinamento pela busca local';
+    $('refine-mode').textContent=selectedState.ready?'Modelo local pronto':selectedState.busy?'Preparando o modelo…':'Modelo local indisponível';
     updateIndicator(status);
     return status;
   }

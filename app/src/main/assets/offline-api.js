@@ -459,14 +459,16 @@ const OfflineAPI = (() => {
       canPick:!flags.excluded.length&&!flags.required.length&&!flags.deprioritized.length
     };
   }
+  function chatEditCommand(message) {
+    return normalize(message).match(/(?:^|[.!?]\s+)(?:(?:por favor|pode|quero(?: que)?)[,\s]+)?(acrescent(?:e|ar)|adicion(?:e|ar)|inclu(?:a|ir)|colo(?:que|car)|retir(?:e|ar)|remov(?:a|er)|tir(?:e|ar)|exclu(?:a|ir))\s+(?:(?:o|a)\s+)?(?:hino\s+)?(.+?)[.!?]*$/);
+  }
   function chatCandidates(payload) {
     const message=String(payload?.message||'').trim();
     if(!message||message.length>MAX_QUERY_LENGTH)return {hymns:[]};
-    const norm=normalize(message);
     const context=contextQuery(message,'',{refine:true});
     if(context.fresh||context.excluded.length||context.required.length||context.deprioritized.length)
       return {hymns:[],refine:true};
-    const command=norm.match(/(?:^|[.!?]\s+)(?:(?:por favor|pode|quero(?: que)?)[,\s]+)?(acrescent(?:e|ar)|adicion(?:e|ar)|inclu(?:a|ir)|colo(?:que|car)|retir(?:e|ar)|remov(?:a|er)|tir(?:e|ar)|exclu(?:a|ir))\s+(?:(?:o|a)\s+)?(?:hino\s+)?(.+?)[.!?]*$/);
+    const command=chatEditCommand(message);
     const opts=searchOptions(payload?.settings);
     if(command){
       const verb=/^(?:retir|remov|tir|exclu)/.test(command[1])?'retirar':'acrescentar';
@@ -896,5 +898,5 @@ const OfflineAPI = (() => {
     if(match)return hymnDetail(Number(match[1]));
     throw Error('Operação não reconhecida.');
   }
-   return {request,chatSearchIntent,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions};
+   return {request,chatEditCommand,chatSearchIntent,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions};
 })();
