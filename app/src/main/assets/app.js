@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatOptions:[],
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatProposal:null,chatQuestion:null,
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -90,11 +90,13 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   try {
     let data;
     if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),model_query:refine?modelQuery:undefined,semantic_hints:semanticHints,settings:state.searchSettings});
+    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),curated_ids:[...state.chatAdded.keys()],semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),curated_ids:[...state.chatAdded.keys()],model_query:refine?modelQuery:undefined,semantic_hints:semanticHints,settings:state.searchSettings});
     if(page===1){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.deprioritize=data.deprioritized||[];state.requiredTerms=data.required||[];state.semanticHints=semanticHints;
+      if(data.reset_context)clearChatContext();
+      if(data.curated_ids)state.chatEligible=new Set(data.curated_ids);
       if(data.reset_context||(!refine&&!preserveContext))state.searchRootQuery=state.effectiveQuery;
       state.lastResults=data.results.slice();
       state.aiContext=data.ai_context;
@@ -255,14 +257,36 @@ $('search-form').addEventListener('submit',ev=>{ev.preventDefault();submitSearch
 $('refine-toggle').addEventListener('click',()=>{
   const open=$('refine-panel').classList.contains('hidden');
   setRefineOpen(open);
-  if(open)$('refine-input').focus();
+  if(open)openSelectionChat();
 });
+$('start-selection-chat').addEventListener('click',()=>{
+  if(!state.ready){toast('Importe a coletânea para escolher hinos.');return;}
+  $('results-title').textContent='Escolher hinos';
+  $('results-subtitle').textContent='';
+  $('results-list').replaceChildren();
+  $('load-more').classList.add('hidden');
+  $('notice').classList.add('hidden');
+  $('search-diagnostics').classList.add('hidden');
+  RepertoireUI.renderSearch({});
+  showResults();
+  openSelectionChat();
+});
+function openSelectionChat(){
+  setRefineOpen(true);
+  if(!state.chatHistory.length){
+    state.chatQuestion='ocasiao';
+    chatSay('assistant','Qual é o momento do culto? Você também pode me dizer o tema ou o estilo que prefere.');
+  }
+  $('refine-input').focus();
+}
 function clearChatContext(){
   state.chatHistory=[];
   state.chatAdded=new Map();
+  state.chatEligible=null;
   state.chatRemoved=new Set();
   state.chatChoices=null;
-  state.chatOptions=[];
+  state.chatProposal=null;
+  state.chatQuestion=null;
   $('curation-status')?.classList.add('hidden');
 }
 function chatSay(kind,text){
@@ -273,7 +297,8 @@ function chatSay(kind,text){
 function visibleHymns(){
   const additions=[...state.chatAdded.values()].filter(hymn=>{
     const collections=state.searchSettings.collections;
-    return !collections||!hymn.collection_ids?.length||hymn.collection_ids.some(id=>collections[id]!==false);
+    return (!state.chatEligible||state.chatEligible.has(hymn.id))&&
+      (!collections||!hymn.collection_ids?.length||hymn.collection_ids.some(id=>collections[id]!==false));
   });
   const raw=state.lastResults.filter(hymn=>!state.chatRemoved.has(hymn.id)&&!state.chatAdded.has(hymn.id));
   return [...additions,...raw];
@@ -300,6 +325,7 @@ function applyChatEdit(verb,hymn){
   }else if(verb==='acrescentar'&&!current){
     state.chatRemoved.delete(hymn.id);
     state.chatAdded.set(hymn.id,{...hymn,curated:true,aiReview:null});
+    state.chatEligible?.add(hymn.id);
   }else if(verb==='destacar'&&current){
     const bubble=chatSay('assistant','Destaque da lista');
     const button=document.createElement('button');
@@ -321,8 +347,26 @@ function resolveChatChoice(message,choices){
     OfflineAPI.normalize(hymn.title)===text.replace(/^["“]|["”]$/g,''));
   return matches.length===1?matches[0]:null;
 }
+function contextualRemoval(selector,visible){
+  if(!selector)return [];
+  const words=value=>OfflineAPI.normalize(value||'').replace(/[^a-z0-9]+/g,' ').trim();
+  const phrase=words(selector).replace(/^(?:(?:sobre|que fala (?:de|sobre)|cujo tema e|da|do|de|o|a)\s+)+/,'');
+  if(phrase.length<4)return [];
+  return visible.filter(hymn=>[hymn.title,hymn.snippet].some(value=>(' '+words(value)+' ').includes(' '+phrase+' ')));
+}
+async function refineChatSearch(message,turn,modelQuery){
+  const success=await performSearch(message,{refine:true,autoAI:false,modelQuery});
+  if(state.chatPending===turn)
+    chatSay('assistant',success?'Atualizei as sugestões com seu pedido. '+state.total+(state.total===1?' resultado.':' resultados.'):
+      'Não foi possível ajustar as sugestões.');
+  return success;
+}
 async function submitRefinement(message){
   if(!message||state.busy||state.chatPending)return false;
+  if(message.length>320){
+    chatSay('assistant','Envie até 320 caracteres por mensagem para eu considerar o pedido inteiro.');
+    return false;
+  }
   const turn={epoch:state.searchEpoch};
   const history=state.chatHistory.slice();
   state.chatPending=turn;
@@ -331,14 +375,40 @@ async function submitRefinement(message){
   chatSay('user',message);
   const current=()=>state.chatPending===turn&&turn.epoch===state.searchEpoch;
   try{
-    const lookup=await jsonRequest('/api/chat-candidates',{message,settings:state.searchSettings,...searchRestrictions()});
+    const proposal=state.chatProposal;
+    state.chatProposal=null;
+    if(proposal&&/^(?:sim|pode (?:adicionar|incluir|acrescentar)|confirmo|aceito)[.!]?$/i.test(message))
+      return applyChatEdit('acrescentar',proposal);
+    if(proposal&&/^(?:não|nao|não quero)[.!]?$/i.test(message)){
+      chatSay('assistant','Mantive a lista. Posso procurar outro hino se você me disser o que prefere.');
+      return true;
+    }
+    const explaining=/\b(?:explique|por que|qual a diferen[cç]a)\b/i.test(message);
+    const keepList=/^(?:não|nao)\s+(?:retire|remova|tire|exclua|acrescente|adicione|inclua|coloque)\b[^,.!?]*[.!?]?$/i.test(message);
+    if(keepList&&!explaining){
+      chatSay('assistant','Mantive a lista como está.');
+      return true;
+    }
+    const lookup=explaining?{hymns:[]}:
+      await jsonRequest('/api/chat-candidates',{message,settings:state.searchSettings,...searchRestrictions()});
     if(!current())return false;
+    if(lookup.refine){
+      state.chatQuestion=null;
+      return await refineChatSearch(message,turn);
+    }
     const visible=visibleHymns();
     let shown=visible.slice(0,6);
     let found=[];
     let forced=null;
     const clarified=state.chatChoices&&resolveChatChoice(message,state.chatChoices.hymns);
-    const reference=lookup.exact?lookup:clarified?{verb:state.chatChoices.verb,hymns:[clarified]}:null;
+    const contextual=lookup.verb==='retirar'&&!lookup.exact?contextualRemoval(lookup.selector,visible):null;
+    if(contextual&&!contextual.length&&!clarified){
+      state.chatChoices=null;
+      chatSay('assistant','Qual hino você quer retirar? Diga o número, o título ou a coletânea para eu identificar o hino.');
+      return false;
+    }
+    const reference=lookup.exact?lookup:clarified?{verb:state.chatChoices.verb,hymns:[clarified]}:
+      contextual?{verb:'retirar',hymns:contextual}:null;
     if(reference){
       const wantsOnList=reference.verb==='retirar';
       const matches=reference.hymns.filter(hymn=>visible.some(h=>h.id===hymn.id)===wantsOnList);
@@ -370,26 +440,40 @@ async function submitRefinement(message){
       state.chatChoices=null;
       const onList=new Set(visible.map(h=>h.id));
       const options=new Map();
-      for(const h of [...lookup.hymns,...state.chatOptions]){
+      for(const h of lookup.hymns){
         if(!onList.has(h.id)&&!state.chatRemoved.has(h.id)&&!options.has(h.id))options.set(h.id,h);
       }
       found=[...options.values()].slice(0,3);
-      state.chatOptions=found;
     }
-    const response=await GGUF.refineChat({message,history,shown,found,forced,editIntent:lookup.verb});
+    const pick=OfflineAPI.chatSearchIntent(message).list;
+    const preference=!explaining&&(Boolean(state.chatQuestion&&state.chatQuestion!=='hino')||
+      /^(?:mais|menos|prefiro|quero|gostaria|tamb[eé]m gostaria|priorize|com foco|para (?:o|a))\s+/i.test(message));
+    state.chatQuestion=null;
+    const response=await GGUF.refineChat({message,history,shown,found,forced,editIntent:lookup.verb,preference,explaining,pick});
     if(!current())return false;
     if(response?.cancelled){chatSay('assistant','Conversa interrompida.');return false;}
-    if(response?.reply)chatSay('assistant',response.reply);
-    if(response?.verb)return applyChatEdit(response.verb,response.hymn);
     if(forced)return applyChatEdit(forced.verb,forced.hymn);
-    if(response?.query||(response?.unavailable&&!lookup.verb)){
-      const success=await performSearch(message,{refine:true,autoAI:false,modelQuery:response.query});
-      if(state.chatPending===turn)
-        chatSay('assistant',success?'Busca refinada · '+state.total+(state.total===1?' resultado.':' resultados.'):
-          'Não foi possível refinar a busca.');
-      return success;
+    if(response?.verb==='destacar'&&pick)return applyChatEdit('destacar',response.hymn);
+    if(response?.verb==='acrescentar'&&lookup.verb==='acrescentar'&&found.some(h=>h.id===response.hymn.id)){
+      state.chatProposal=response.hymn;
+      chatSay('assistant','Posso acrescentar '+chatHymnName(response.hymn)+'? Responda sim ou não.');
+      return true;
     }
-    if(response?.reply)return true;
+    if(response?.reply){
+      state.chatQuestion=response.question;
+      chatSay('assistant',response.reply);
+      return true;
+    }
+    if(explaining){
+      chatSay('assistant',visible.length?'A lista atual inclui '+visible.slice(0,3).map(chatHymnName).join(', ')+'. Abra um hino para ver o trecho que motivou a sugestão.':'A lista está vazia. Diga o tema ou o momento do culto para eu procurar opções.');
+      return true;
+    }
+    if(!lookup.verb&&(response?.query||response?.unavailable||preference))
+      return await refineChatSearch(message,turn,response?.query);
+    if(lookup.verb==='acrescentar'){
+      chatSay('assistant','Qual hino você quer acrescentar? Informe o número ou o título.');
+      return false;
+    }
     chatSay('assistant','A IA local não respondeu. Você pode tentar novamente ou indicar um hino pelo número ou título.');
     return false;
   }catch(error){
@@ -408,7 +492,7 @@ $('refine-form').addEventListener('submit',async ev=>{
   const input=$('refine-input');
   const message=input.value.trim();
   if(!message||state.busy||state.chatPending)return;
-  input.value='';
+  if(message.length<=320)input.value='';
   await submitRefinement(message);
 });
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
@@ -848,7 +932,7 @@ const GGUF=(()=>{
     }else chat.resolve(null);
   }
   function refineChat(context){
-    if(!state.effectiveQuery||!selectedState.ready)return Promise.resolve({unavailable:true});
+    if(!selectedState.ready)return Promise.resolve({unavailable:true});
     const constraints=[
       state.exclude.length&&'excluir '+state.exclude.join(', '),
       state.deprioritize?.length&&'menos foco em '+state.deprioritize.join(', '),

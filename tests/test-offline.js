@@ -143,6 +143,14 @@ const samples=[
  assert.equal(targeted.verb,'acrescentar');
  assert.equal(targeted.exact,true);
  assert.ok(targeted.hymns.some(hymn=>hymn.number==='003'));
+ const polite=await api.request('/api/chat-candidates',{message:'Por favor, adicione o hino 003 da Coletânea'});
+ assert.equal(polite.exact,true);
+ assert.ok(polite.hymns.some(hymn=>hymn.number==='003'));
+ const filters=await api.request('/api/chat-candidates',{message:'Somente hinos de vigilância'});
+ assert.equal(filters.refine,true);
+ const withoutWatch=await api.request('/api/search',{query:'Cristo',exclude:['vigilância'],
+   curated_ids:[targeted.hymns[0].id]});
+ assert.deepEqual(Array.from(withoutWatch.curated_ids),[]);
  const absent=await api.request('/api/chat-candidates',{message:'Retire o hino 9999'});
  assert.equal(absent.verb,'retirar');
  assert.equal(absent.hymns.length,0);
