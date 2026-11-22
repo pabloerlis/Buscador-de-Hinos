@@ -86,7 +86,9 @@ public class Lfm3DeviceSmokeTest {
             android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=compare-five total_ms="+wall
                 +" setup_ms="+compareMetrics[0]+" prefill_ms="+compareMetrics[1]
                 +" first_token_ms="+compareMetrics[2]+" generated="+compareMetrics[3]);
-            JSONObject resultJson=new JSONObject(new String(compare,StandardCharsets.UTF_8));
+            String compareText=new String(compare,StandardCharsets.UTF_8);
+            android.util.Log.i("LFM3_BENCH","MODEL_RESPONSE case=compare-five output="+compareText);
+            JSONObject resultJson=new JSONObject(compareText);
             assertEquals("Reranking errou a narrativa do filho pródigo",3,resultJson.getInt("id"));
             assertTrue("Justificativa curta ausente",resultJson.getString("motivo").trim().length()>=8);
             assertTrue("Não houve geração real",compareMetrics[3]>0);

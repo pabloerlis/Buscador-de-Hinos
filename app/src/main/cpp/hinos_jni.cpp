@@ -1,4 +1,5 @@
 #include <jni.h>
+#include <android/log.h>
 #include <llama.h>
 #include <ggml-backend.h>
 #include <algorithm>
@@ -39,6 +40,17 @@ static bool shouldCancel(void* data) {
 
 static jlong elapsedMs(Clock::time_point from) {
     return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now() - from).count();
+}
+
+// LFM3 pode iniciar a resposta em <think>. Uma gramática de JSON a partir
+// desse ponto restringiria o raciocínio, em vez da resposta final. Fechamos
+// apenas esse prefixo de template, e somente para saída estruturada.
+static bool endsWithOpenThinking(const std::string& prompt) {
+    const auto tail = prompt.find_last_not_of(" \r\n\t");
+    constexpr const char* open = "<think>";
+    constexpr std::size_t length = 7;
+    return tail != std::string::npos && tail + 1 >= length
+        && prompt.compare(tail + 1 - length, length, open) == 0;
 }
 
 static std::string readUtf8(JNIEnv* env, jbyteArray bytes) {
@@ -177,6 +189,11 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
             std::vector<char> formatted(formattedSize+1,0);
             int used=llama_chat_apply_template(tmpl,&message,1,true,formatted.data(),formattedSize+1);
             if(used>0&&used<=(int)formattedSize)prompt.assign(formatted.data(),used);
+        }
+        if (!grammar.empty() && endsWithOpenThinking(prompt)) {
+            prompt += "</think>\n";
+            __android_log_print(ANDROID_LOG_INFO,"LFM3_TEMPLATE",
+                "Closed thinking prefix for constrained output");
         }
         const llama_vocab* vocab=llama_model_get_vocab(g_model);
         int n_tokens=llama_tokenize(vocab,prompt.c_str(),prompt.size(),nullptr,0,true,true);
