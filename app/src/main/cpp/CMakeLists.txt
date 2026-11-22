@@ -14,6 +14,9 @@ set(GGML_NATIVE OFF CACHE BOOL "" FORCE)
 set(GGML_OPENMP OFF CACHE BOOL "" FORCE)
 set(GGML_LLAMAFILE OFF CACHE BOOL "" FORCE)
 set(GGML_CPU_ALL_VARIANTS OFF CACHE BOOL "" FORCE)
+if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+  set(GGML_CPU_KLEIDIAI ON CACHE BOOL "Use portable ARM64 kernels" FORCE)
+endif()
 include(FetchContent)
 FetchContent_Declare(llamacpp
   GIT_REPOSITORY https://github.com/ggml-org/llama.cpp.git
@@ -23,6 +26,9 @@ FetchContent_Declare(llamacpp
 )
 FetchContent_MakeAvailable(llamacpp)
 add_library(hinosllm SHARED hinos_jni.cpp)
+if(ANDROID AND CMAKE_ANDROID_ARCH_ABI STREQUAL "arm64-v8a")
+  target_compile_definitions(hinosllm PRIVATE HINOS_KLEIDIAI=1)
+endif()
 target_link_libraries(hinosllm PRIVATE llama ggml log)
 target_include_directories(hinosllm PRIVATE ${llamacpp_SOURCE_DIR}/include ${llamacpp_SOURCE_DIR}/ggml/include)
 

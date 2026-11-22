@@ -19,6 +19,7 @@ static std::mutex g_mutex;
 static std::mutex g_log_mutex;
 static bool g_initialized=false;
 static std::string g_recent_logs;
+static std::atomic<bool> g_kleidiai_buffer{false};
 static std::atomic<int> g_load_progress{0};
 static std::atomic<int> g_generation_stage{0};
 static std::atomic<bool> g_cancel{false};
@@ -64,6 +65,9 @@ static void javaException(JNIEnv* env,const std::string& message){
 static void recordLog(ggml_log_level level,const char* message,void*){
     if(!message)return;
     std::string line(message);
+    if (line.find("CPU_KLEIDIAI model buffer size") != std::string::npos) {
+        g_kleidiai_buffer.store(true);
+    }
     // Preserva as mensagens de diagnóstico do motor, incluindo arquiteturas GGUF não suportadas.
     if(level<GGML_LOG_LEVEL_WARN && line.find("failed")==std::string::npos && line.find("unknown")==std::string::npos && line.find("unsupported")==std::string::npos && line.find("error")==std::string::npos)return;
     std::lock_guard<std::mutex> lock(g_log_mutex);
@@ -113,13 +117,19 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerationStats(JNIEnv* env,j
     return result;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_br_com_buscadordehinos_app_MainActivity_nativeUsesPackedArmBuffer(JNIEnv*, jclass) {
+    return g_kleidiai_buffer.load() ? JNI_TRUE : JNI_FALSE;
+}
+
 extern "C" JNIEXPORT jint JNICALL
 Java_br_com_buscadordehinos_app_MainActivity_nativeLoadProgress(JNIEnv*,jclass){
     return g_load_progress.load();
 }
 
 extern "C" JNIEXPORT jstring JNICALL
-Java_br_com_buscadordehinos_app_MainActivity_nativeLoad(JNIEnv* env,jclass,jstring pathString){
+Java_br_com_buscadordehinos_app_MainActivity_nativeLoad(JNIEnv* env,jclass,jstring pathString,
+        jboolean allowPackedWeights){
     std::lock_guard<std::mutex> guard(g_mutex);
     if(!pathString){javaException(env,"Caminho do modelo ausente.");return nullptr;}
     const char* cpath=env->GetStringUTFChars(pathString,nullptr);
@@ -134,16 +144,37 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeLoad(JNIEnv* env,jclass,jstri
         llama_model_params params=llama_model_default_params();
         params.n_gpu_layers=0;
         params.load_mode=LLAMA_LOAD_MODE_MMAP; // API b11960+: mmap, sem mlock e sem I/O direto.
-        params.use_extra_bufts=false; // Evita buffers de repacking adicionais no primeiro teste.
+        params.use_extra_bufts=false;
+#if defined(HINOS_KLEIDIAI)
+        params.use_extra_bufts=allowPackedWeights==JNI_TRUE;
+#endif
         params.progress_callback=modelProgress;
-        g_model=llama_model_load_from_file(path.c_str(),params);
+        if (params.use_extra_bufts) {
+            g_kleidiai_buffer.store(false);
+            try {
+                g_model=llama_model_load_from_file(path.c_str(),params);
+            } catch (const std::bad_alloc&) {
+                // Reempacotar pesos pode falhar mesmo com RAM disponível no sistema.
+            }
+            if (!g_model) {
+                g_kleidiai_buffer.store(false);
+                g_load_progress.store(0);
+                params.use_extra_bufts=false;
+            }
+        }
+        if (!params.use_extra_bufts) {
+            g_kleidiai_buffer.store(false);
+            g_model=llama_model_load_from_file(path.c_str(),params);
+        }
         if(!g_model){
             const std::string detail=logDetail();
             javaException(env,"Motor não conseguiu abrir o GGUF. Isso também pode ser formato incompatível ou falha de acesso ao arquivo, não apenas RAM. "+(detail.empty()?"Confira o modelo e a quantização.":"Detalhe do motor: "+detail));
             return nullptr;
         }
         g_load_progress.store(100);
-        return asJava(env,"GGUF pronto. Peso mapeado sob demanda, sem cópia integral do arquivo.");
+        return asJava(env,g_kleidiai_buffer.load()
+            ?"GGUF pronto. Modelo alocado com buffer ARM64 KleidiAI."
+            :"GGUF pronto. Execução por CPU com os buffers padrão do modelo.");
     }catch(const std::bad_alloc&){javaException(env,"Alocação nativa insuficiente. Feche aplicativos e use uma quantização menor; o contexto será reduzido nesta versão.");return nullptr;}
     catch(const std::exception& ex){javaException(env,std::string("Erro nativo ao abrir GGUF: ")+ex.what());return nullptr;}
 }

@@ -28,7 +28,7 @@ for mode in optimized baseline; do
   # A variante historica pode expirar; nao bloquear a execucao da variante otimizada.
   # Somente o timeout da comparacao baseline, apos OK real, pode ser observado como controle negativo.
   set +e
-  timeout -k 10s 510s adb shell am instrument -w -r -e class \
+  timeout -k 10s 510s adb shell am instrument -w -r -e benchmarkMode "$mode" -e class \
     br.com.buscadordehinos.app.Lfm3DeviceSmokeTest \
     br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner | tee "$log"
   instrument_rc=${PIPESTATUS[0]}

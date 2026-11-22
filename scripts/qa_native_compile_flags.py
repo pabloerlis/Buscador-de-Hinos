@@ -42,10 +42,17 @@ for f in files:
                              "optimization_flags":opts,
                              "effective":opts[-1] if opts else None,
                              "has_line_debug":"-gline-tables-only" in argv,
-                             "frame_pointer":"-fno-omit-frame-pointer" in argv})
+                             "frame_pointer":"-fno-omit-frame-pointer" in argv,
+                             "kleidiai":"-DGGML_USE_CPU_KLEIDIAI" in argv,
+                             "hinos_kleidiai":"-DHINOS_KLEIDIAI=1" in argv})
         if not matching:
             report["errors"].append(f"{abi}: alvo {target} sem comando C/C++ auditável")
         for m in matching:
+            is_arm64 = abi=="arm64-v8a"
+            if target=="ggml-cpu" and m["kleidiai"]!=is_arm64:
+                report["errors"].append(f"{abi}/{target}/{m['file']}: KleidiAI compilado para ABI inesperada")
+            if target=="hinosllm" and m["hinos_kleidiai"]!=is_arm64:
+                report["errors"].append(f"{abi}/{target}: seleção de buffer KleidiAI divergente")
             if args.mode=="optimized":
                 if m["effective"]!="-O3" or not m["has_line_debug"] or not m["frame_pointer"]:
                     report["errors"].append(f"{abi}/{target}/{m['file']}: flags não otimizadas {m['optimization_flags']}")

@@ -370,6 +370,8 @@ jobs:
           path: qa-report
       - name: Gerar referencia E5 ONNX 384D apenas para os testes Android
         run: python3 scripts/qa_android_query_canary.py qa-report/e5-paraphrase-vectors.json app/src/androidTest/assets/e5-query-canary.json
+      - name: Preparar a entrada GGUF a partir do código da interface
+        run: node scripts/build_lfm3_qa_fixture.js
       - name: Compilar baseline nativa Debug sem -O3 para comparação isolada
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}

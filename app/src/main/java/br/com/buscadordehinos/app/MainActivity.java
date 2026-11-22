@@ -65,8 +65,9 @@ public final class MainActivity extends Activity {
         }
         NATIVE_AVAILABLE=available;
     }
-    private static native String nativeLoad(String path);
+    private static native String nativeLoad(String path, boolean allowPackedWeights);
     private static native int nativeLoadProgress();
+    private static native boolean nativeUsesPackedArmBuffer();
     private static native byte[] nativeGenerate(byte[] prompt,byte[] grammar,int maxTokens,int timeoutMs,long[] metrics);
     private static native int nativeGenerationStage();
     private static native long[] nativeGenerationStats();
@@ -340,6 +341,7 @@ public final class MainActivity extends Activity {
                 result.put("available",NATIVE_AVAILABLE);
                 result.put("selected",selected);
                 result.put("loaded",modelLoaded);
+                result.put("armWeightsPacked",NATIVE_AVAILABLE&&modelLoaded&&nativeUsesPackedArmBuffer());
                 result.put("busy",llmBusy);
                 result.put("name",selected?preferences.getString(MODEL_DISPLAY_NAME_KEY,"GGUF selecionado"):"");
                 if(selected&&"none".equals(phase))phase="selected";
@@ -408,7 +410,11 @@ public final class MainActivity extends Activity {
                     File modelFile=prepareModelFile(uri,size);
                     modelPhase="loading";
                     ggufEvent("phase",true,"Modelo copiado. Carregando pesos…");
-                    message=nativeLoad(modelFile.getAbsolutePath());
+                    ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(memory);
+                    // Reserve memória para o Android e o contexto antes de reempacotar pesos.
+                    long headroom=memory.availMem-memory.threshold-768L*1024*1024;
+                    boolean allowPackedWeights=!memory.lowMemory && modelFile.length()<=headroom;
+                    message=nativeLoad(modelFile.getAbsolutePath(),allowPackedWeights);
                     android.content.SharedPreferences.Editor metadata=preferences.edit().putLong(MODEL_BYTES_KEY,size);
                     if(!preferences.contains(MODEL_DISPLAY_NAME_KEY))metadata.putString(MODEL_DISPLAY_NAME_KEY,modelName(uri));
                     metadata.apply();

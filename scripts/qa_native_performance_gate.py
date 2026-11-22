@@ -57,8 +57,8 @@ if not errors:
         a=result["baseline"][case]
         b=result["optimized"][case]
         bt=b["total_ms"]
-        if case=="compare-five" and b["first_token_ms"]>=90000:
-            errors.append("O primeiro token da comparação otimizada excedeu 90 segundos")
+        if case=="compare-five" and b["first_token_ms"]>=20000:
+            errors.append("O primeiro token da comparação otimizada excedeu 20 segundos")
         if a.get("timed_out"):
             result.setdefault("speedups",{})[case]={"lower_bound_x":round(a["lower_bound_ms"]/bt,3)}
         else:

@@ -569,7 +569,7 @@ const GGUF=(()=>{
   const selectedState={ready:false,busy:false,task:null};
   let nextRequest=0,queuedAuto=null;
   const aiCache=new Map();
-  const MAX_AI_MS=60000;
+  const MAX_AI_MS=12000;
   const canUseTopics=()=>!state.exactNumber&&state.searchSettings.mode!=='literal';
   const phases={none:'Sem modelo',selected:'Arquivo selecionado',copying:'Copiando GGUF',loading:'Carregando modelo',ready:'GGUF carregado',generating:'IA em execução',error:'Falha ao carregar',unavailable:'Motor indisponível'};
   const generationStages=['Aguardando o motor…','Preparando contexto…','Processando entrada…','Gerando resposta…'];
@@ -612,7 +612,9 @@ const GGUF=(()=>{
     $('settings-ai').textContent=phases[phase]||phase;
     const modelName=status.name||'Nenhum arquivo selecionado';
     $('gguf-status').textContent=available?(status.selected?'Arquivo: '+modelName:'Nenhum arquivo selecionado.'):'Motor GGUF indisponível neste aparelho.';
-    $('gguf-phase').textContent='Estado: '+(phases[phase]||phase)+((phase==='loading'||phase==='copying')&&Number.isFinite(status.progress)?' · '+status.progress+'%':'');
+    const backend = status.loaded?(status.armWeightsPacked?' · Buffer ARM64 KleidiAI':' · CPU padrão'):'';
+    $('gguf-phase').textContent='Estado: '+(phases[phase]||phase)+backend+
+      ((phase==='loading'||phase==='copying')&&Number.isFinite(status.progress)?' · '+status.progress+'%':'');
     const fmt=x=>Number.isFinite(x)&&x>0?Math.round(x)+' MB':'—';
     $('gguf-model-meta').textContent=`Tamanho GGUF: ${fmt(status.modelMB)} · Armazenamento livre: ${fmt(status.storageMB)} · Cache local: ${fmt(status.cachedMB)} · RAM disponível: ${fmt(status.availableMB)} · RAM total: ${fmt(status.totalMB)} · Memória nativa usada: ${fmt(status.nativeMB)}. Valores aproximados, sujeitos às restrições do Android.`;
     if(status.lastError){$('gguf-last').textContent='Erro mais recente: '+status.lastError;}
@@ -681,12 +683,13 @@ const GGUF=(()=>{
     if(selectedState.task){queuedAuto={query,epoch:state.searchEpoch};return;}
     interpret(query,MAX_AI_MS);
   }
-  function interpret(query,timeoutMs=90000){
+  function interpret(query,timeoutMs=MAX_AI_MS){
     if(!query?.trim()||state.busy||state.repertoirePending||!canUseTopics())return;
     const key=JSON.stringify([nativeStatus().name||'',OfflineAPI.normalize(query),state.exclude.map(OfflineAPI.normalize)]);
     const cached=aiCache.get(key);
     if(cached){applyHints(cached);return;}
-    const request=LocalHymnAI.prepareThemes(query,state.exclude,OfflineAPI.semanticLabels(),timeoutMs);
+    const preferred = [...(state.aiContext?.topics||[]),...state.lastResults.slice(0,3).flatMap(hymn=>hymn.topics||[])];
+    const request=LocalHymnAI.prepareThemes(query,state.exclude,OfflineAPI.semanticLabels(),timeoutMs,preferred);
     if(request&&startTask('interpret',request,{cacheKey:key})){
       showTask('Sugerindo temas','A busca local continua disponível.');
     }
@@ -708,7 +711,7 @@ const GGUF=(()=>{
     const search={query:state.effectiveQuery,exclusions:state.exclude.slice(),deprioritized:state.deprioritize?.slice(),context:state.aiContext,settings:state.searchSettings};
     const request=LocalHymnAI.prepareComparison(search.query,search.exclusions,state.lastResults,search.context);
     if(startTask('compare',request,{search,deadline:performance.now()+request.timeoutMs})){
-      $('gguf-comparison').classList.add('hidden');
+      if(state.lastResults.length)compare();
       showTask('Buscando hinos com IA',`Trechos disponíveis para o modelo: ${request.candidates.size}.`);
     }
   }
@@ -716,7 +719,7 @@ const GGUF=(()=>{
     if(task.deadline-performance.now()<1000){resetTask('A comparação atingiu o limite de tempo antes da busca complementar.',true);return;}
     task.id=null;
     const search=task.search;
-    const original=[...task.candidates.values()].map(hymn=>({...hymn,snippet:hymn.excerpt}));
+    const original=[...task.candidates.values()].map(hymn=>({...hymn,snippet:hymn.excerpt,match_type:hymn.matchType}));
     setActivity(true,'Consultando o índice local…');
     showTask('Busca complementar',`O modelo pediu uma busca por “${term}”.`);
     let additional;
@@ -738,9 +741,16 @@ const GGUF=(()=>{
     sendTask(task,{...request,timeoutMs:remaining});
   }
   function displayComparison(picks,lookup){
-    const format=hymn=>[`${hymn.number?'Hino '+hymn.number+' — ':''}${hymn.title}${hymn.collection?' · '+hymn.collection:''}`,`Motivo da IA: ${hymn.reason}`,`Trecho da coletânea: “${hymn.excerpt}”`].join('\n');
-    const result=picks.length?'Comparação da IA local\n\n'+picks.map(format).join('\n\n'):'A IA não encontrou evidência suficiente nos trechos comparados.';
-    $('gguf-comparison-text').textContent=lookup?`Busca complementar por “${lookup.term}” · ${lookup.added} novo(s) candidato(s)\n\n${result}`:result;
+    const format = hymn => [
+      (hymn.number?'Hino '+hymn.number+' — ':'')+hymn.title,
+      'Trecho da coletânea: “'+hymn.excerpt+'”'
+    ].join('\n');
+    const parts = [];
+    if(state.lastResults.length)parts.push(indexComparison());
+    if(lookup)parts.push('Busca complementar por “'+lookup.term+'” · '+lookup.added+' novo(s) candidato(s)');
+    parts.push(picks.length?'Sugestões da IA\n\n'+picks.map(format).join('\n\n'):
+      'A IA não destacou nenhum trecho.');
+    $('gguf-comparison-text').textContent=parts.join('\n\n');
     const actions=$('gguf-comparison-actions');
     actions.replaceChildren();
     for(const hymn of picks){
@@ -751,11 +761,19 @@ const GGUF=(()=>{
     }
     $('gguf-comparison').classList.remove('hidden');
   }
+  function indexComparison() {
+    const rows = state.lastResults.slice(0,5).map((hymn,index)=>[
+      (index+1)+'. '+(hymn.number?hymn.number+' · ':'')+hymn.title+' · '+hymn.relevance_percent+'%',
+      hymn.reason,
+      hymn.snippet && '“'+hymn.snippet+'”'
+    ].filter(Boolean).join('\n'));
+    return ['Comparação do índice local',...rows].join('\n\n');
+  }
   function compare(){
-    const selected=state.lastResults.slice(0,5);
-    if(!selected.length){toast('Primeiro faça uma pesquisa.');return;}
-    const text='Afinidade estimada dos primeiros resultados\n\n'+selected.map((h,i)=>`${i+1}. ${h.number?h.number+' · ':''}${h.title} · ${h.relevance_percent}%${h.reason?'\n'+h.reason:''}${h.snippet?'\n“'+h.snippet+'”':''}`).join('\n\n');
-    appendConversation('assistant',text);
+    if(!state.lastResults.length){toast('Primeiro faça uma pesquisa.');return;}
+    $('gguf-comparison-text').textContent=indexComparison();
+    $('gguf-comparison-actions').replaceChildren();
+    $('gguf-comparison').classList.remove('hidden');
   }
   function detail(){
     const h=state.currentHymn;if(!h)return;

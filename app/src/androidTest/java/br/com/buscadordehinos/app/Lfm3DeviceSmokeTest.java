@@ -7,6 +7,8 @@ import org.junit.runner.RunWith;
 import java.io.File;
 import android.os.SystemClock;
 import org.json.JSONObject;
+import org.json.JSONArray;
+import java.io.ByteArrayOutputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
@@ -25,7 +27,7 @@ public class Lfm3DeviceSmokeTest {
         assertTrue("GGUF oficial ausente no armazenamento privado",gguf.isFile());
         assertTrue("GGUF inesperadamente pequeno (cópia incompleta)",gguf.length()>1_000_000_000L);
 
-        Method load=MainActivity.class.getDeclaredMethod("nativeLoad",String.class);
+        Method load=MainActivity.class.getDeclaredMethod("nativeLoad",String.class,boolean.class);
         Method generate=MainActivity.class.getDeclaredMethod("nativeGenerate",
             byte[].class,byte[].class,int.class,int.class,long[].class);
         Method unload=MainActivity.class.getDeclaredMethod("nativeUnload");
@@ -34,7 +36,7 @@ public class Lfm3DeviceSmokeTest {
         unload.setAccessible(true);
         long[] metrics=new long[4];
         try {
-            String result=(String)load.invoke(null,gguf.getAbsolutePath());
+            String result=(String)load.invoke(null,gguf.getAbsolutePath(),false);
             assertNotNull("A arquitetura LFM3 não carregou",result);
             assertTrue("Modelo não reportou carregamento: "+result,
                 result.contains("GGUF pronto"));
@@ -59,26 +61,21 @@ public class Lfm3DeviceSmokeTest {
                 +" prefill_ms="+metrics[1]+" first_token_ms="+metrics[2]
                 +" generated="+metrics[3]);
 
-            // Cinco candidatos em posições distintas. A resposta correta depende da
-            // sequência narrativa completa, não da simples palavra "filho".
-            String narrative="TAREFA: escolher UM hino que CONTA A HISTÓRIA de Lucas 15:11-32, o filho pródigo. "
-                +"Critério: a mesma sequência de eventos: deixar o pai, arrepender-se, voltar e ser acolhido pelo pai. "
-                +"Gratidão genérica não é a história; palavras religiosas isoladas não bastam. "
-                +"Hinos candidatos: "
-                +"1: Noite de Paz — descreve o nascimento de Jesus, manjedoura e anjos. "
-                +"2: Gratidão — canta louvor e agradecimento geral, sem retorno do filho ao pai. "
-                +"3: Um dia eu quis te deixar — primeira estrofe, o filho deixa o lar e se afasta; "
-                +"ÚLTIMA ESTROFE, ele se arrepende, retorna ao pai, que o acolhe e perdoa. "
-                +"4: No Mar — tempestade e socorro durante uma viagem. "
-                +"5: Manhã Gloriosa — ressurreição e esperança na vida eterna. "
-                +"Qual candidato tem a narrativa INTEIRA? Responda APENAS um JSON válido "
-                +"com id e motivo de 8 a 24 letras minúsculas, sem acentos.";
-            String gbnf="root ::= \"{\\\"id\\\":\" (\"1\" | \"2\" | \"3\" | \"4\" | \"5\") \",\\\"motivo\\\":\\\"\" [a-z ]{8,24} \"\\\"}\"\n";
+            JSONObject fixture;
+            try (java.io.InputStream input=InstrumentationRegistry.getInstrumentation()
+                    .getContext().getAssets().open("lfm3-comparison.json")) {
+                ByteArrayOutputStream data=new ByteArrayOutputStream();
+                byte[] chunk=new byte[4096];
+                for (int size; (size=input.read(chunk))!=-1;) data.write(chunk,0,size);
+                fixture=new JSONObject(new String(data.toByteArray(),StandardCharsets.UTF_8));
+            }
+            int timeout="baseline".equals(InstrumentationRegistry.getArguments().getString("benchmarkMode"))
+                ?180_000:fixture.getInt("timeoutMs");
             long[] compareMetrics=new long[4];
             long start=SystemClock.elapsedRealtime();
             byte[] compare=(byte[])generate.invoke(null,new Object[]{
-                narrative.getBytes(StandardCharsets.UTF_8),
-                gbnf.getBytes(StandardCharsets.UTF_8),120,180_000,compareMetrics
+                fixture.getString("prompt").getBytes(StandardCharsets.UTF_8),
+                fixture.getString("grammar").getBytes(StandardCharsets.UTF_8),fixture.getInt("maxTokens"),timeout,compareMetrics
             });
             long wall=SystemClock.elapsedRealtime()-start;
             assertNotNull("Sem resultado de cinco hinos",compare);
@@ -86,9 +83,9 @@ public class Lfm3DeviceSmokeTest {
             android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=compare-five total_ms="+wall
                 +" setup_ms="+compareMetrics[0]+" prefill_ms="+compareMetrics[1]
                 +" first_token_ms="+compareMetrics[2]+" generated="+compareMetrics[3]);
-            JSONObject resultJson=new JSONObject(new String(compare,StandardCharsets.UTF_8));
-            assertEquals("Reranking errou a narrativa do filho pródigo",3,resultJson.getInt("id"));
-            assertTrue("Justificativa curta ausente",resultJson.getString("motivo").trim().length()>=8);
+            JSONArray resultJson=new JSONArray(new String(compare,StandardCharsets.UTF_8));
+            assertEquals("A comparação deve selecionar o único trecho com evidência direta",1,resultJson.length());
+            assertEquals("A resposta deve referenciar o hino permitido",fixture.getInt("expected"),resultJson.getInt(0));
             assertTrue("Não houve geração real",compareMetrics[3]>0);
 
             android.util.Log.i("LFM3_SMOKE_SUCCESS","official QAD Q4_0, tokens="
