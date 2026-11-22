@@ -64,7 +64,17 @@ const ScriptureIndex = (() => {
         residual:(matched.slice(0,ref.start)+' '+matched.slice(ref.end)).replace(/\s+/g,' ').trim(),
         source:'Bíblia Livre (2018) · CC BY 4.0 Brasil'};
     }
-    return {lookup,bookCount:Object.keys(chapters).length,revision:data.revision||'Bíblia Livre',source:data.source||'midvash/bible-data'};
+    function readChapter(book,number) {
+      const item=rawBooks.find(([id])=>id===book);
+      const chapter=chapters[book]?.[String(number)];
+      if(!item||!Array.isArray(chapter))return null;
+      return {reference:item[1]+' '+number,verses:chapter.flatMap((text,index)=>
+        index&&typeof text==='string'&&text.trim()?[{number:index,text:text.trim()}]:[])};
+    }
+    const books=rawBooks.filter(([id])=>Object.hasOwn(chapters,id)).map(([id,label])=>({
+      id,label,chapters:Object.keys(chapters[id]).map(Number).sort((a,b)=>a-b)
+    }));
+    return {lookup,readChapter,books,bookCount:Object.keys(chapters).length,revision:data.revision||'Bíblia Livre',source:data.source||'midvash/bible-data'};
   }
   return {create,parse,normalize};
 })();

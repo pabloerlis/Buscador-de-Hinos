@@ -367,7 +367,7 @@ body { background: var(--canvas); }
   .topbar { min-height: 53px; height: 53px; padding: 0 14px; }
   .workspace { padding-bottom: calc(var(--tab-height) + env(safe-area-inset-bottom,0px)); }
   .workspace-nav { order: 3; position: fixed; bottom: 0; left: 0; right: 0; border-bottom: 0; border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom,0px); }
-  .workspace-tabs { min-height: calc(var(--tab-height) - 1px); padding: 4px 6px; gap: 3px; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
+  .workspace-tabs { min-height: calc(var(--tab-height) - 1px); padding: 4px 6px; gap: 3px; display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); }
   .workspace-tabs button { flex-direction: column; gap: 3px; padding: 4px 2px; font-size: 11px; }
   .top-state { display: none; }
   .hero { padding: 23px 14px 8px; }
@@ -382,3 +382,16 @@ body { background: var(--canvas); }
   .chat-composer #chat-search svg { display: none; }
   .toast { bottom: calc(var(--tab-height) + env(safe-area-inset-bottom,0px) + 8px); }
 }
+
+
+.chat-input-row textarea { flex: 1; min-width: 0; min-height: 46px; max-height: 120px; resize: vertical; padding: 8px 12px; background: var(--canvas); border: 1px solid var(--line); border-radius: 12px; color: var(--ink); font: inherit; font-size: 16px; }
+.chat-citation { margin-top: 8px; color: var(--muted); font-size: .88em; }
+.chat-citation p { margin: 5px 0 0; }
+.chat-citation summary { cursor: pointer; }
+.bible-page { width: min(100%,var(--workspace-width)); margin: auto; padding: 28px 18px; }
+.bible-controls { display: flex; flex-wrap: wrap; gap: 12px; }
+.bible-controls label { display: grid; gap: 5px; color: var(--muted); font-size: 13px; }
+.bible-controls select { min-height: 44px; padding: 7px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--surface); font: inherit; font-size: 16px; }
+.bible-reading { background: var(--surface); border-radius: 12px; padding-inline: 16px; }
+.bible-reading p { margin: 0; padding: 8px 0; line-height: 1.65; }
+.bible-reading sup { color: var(--muted); font-weight: 650; }

@@ -206,14 +206,14 @@ assert.throws(()=>ai.readChat('["retirar",1]',forcedChat));
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
 const turnSource=js.slice(js.indexOf('function scrollChat('),js.indexOf("$('refine-form').addEventListener"));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
-function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,embeddingTask=null,chatLookup=null,searchResults=hymns}={}){
+function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,embeddingTask=null,chatLookup=null,searchResults=hymns,scripture=null}={}){
   const calls=[],cancelled=[],elements=new Map(),requests=[],lookups=[],embeddings=[],opened=[],messages=[];
   let now=0;
   const $=id=>{
     if(!elements.has(id)){
       const classes=new Set(['hidden']);
       elements.set(id,{classes,textContent:'',children:[],classList:{add:c=>classes.add(c),remove:c=>classes.delete(c),toggle(){}},
-        addEventListener(name,handler){if(name==='click')this.click=handler;},setAttribute(){},replaceChildren(){this.children=[];},appendChild(child){this.children.push(child);},insertAdjacentHTML(){}});
+        addEventListener(name,handler){if(name==='click')this.click=handler;},setAttribute(){},replaceChildren(){this.children=[];},appendChild(child){this.children.push(child);},append(...children){this.children.push(...children);},insertAdjacentHTML(){}});
     }
     return elements.get(id);
   };
@@ -221,11 +221,12 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
     generate:(...args)=>calls.push(args),cancel:id=>cancelled.push(id)}}:{};
   const vector=Array(384).fill(0.1);
   const settings={mode:'balanced',vectorMode:nativeModel?'balanced':'off',collections:{principal:true,avulsos:false}};
-  const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatOptions:[]};
+  const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatOptions:[],chatQuestions:new Set()};
   const {gguf,search,refine,visible}=vm.runInNewContext(aiSource+searchSource+turnSource+ggufSource+'\n({gguf:GGUF,search:performSearch,refine:submitRefinement,visible:visibleHymns})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>{messages.push(text);return $('conversation');},showResults(){},selectWorkspace(){},
-    document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
+    document:{createElement(){return {append(){},addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
     OfflineAPI:{chatEditCommand:text=>/\b(?:acrescente|retire)\b/i.test(text),chatSearchIntent:text=>({eligible:true,canPick:true,list:/entre esses|desses/i.test(text)}),normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
     jsonRequest:async(url,payload)=>{
+      if(url==='/api/scripture/context')return scripture;
       if(url.startsWith('/api/hymns/'))return {lyrics:reviewLyrics.get(Number(url.split('/').at(-1)))};
       if(url==='/api/chat-candidates'){
         lookups.push(payload.message);
@@ -400,9 +401,28 @@ async function checkBridge(){
   chat.complete(chat.calls[0][1],'["perguntar","clima"]');
   assert.equal(await firstTurn,true);
   assert.equal(chat.requests.length,0);
+  const notes=setup({scripture:{reference:'Lucas 15:20',text:'Seu pai o viu e se compadeceu.'}});
+  notes.state.chatQuestions.add('ocasiao');
+  notes.state.chatQuestions.add('clima');
+  const note='No culto, anotei que o Pai acolhe com misericórdia quem retorna. '
+    +'A restauração começa quando a pessoa reconhece a distância e decide voltar. '.repeat(5)+'Lucas 15:20';
+  const interpretation=notes.refine(note);
+  await tick();
+  assert.match(notes.calls[0][0],/Bíblia Livre Lucas 15:20: Seu pai o viu/);
+  assert.ok(notes.calls[0][0].includes(note));
+  const choices=notes.calls[0][2].split('\n').find(line=>line.startsWith('preference ::='));
+  assert.doesNotMatch(choices,/ocasiao|clima/);
+  notes.complete(notes.calls[0][1],'["falar","A anotação destaca o acolhimento do Pai. Perdão e restauração são caminhos para escolher os hinos."]');
+  assert.equal(await interpretation,true);
+  assert.equal(notes.requests.length,0);
+  assert.match(notes.messages.at(-1),/Perdão e restauração/);
+  assert.equal(await notes.refine('Pode buscar agora?'),true);
+  assert.match(notes.requests.at(-1).query,/acolhe com misericórdia/);
+
   const choose=chat.refine('Mais alegres, por favor');
   await tick();
   assert.match(chat.calls[1][0],/prefere hinos mais alegres ou mais solenes/);
+  assert.doesNotMatch(chat.calls[1][2].split('\n').find(line=>line.startsWith('preference ::=')),/clima/);
   assert.match(chat.calls[1][2],/^root ::= falar \| perguntar\n/);
   chat.complete(chat.calls[1][1],'["falar","Entendi. Para a abertura, vamos pensar em algo alegre e fácil de cantar em conjunto."]');
   assert.equal(await choose,true);

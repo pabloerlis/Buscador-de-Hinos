@@ -15,7 +15,7 @@ const window={indexedDB:fakeIndexedDB};
 const document={createElement(tag){assert.equal(tag,'template');return {content:{textContent:''},set innerHTML(html){this.content.textContent=html.replace(/<[^>]*>/g,'').replace(/&amp;/g,'&').replace(/&nbsp;/g,' ');}};}};
 const dbPath=path.join(__dirname,'../app/src/main/assets/semantic-db.json');
 const db=JSON.parse(fs.readFileSync(dbPath,'utf8'));
-const ctx={window,document,indexedDB:fakeIndexedDB,setTimeout,clearTimeout,console,fetch:async(url)=>{if(String(url).endsWith('semantic-db.json'))return {ok:true,json:async()=>db};throw Error('No network in tests');}};
+const ctx={window,document,indexedDB:fakeIndexedDB,setTimeout,clearTimeout,console,fetch:async(url)=>{if(String(url).endsWith('semantic-db.json'))return {ok:true,json:async()=>db};if(url==='scripture-pt.json')return {ok:true,json:async()=>({schema_version:1,version:'almeida-livre',books:{John:{'3':[null,'Texto de teste.']}}})};throw Error('No network in tests');}};
 const repertoireMemory=new Map();
 ctx.localStorage={getItem:k=>repertoireMemory.get(k)||null,setItem:(k,v)=>repertoireMemory.set(k,String(v)),removeItem:k=>repertoireMemory.delete(k)};
 vm.createContext(ctx);
@@ -23,6 +23,7 @@ vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/sema
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/bible-context.js'),'utf8')+'\nthis.bible=BibleContext;',ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/repertoire-store.js'),'utf8'),ctx);
 vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/offline-api.js'),'utf8')+'\nthis.api=OfflineAPI;',ctx);
+vm.runInContext(fs.readFileSync(path.join(__dirname,'../app/src/main/assets/scripture-index.js'),'utf8'),ctx);
 const api=ctx.api;
 const samples=[
   {title:'001 - Fé e descanso',content:'Em Deus posso confiar<br>Ele é meu refúgio e amparo'},
@@ -32,6 +33,14 @@ const samples=[
   ...Array.from({length:8},(_,i)=>({title:`${String(i+5).padStart(3,'0')} - Gratidão ${i}`,content:'Sou grato ao Senhor e canto louvor com alegria.'}))
 ];
 (async()=>{
+ const books=await api.request('/api/scripture/books');
+ assert.equal(books.books[0].label,'João');
+ const chapter=await api.request('/api/scripture/chapter',{book:'John',chapter:3});
+ assert.equal(chapter.verses[0].number,1);
+ const verse=await api.request('/api/scripture/context',{message:'Minha anotação sobre João 3:1 e graça.'});
+ assert.equal(verse.reference,'João 3:1');
+ assert.equal(verse.text,'Texto de teste.');
+ assert.equal(await api.request('/api/scripture/context',{message:'Um culto sem referência'}),null);
  const status=await api.request('/api/status');assert.equal(status.ready,false);
  assert.equal(api.normalize('FÉ, ESPERANÇA'),'fe, esperanca');
  assert.equal(api.parseTitle(' 125 - JESUS SALVA ').number,'125');

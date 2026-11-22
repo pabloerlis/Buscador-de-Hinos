@@ -880,6 +880,16 @@ const OfflineAPI = (() => {
       event_ready:!!eventFrames,event_stats:eventFrames?.stats()||null,
       bridge_ready:!!bridge,bridge_entries:bridge?.entries||0,collections:libraryCounts(),
       collection:metadata.collection,edition:metadata.edition,ai_configured:false,source_url:SOURCE,chat_mode:narratives?'Narrativas bíblicas + temas offline':'Busca contextual local'};
+    if(url==='/api/scripture/books')return {books:scriptureIndex?.books||[]};
+    if(url==='/api/scripture/chapter')return scriptureIndex?.readChapter(payload.book,payload.chapter)||null;
+    if(url==='/api/scripture/context'){
+      const message=String(payload?.message||'').slice(0,1000);
+      const direct=scriptureIndex?.lookup(message,3);
+      if(direct)return {reference:direct.reference,text:direct.text};
+      const story=narratives?.interpret(message,searchOptions(payload?.settings).customAliases).matches[0];
+      const passage=story&&scriptureIndex?.lookup(story.reference,3);
+      return passage?{reference:passage.reference,text:passage.text,narrative:story.label}:null;
+    }
     if(url==='/api/stories')return {stories:narratives?.list()||[]};
     if(url==='/api/repertoire')return {count:RepertoireStore.marked(hymns).length,
       not_learned:RepertoireStore.marked(hymns).map(song=>({id:song.id,title:song.title,number:song.number,collection:song.collection}))};

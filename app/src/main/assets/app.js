@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatProposal:null,
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatProposal:null,chatQuestions:new Set(),
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -287,9 +287,13 @@ function selectWorkspace(name){
     window.scrollTo({top:0,behavior:'instant'});
   }
   if(name==='chat'){
-    if(!state.chatHistory.length)chatSay('assistant','Para qual momento você está escolhendo os hinos? Quando quiser sugestões, toque em Buscar hinos ou me peça uma busca.');
+    if(!state.chatHistory.length){
+      state.chatQuestions.add('ocasiao');
+      chatSay('assistant','Para qual momento você está escolhendo os hinos? Você também pode colar uma anotação espiritual aqui.');
+    }
     scrollChat();
   }
+  if(name==='bible')void BibleReader.open();
 }
 bindTabs(workspaceTabs,tab=>selectWorkspace(tab.id.replace('app-tab-','')));
 q('.brand').addEventListener('click',event=>{event.preventDefault();selectWorkspace('search');});
@@ -328,6 +332,7 @@ function resetChatTurn(){
 }
 function clearChatContext(){
   state.chatHistory=[];
+  state.chatQuestions.clear();
   $('conversation').replaceChildren();
   const hadEdits=state.chatAdded.size||state.chatRemoved.size;
   clearChatEdits();
@@ -406,7 +411,30 @@ function contextualRemoval(selector,visible){
   if(phrase.length<4)return [];
   return visible.filter(hymn=>[hymn.title,hymn.snippet].some(value=>(' '+words(value)+' ').includes(' '+phrase+' ')));
 }
+async function chatScripture(message){
+  return jsonRequest('/api/scripture/context',{message,settings:state.searchSettings});
+}
+function showChatScripture(bubble,scripture){
+  if(!scripture)return;
+  const citation=document.createElement('details');
+  citation.className='chat-citation';
+  const label=document.createElement('summary');
+  label.textContent='Bíblia Livre · '+scripture.reference;
+  const excerpt=document.createElement('p');
+  excerpt.textContent=scripture.text;
+  citation.append(label,excerpt);
+  bubble.appendChild(citation);
+  scrollChat();
+}
 async function refineChatSearch(request,turn){
+  if(request.context&&request.query){
+    const scripture=await chatScripture(request.context);
+    if(state.chatPending!==turn)return false;
+    if(scripture&&(scripture.narrative||request.context.length>500)){
+      const anchor=[scripture.narrative,scripture.reference].filter(Boolean).join(' ');
+      request={...request,query:(anchor+'. '+request.query).slice(0,500)};
+    }
+  }
   if(!request.query){
     chatSay('assistant','Qual tema, passagem ou hino você quer buscar?');
     return false;
@@ -427,6 +455,13 @@ async function refineChatSearch(request,turn){
     'Encontrei '+state.total+(state.total===1?' hino.':' hinos.'):
     'Não encontrei hinos para esse pedido. Podemos ajustar o tema.');
   if(state.total){
+    for(const hymn of visibleHymns().slice(0,3)){
+      const suggestion=document.createElement('button');
+      suggestion.className='secondary-btn';suggestion.type='button';
+      suggestion.textContent=chatHymnName(hymn);
+      suggestion.addEventListener('click',()=>openHymn(hymn.id));
+      bubble.appendChild(suggestion);
+    }
     const button=document.createElement('button');
     button.className='secondary-btn';button.type='button';button.textContent='Ver resultados';
     button.addEventListener('click',()=>{
@@ -440,8 +475,8 @@ async function refineChatSearch(request,turn){
 }
 async function submitRefinement(message,{viaButton=false}={}){
   if((!message&&!viaButton)||state.busy||state.chatPending)return false;
-  if(message.length>320){
-    chatSay('assistant','Envie até 320 caracteres por mensagem.');
+  if(message.length>LocalHymnAI.CHAT_MESSAGE_LIMIT){
+    chatSay('assistant','Envie até '+LocalHymnAI.CHAT_MESSAGE_LIMIT+' caracteres por mensagem.');
     return false;
   }
   const history=state.chatHistory.slice();
@@ -522,7 +557,12 @@ async function submitRefinement(message,{viaButton=false}={}){
       }
       found=[...options.values()].slice(0,3);
     }
-    const response=await GGUF.refineChat({message,history,shown,found,editIntent:lookup.verb,explaining,pick});
+    const previousNote=history.filter(item=>item.kind==='user'&&item.intent==='conversation').at(-1)?.text;
+    const scripture=!lookup.verb&&(await chatScripture(message)||
+      (message.length<120&&previousNote?await chatScripture(previousNote):null));
+    if(!current())return false;
+    const response=await GGUF.refineChat({message,history,shown,found,editIntent:lookup.verb,explaining,pick,scripture,
+      asked:[...state.chatQuestions]});
     if(!current())return false;
     if(response?.cancelled){chatSay('assistant','Conversa interrompida.');return false;}
     if(response?.verb==='destacar'&&pick)return applyChatEdit('destacar',response.hymn);
@@ -532,7 +572,8 @@ async function submitRefinement(message,{viaButton=false}={}){
       return true;
     }
     if(response?.reply){
-      chatSay('assistant',response.reply);
+      if(response.question)state.chatQuestions.add(response.question);
+      showChatScripture(chatSay('assistant',response.reply),scripture);
       return true;
     }
     if(explaining){
@@ -542,6 +583,10 @@ async function submitRefinement(message,{viaButton=false}={}){
     if(lookup.verb==='acrescentar'){
       chatSay('assistant','Qual hino você quer acrescentar? Informe o número ou o título.');
       return false;
+    }
+    if(scripture){
+      showChatScripture(chatSay('assistant','Consultei este trecho da Bíblia Livre. O modelo local não respondeu a esta mensagem.'),scripture);
+      return true;
     }
     chatSay('assistant',response?.unavailable?
       'Carregue um modelo GGUF em Ajustes › IA local para conversar. A busca pelo catálogo está disponível no botão Buscar hinos.':
@@ -561,11 +606,70 @@ function sendChatInput(viaButton){
   const input=$('refine-input');
   const message=input.value.trim();
   if((!message&&!viaButton)||state.busy||state.chatPending)return;
-  if(message.length<=320)input.value='';
+  if(message.length<=LocalHymnAI.CHAT_MESSAGE_LIMIT)input.value='';
   void submitRefinement(message,{viaButton});
 }
 $('refine-form').addEventListener('submit',event=>{event.preventDefault();sendChatInput(false);});
+$('refine-input').addEventListener('keydown',event=>{
+  if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){
+    event.preventDefault();
+    sendChatInput(false);
+  }
+});
 $('chat-search').addEventListener('click',()=>sendChatInput(true));
+
+const BibleReader=(()=>{
+  const book=$('bible-book'),chapter=$('bible-chapter'),reading=$('bible-reading'),status=$('bible-reading-status');
+  let books=[],loaded=false,sequence=0;
+  function fill(select,items){
+    select.replaceChildren(...items.map(([value,label])=>{
+      const option=document.createElement('option');
+      option.value=value;option.textContent=label;
+      return option;
+    }));
+  }
+  async function showChapter(){
+    const current=++sequence;
+    try{
+      const passage=await jsonRequest('/api/scripture/chapter',{book:book.value,chapter:chapter.value});
+      if(current!==sequence)return;
+      reading.replaceChildren();
+      status.textContent=passage?.reference||'Capítulo indisponível.';
+      for(const verse of passage?.verses||[]){
+        const row=document.createElement('p');
+        const number=document.createElement('sup');
+        number.textContent=verse.number;
+        row.append(number,' '+verse.text);
+        reading.appendChild(row);
+      }
+    }catch(error){
+      if(current===sequence){reading.replaceChildren();status.textContent='Não foi possível abrir o capítulo.';}
+    }
+  }
+  function changeBook(){
+    const selected=books.find(item=>item.id===book.value);
+    fill(chapter,(selected?.chapters||[]).map(number=>[number,number]));
+    void showChapter();
+  }
+  book.addEventListener('change',changeBook);
+  chapter.addEventListener('change',showChapter);
+  async function open(){
+    if(loaded)return;
+    loaded=true;
+    try{
+      ({books}=await jsonRequest('/api/scripture/books'));
+      if(books.length){
+        fill(book,books.map(item=>[item.id,item.label]));
+        book.disabled=false;chapter.disabled=false;
+        changeBook();
+        return;
+      }
+      status.textContent='Bíblia Livre indisponível nesta instalação.';
+    }catch(error){status.textContent='Não foi possível carregar a Bíblia Livre.';}
+    loaded=false;
+  }
+  return {open};
+})();
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
 $('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;resetChatTurn();clearChatEdits();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});});
@@ -954,7 +1058,7 @@ const GGUF=(()=>{
     if(queuedChat){queuedChat.resolve({cancelled:true});queuedChat=null;}
     if(selectedState.task?.type!=='diagnostic')cancelIfBusy();
   }
-  function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired,themeLabels,actions,editKeys}){
+  function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired,themeLabels,actions,editKeys,questions,noFreeQuestion}){
     task.id=String(++nextRequest);
     task.candidates=candidates;
     task.canLookup=canLookup;
@@ -962,6 +1066,8 @@ const GGUF=(()=>{
     task.themeLabels=themeLabels;
     task.actions=actions;
     task.editKeys=editKeys;
+    task.questions=questions;
+    task.noFreeQuestion=noFreeQuestion;
     setActivity(true,generationStages[0]);
     try{native().generate(prompt,task.id,grammar,maxTokens,timeoutMs);}
     catch(error){
