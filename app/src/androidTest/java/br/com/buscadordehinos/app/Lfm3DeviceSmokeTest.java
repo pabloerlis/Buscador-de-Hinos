@@ -158,7 +158,7 @@ public class Lfm3DeviceSmokeTest {
                     +" setup_ms="+freeMetrics[0]+" prefill_ms="+freeMetrics[1]
                     +" first_token_ms="+freeMetrics[2]+" generated="+freeMetrics[3]);
                 android.util.Log.i("LFM3_BENCH","MODEL_RESPONSE case=free-reason output="
-                    +new String(free,StandardCharsets.UTF_8).replace('\\n',' '));
+                    +new String(free,StandardCharsets.UTF_8).replace('\n',' '));
             } catch(Exception e) {
                 android.util.Log.e("LFM3_BENCH","FREE_REASON_DIAGNOSTIC_ERROR "+e.toString());
             }
@@ -167,7 +167,7 @@ public class Lfm3DeviceSmokeTest {
                 "Um dia eu quis te deixar: filho abandona o pai, arrepende-se, "
                     +"regressa e recebe perdão do pai."
             };
-            String binaryGrammar="root ::= \\"S\\" | \\"N\\"\\n";
+            String binaryGrammar="root ::= \"S\" | \"N\"\n";
             for(int i=0;i<binaryCases.length;i++){
                 String binaryPrompt="História alvo: filho abandona a casa do pai, "
                     +"arrepende-se, retorna e é acolhido e perdoado. "
