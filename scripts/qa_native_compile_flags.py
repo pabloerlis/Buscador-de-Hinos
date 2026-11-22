@@ -45,8 +45,15 @@ for f in files:
         for entry in entries:
             argv=entry.get("arguments") or shlex.split(entry.get("command",""))
             flags=[v for v in argv if v.startswith(("-march=","-mcpu="))]
-            if any(re.search(r"(?:\+|,)(?:i8mm|dotprod)",v) for v in flags):
-                report["errors"].append(f"{abi}: ISA obrigatória sem fallback: {flags}")
+            required_isa=any(re.search(r"(?:\+|,)(?:i8mm|dotprod)",v) for v in flags)
+            source=entry.get("file","").replace(chr(92),"/")
+            # KleidiAI compila microkernels especializados com -march próprio.
+            # São chamados somente quando o despacho em runtime detecta a ISA.
+            # A proibição continua absoluta em ggml/llama/JNI e código genérico.
+            specialized=("/_deps/kleidiai-src/" in source and
+                         "/kai/ukernels/" in source)
+            if required_isa and not specialized:
+                report["errors"].append(f"{abi}: ISA obrigatória fora de microkernel com dispatch: {source} {flags}")
                 break
     targets={}
     for target in required_targets:
