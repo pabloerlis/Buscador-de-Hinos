@@ -20,3 +20,16 @@ fs.writeFileSync(out,JSON.stringify({
   prompt:request.prompt, grammar:request.grammar, maxTokens:request.maxTokens,
   timeoutMs:request.timeoutMs, expected:3
 })+'\n');
+
+const pairs = [
+  'Os filhos entram no céu.\nOs anjos cantam ao recebê-los.',
+  'Deixei meu pai.\nArrependido, voltei para casa.\nEle me abraçou e me perdoou.',
+  'O vento cessou no mar.\nO barco chegou à praia.',
+  'Deus me consola na dor.\nSeu amor me dá forças.'
+];
+const reviewHymns = pairs.map((lyrics,i)=>({id:i+1,snippet:lyrics.split('\n')[0]}));
+const review = ai.prepareReview('Filho pródigo',new Map(pairs.map((lyrics,i)=>[i+1,lyrics])),reviewHymns);
+if (!review) throw Error('A revisão automática precisa de quatro hinos.');
+fs.writeFileSync('app/src/androidTest/assets/lfm3-review.json',JSON.stringify({
+  prompt:review.prompt, grammar:review.grammar, maxTokens:review.maxTokens, timeoutMs:review.timeoutMs
+})+'\n');

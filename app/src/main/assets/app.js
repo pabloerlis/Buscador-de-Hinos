@@ -56,6 +56,7 @@ function resultCard(hymn,{unlearned=false}={}){
   return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
   <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
+  ${hymn.aiReview?`<p class="why"><strong>Revisão da IA: ${escapeHTML(hymn.aiReview.label)}</strong>${hymn.aiReview.excerpt?` · “${escapeHTML(hymn.aiReview.excerpt)}”`:''}</p>`:''}
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
 }
@@ -128,8 +129,16 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     }
     toast(error.message);
   }finally{busySearch(false);}
-  if(succeeded&&page===1&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
-  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
+  if(succeeded&&page===1&&!state.exactNumber){
+    const epoch=state.searchEpoch;
+    const embeddings=!isBibleSearch&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off'
+      ?EmbeddingSearch.maybeUpdate(state.effectiveQuery,epoch):undefined;
+    if(autoAI&&!semanticHints.length){
+      Promise.resolve(embeddings).then(()=>{
+        if(epoch===state.searchEpoch)GGUF.maybeAuto(state.effectiveQuery);
+      });
+    }
+  }
   GGUF.info?.();
   return succeeded;
 }
@@ -546,10 +555,11 @@ const EmbeddingSearch=(()=>{
     try{
       const answer=await request(query);
       if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off')return;
-      state.vectorQuery=answer.vector;
+      if(state.page!==1||state.busy)return;
       const result=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
         semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings});
-      if(epoch!==state.searchEpoch)return;
+      if(epoch!==state.searchEpoch||state.page!==1||state.busy)return;
+      state.vectorQuery=answer.vector;
       state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
       state.aiContext=result.ai_context;
       $('results-list').innerHTML=result.results.length?result.results.map(resultCard).join(''):
@@ -633,7 +643,7 @@ const GGUF=(()=>{
     info();
     const next=queuedAuto;
     queuedAuto=null;
-    if(next?.epoch===state.searchEpoch)maybeAuto(next.query);
+    if(next?.epoch===state.searchEpoch)void maybeAuto(next.query);
   }
   function cancelIfBusy(){
     const task=selectedState.task;
@@ -655,7 +665,11 @@ const GGUF=(()=>{
     task.themeLabels=themeLabels;
     setActivity(true,generationStages[0]);
     try{native().generate(prompt,task.id,grammar,maxTokens,timeoutMs);}
-    catch(error){resetTask('Não foi possível iniciar a IA: '+error.message,true);return false;}
+    catch(error){
+      if(task.type==='review')resetTask('Busca inicial preservada. Não foi possível iniciar a revisão.');
+      else resetTask('Não foi possível iniciar a IA: '+error.message,true);
+      return false;
+    }
     info();
     return true;
   }
@@ -678,10 +692,55 @@ const GGUF=(()=>{
     }catch(error){ /* Resposta incompleta ou inválida. */ }
     return [];
   }
-  function maybeAuto(query){
-    if(!selectedState.ready||!$('gguf-auto').checked||!state.ready||!canUseTopics())return;
+  async function maybeAuto(query){
+    const hymns=state.lastResults.slice(0,LocalHymnAI.REVIEW_LIMIT);
+    if(!selectedState.ready||!$('gguf-auto').checked||!state.ready||state.busy||
+        state.repertoirePending||!canUseTopics()||hymns.length<LocalHymnAI.REVIEW_LIMIT||
+        hymns.some(hymn=>hymn.match_type==='titulo_exato')||/["“”]/.test(query))return;
     if(selectedState.task){queuedAuto={query,epoch:state.searchEpoch};return;}
-    interpret(query,MAX_AI_MS);
+    if(selectedState.busy||!native()?.generate)return;
+    const task={type:'review',epoch:state.searchEpoch,startedAt:performance.now()};
+    selectedState.task=task;
+    $('ai-last').textContent='';
+    showTask('Revisando os primeiros hinos','Os resultados da busca inicial já estão disponíveis.');
+    info();
+    let request;
+    try{
+      const entries=await Promise.all(hymns.map(async hymn=>{
+        const detail=await jsonRequest('/api/hymns/'+hymn.id);
+        return [hymn.id,detail.lyrics];
+      }));
+      if(selectedState.task!==task||task.epoch!==state.searchEpoch)return;
+      request=LocalHymnAI.prepareReview(query,new Map(entries),hymns,{
+        exclude:state.exclude,required:state.requiredTerms,context:state.aiContext
+      });
+    }catch(error){
+      if(selectedState.task===task)resetTask('Busca inicial preservada. Não foi possível ler os trechos para revisão.');
+      return;
+    }
+    if(!request){resetTask('Busca inicial preservada. Trechos insuficientes para revisão.');return;}
+    sendTask(task,request);
+  }
+  function finishReview(task, ok, answer){
+    if(!ok){resetTask('Busca inicial preservada. A revisão da IA não terminou.');return;}
+    let results;
+    try{
+      results=LocalHymnAI.applyReview(state.lastResults,LocalHymnAI.readReview(answer,task.candidates));
+    }catch(error){resetTask('Busca inicial preservada. A resposta da revisão foi inválida.');return;}
+    if(!results||state.repertoirePending||!$('gguf-auto').checked){
+      resetTask('A lista mudou durante a revisão.');
+      return;
+    }
+    const list=$('results-list');
+    const focus=document.activeElement?.dataset;
+    const focusId=Number(focus?.hymnId||focus?.repertoireId);
+    state.lastResults=results;
+    list.innerHTML=results.map(resultCard).join('');
+    if(focusId>0){
+      const attribute=focus.hymnId?'data-hymn-id':'data-repertoire-id';
+      list.querySelector('['+attribute+'="'+focusId+'"]')?.focus({preventScroll:true});
+    }
+    resetTask('A IA revisou os primeiros '+task.candidates.length+' hinos.');
   }
   function interpret(query,timeoutMs=MAX_AI_MS){
     if(!query?.trim()||state.busy||state.repertoirePending||!canUseTopics())return;
@@ -804,6 +863,7 @@ const GGUF=(()=>{
       $('gguf-test-result').textContent=message;
       resetTask(message,!passed);return;
     }
+    if(task.type==='review'){finishReview(task,ok,answer);return;}
     if(!ok){resetTask('IA falhou: '+value,true);return;}
     if(task.type==='compare'){
       try{
@@ -830,7 +890,12 @@ const GGUF=(()=>{
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
   const savedAuto=localStorage.getItem('hinos-gguf-auto-v15');$('gguf-auto').checked=savedAuto==='1';
-  $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-gguf-auto-v15',$('gguf-auto').checked?'1':'0'));
+  $('gguf-auto').addEventListener('change',()=>{
+    const auto=$('gguf-auto').checked;
+    localStorage.setItem('hinos-gguf-auto-v15',auto?'1':'0');
+    if(!auto&&selectedState.task?.type==='review')cancelIfBusy();
+    if(auto&&state.effectiveQuery)void maybeAuto(state.effectiveQuery);
+  });
   if(native())setInterval(info,1250);
   info();return {info,maybeAuto,cancelSearchTask};
 })();

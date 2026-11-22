@@ -125,5 +125,74 @@ const LocalHymnAI = (() => {
     };
   }
 
-  return { diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  const REVIEW_LIMIT = 4;
+  const REVIEW_TIMEOUT_MS = 20000;
+  const reviewLabels = { D: 'Encaixe direto', T: 'Relação temática', I: 'Evidência insuficiente' };
+
+  function reviewPassages(snippet, lyrics) {
+    const stanzas = String(lyrics||'').split(/\r?\n[ \t]*\r?\n+/)
+      .map(stanza=>stanza.split(/\r?\n/).map(line=>clip(line, 100)).filter(Boolean))
+      .filter(lines=>lines.length);
+    if (!stanzas.length) return [];
+    const key = text => text.normalize('NFC').toLocaleLowerCase('pt-BR');
+    const lineHint = clip(String(snippet||'').split(/\s+\/\s+/)[0], 45);
+    const hint = key(lineHint);
+    const match = hint.length>=6 ? stanzas.findIndex(lines=>lines.some(line=>key(line).includes(hint))) : -1;
+    const lines = stanzas[Math.max(0, match)];
+    const anchor = match<0 ? 0 : lines.findIndex(line=>key(line).includes(hint));
+    const excerpt = clip(lines.slice(Math.max(0, anchor-1), anchor+2).join(' / '), 150);
+    const alternatives = [stanzas.at(-1), stanzas[0]].filter(stanza=>stanza!==lines)
+      .map(stanza=>clip(stanza.join(' / '), 75));
+    const second = alternatives.find(text=>!key(excerpt).includes(key(text)));
+    return second ? [excerpt, second] : [excerpt];
+  }
+
+  function prepareReview(query, lyricsById, hymns, {exclude=[], required=[], context}={}) {
+    const candidates = hymns.slice(0, REVIEW_LIMIT).map(hymn=>({
+      id: hymn.id, excerpts: reviewPassages(hymn.snippet, lyricsById.get(hymn.id))
+    }));
+    if (candidates.length!==REVIEW_LIMIT || candidates.some(item=>!item.excerpts.length) ||
+        new Set(candidates.map(item=>item.id)).size!==REVIEW_LIMIT) return null;
+    const prompt = [
+      'Julgue cada hino para o pedido. Em histórias, confira ação, pessoas e destino.',
+      'D: encaixe direto. T: só tema parecido. I: sem evidência. Cite 1 ou 2, ou I0.',
+      'Uma resposta por hino, na ordem: D1,T2,I0,D2',
+      'Pedido: '+promptText(query, 140),
+      exclude.length && 'Excluir: '+promptText(exclude.join(', '), 65),
+      required.length && 'Obrigatório: '+promptText(required.join(', '), 65),
+      context?.reference && 'Referência: '+promptText(context.reference, 38),
+      context?.passage && 'Contexto: '+promptText(context.passage, 86),
+      ...candidates.map(({excerpts},i)=>(i+1)+'. '+excerpts
+        .map((text,j)=>(j+1)+') '+promptText(text, 150)).join(' | '))
+    ].filter(Boolean).join('\n');
+    const rules = candidates.map(({excerpts},i)=>'h'+i+' ::= "D1" | "T1" | "I0"'+
+      (excerpts.length>1?' | "D2" | "T2"':''));
+    const root = 'root ::= '+candidates.map((_,i)=>'h'+i).join(' "," ');
+    return { prompt, candidates, grammar:[root,...rules].join('\n'), maxTokens:20, timeoutMs:REVIEW_TIMEOUT_MS };
+  }
+
+  function readReview(response, candidates) {
+    const marks = response.split(',');
+    if (marks.length!==candidates.length) throw Error('Revisão de hinos incompleta.');
+    return marks.map((mark, i)=>{
+      const {id, excerpts} = candidates[i];
+      if (mark==='I0') return {id, grade:'I', label:reviewLabels.I, excerpt:''};
+      const [,grade,position] = /^([DT])([12])$/.exec(mark)||[];
+      const excerpt = excerpts[Number(position)-1];
+      if (!excerpt) throw Error('Trecho da revisão inválido.');
+      return {id, grade, label:reviewLabels[grade], excerpt};
+    });
+  }
+
+  function applyReview(hymns, judgments) {
+    if (!judgments.every(({id},i)=>hymns[i]?.id===id)) return null;
+    const priority = {D:2,T:1,I:0};
+    const reviewed = judgments.map((review,i)=>({...hymns[i],aiReview:review}));
+    if (judgments.some(item=>item.grade==='D')) {
+      reviewed.sort((a,b)=>priority[b.aiReview.grade]-priority[a.aiReview.grade]);
+    }
+    return [...reviewed,...hymns.slice(reviewed.length)];
+  }
+
+  return { REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
 })();

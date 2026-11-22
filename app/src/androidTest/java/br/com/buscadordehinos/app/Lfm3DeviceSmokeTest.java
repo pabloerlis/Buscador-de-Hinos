@@ -61,14 +61,7 @@ public class Lfm3DeviceSmokeTest {
                 +" prefill_ms="+metrics[1]+" first_token_ms="+metrics[2]
                 +" generated="+metrics[3]);
 
-            JSONObject fixture;
-            try (java.io.InputStream input=InstrumentationRegistry.getInstrumentation()
-                    .getContext().getAssets().open("lfm3-comparison.json")) {
-                ByteArrayOutputStream data=new ByteArrayOutputStream();
-                byte[] chunk=new byte[4096];
-                for (int size; (size=input.read(chunk))!=-1;) data.write(chunk,0,size);
-                fixture=new JSONObject(new String(data.toByteArray(),StandardCharsets.UTF_8));
-            }
+            JSONObject fixture=fixture("lfm3-comparison.json");
             int timeout="baseline".equals(InstrumentationRegistry.getArguments().getString("benchmarkMode"))
                 ?180_000:fixture.getInt("timeoutMs");
             long[] compareMetrics=new long[4];
@@ -88,10 +81,42 @@ public class Lfm3DeviceSmokeTest {
             assertEquals("A resposta deve referenciar o hino permitido",fixture.getInt("expected"),resultJson.getInt(0));
             assertTrue("Não houve geração real",compareMetrics[3]>0);
 
+            if (!"baseline".equals(InstrumentationRegistry.getArguments().getString("benchmarkMode"))) {
+                verifyReview(generate);
+            }
             android.util.Log.i("LFM3_SMOKE_SUCCESS","official QAD Q4_0, tokens="
                 +metrics[3]+", prefill_ms="+metrics[1]+", first_token_ms="+metrics[2]);
         } finally {
             unload.invoke(null);
         }
+    }
+    private static JSONObject fixture(String name) throws Exception {
+        try (java.io.InputStream input=InstrumentationRegistry.getInstrumentation()
+                .getContext().getAssets().open(name)) {
+            ByteArrayOutputStream data=new ByteArrayOutputStream();
+            byte[] chunk=new byte[4096];
+            for (int size; (size=input.read(chunk))!=-1;) data.write(chunk,0,size);
+            return new JSONObject(new String(data.toByteArray(),StandardCharsets.UTF_8));
+        }
+    }
+
+    private static void verifyReview(Method generate) throws Exception {
+        JSONObject request=fixture("lfm3-review.json");
+        int budget=request.getInt("timeoutMs");
+        long[] metrics=new long[4];
+        long start=SystemClock.elapsedRealtime();
+        byte[] output=(byte[])generate.invoke(null,new Object[]{
+            request.getString("prompt").getBytes(StandardCharsets.UTF_8),
+            request.getString("grammar").getBytes(StandardCharsets.UTF_8),request.getInt("maxTokens"),budget,metrics
+        });
+        long wall=SystemClock.elapsedRealtime()-start;
+        assertNotNull("Sem resultado da revisão",output);
+        android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=review-four total_ms="+wall
+            +" setup_ms="+metrics[0]+" prefill_ms="+metrics[1]
+            +" first_token_ms="+metrics[2]+" generated="+metrics[3]);
+        String grades=new String(output,StandardCharsets.UTF_8).trim();
+        assertTrue("A revisão precisa distinguir retorno ao pai de entrada no céu: "+grades,
+            grades.matches("(?:T1|I0),D1,(?:T1|I0),(?:T1|I0)"));
+        assertTrue("A revisão precisa gerar tokens",metrics[3]>0);
     }
 }
