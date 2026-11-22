@@ -1,4 +1,4 @@
-name: Identificar execução de diagnóstico LFM3
+name: LFM3 real na consulta Filho Pródigo
 on:
   push:
     branches: ['diagnostics/filho-prodigo-inferencia-2619']
@@ -6,20 +6,54 @@ permissions:
   actions: read
   contents: write
 jobs:
-  lookup:
+  diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
-    env:
-      GH_TOKEN: ${{ github.token }}
+    timeout-minutes: 18
     steps:
-      - name: Localizar execução anterior
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: actions/download-artifact@v4
+        with:
+          name: bible-indexes-qa
+          run-id: 44967482176
+          github-token: ${{ github.token }}
+          path: app/src/main/assets
+      - uses: actions/cache@v4
+        id: gguf
+        with:
+          path: /tmp/LFM3-1.7B-QAD-Q4_0.gguf
+          key: official-lfm3-17b-qad-q4-0-sha256-43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452
+      - name: Obter GGUF oficial para a prova
+        if: steps.gguf.outputs.cache-hit != 'true'
+        run: curl --fail --location --silent --show-error --retry 3 --max-time 400 https://huggingface.co/LiquidAI/LFM3-1.7B-GGUF/resolve/main/LFM3-1.7B-QAD-Q4_0.gguf --output /tmp/LFM3-1.7B-QAD-Q4_0.gguf
+      - name: Preparar entrada e compilar JNI idêntico ao código de produção em Linux
         shell: bash
         run: |
           set -euo pipefail
-          id="$(gh api 'repos/pabloerlis/Buscador-de-Hinos/actions/runs?head_sha=a961692df960a8ddc6e0eaa77239cd61d2c5a863' --jq '[.workflow_runs[] | select(.head_sha=="a961692df960a8ddc6e0eaa77239cd61d2c5a863")][0].id')"
-          [[ "$id" =~ ^[0-9]+$ ]]
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" --jq '{run_id:([.jobs[].run_id][0]),jobs:[.jobs[]|{id,name,status,conclusion,steps:[.steps[]|{name,status,conclusion}]}]}' >/tmp/status.json
-          cat /tmp/status.json
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/status-revisao-filho-prodigo-2619.json" \
-            -f branch="$GITHUB_REF_NAME" -f message='Localiza diagnóstico inicial de inferência no catálogo' \
-            -f content="$(base64 -w0 /tmp/status.json)"
+          echo "43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452  /tmp/LFM3-1.7B-QAD-Q4_0.gguf" | sha256sum --check
+          mkdir -p /tmp/hinos-review
+          curl --fail --location --silent --show-error --retry 3 --max-time 90 'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' --output /tmp/hinos-avaliacao.json
+          node tests/diagnose-review-ranking.js /tmp/hinos-avaliacao.json
+          cp -r app/src/main/cpp /tmp/hinos-review/cpp
+          sed -i '/^project/a set(CMAKE_POSITION_INDEPENDENT_CODE ON)\nset(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)\nfind_package(JNI REQUIRED)' /tmp/hinos-review/cpp/CMakeLists.txt
+          sed -i 's/PRIVATE llama ggml log/PRIVATE llama ggml/; s/PRIVATE \${llamacpp_SOURCE_DIR}\/include/PRIVATE \${JNI_INCLUDE_DIRS} \${llamacpp_SOURCE_DIR}\/include/' /tmp/hinos-review/cpp/CMakeLists.txt
+          cmake -S /tmp/hinos-review/cpp -B /tmp/hinos-review/build -G Ninja -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/hinos-review/build --target hinosllm -j 4
+      - name: Executar modelo e registrar somente IDs, tempos e notas
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          sed -e 's/int remaining=30_000/int remaining=120_000/' -e '/rows.add(grade/i\                System.out.println("candidate="+(i+1)+" decision="+grade+" prefill_ms="+stats[1]);' tests/diagnostic/MainActivity.java >/tmp/hinos-review/MainActivity.java
+          javac -encoding UTF-8 -d /tmp/hinos-review/classes /tmp/hinos-review/MainActivity.java
+          library="$(find /tmp/hinos-review/build -name libhinosllm.so -print -quit)"
+          java -cp /tmp/hinos-review/classes br.com.buscadordehinos.app.MainActivity "$library" /tmp/LFM3-1.7B-QAD-Q4_0.gguf
+          python3 tests/diagnostic/report-review.py
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/resultado-revisao-filho-prodigo-2619.json" \
+            -f branch="$GITHUB_REF_NAME" -f message='Registra posições antes e depois da revisão, sem letras' \
+            -f content="$(base64 -w0 /tmp/hinos-review/result.json)"
