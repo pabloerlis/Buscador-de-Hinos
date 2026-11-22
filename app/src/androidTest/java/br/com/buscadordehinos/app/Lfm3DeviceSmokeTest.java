@@ -110,8 +110,8 @@ public class Lfm3DeviceSmokeTest {
                 +JSONObject.quote(",\"3\":") +" score "
                 +JSONObject.quote(",\"4\":") +" score "
                 +JSONObject.quote(",\"5\":") +" score "
-                +JSONObject.quote("}") +"\\n"
-                +"score ::= \"0\" | \"1\" | \"2\" | \"3\"\\n";
+                +JSONObject.quote("}") +"\n"
+                +"score ::= \"0\" | \"1\" | \"2\" | \"3\"\n";
             long[] scoreMetrics=new long[4];
             long scoreStart=SystemClock.elapsedRealtime();
             try {
