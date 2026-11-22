@@ -29,8 +29,10 @@ const pairs = [
 ];
 
 const reviewHymns = pairs.map((lyrics,i)=>({id:i+1,snippet:lyrics.split('\n')[i===1?1:0]}));
+const stories = JSON.parse(fs.readFileSync('app/src/main/assets/semantic-stories.json','utf8'));
+const narrative = stories.stories.find(story=>story.id==='filho_prodigo').review_focus;
 const review = ai.prepareReview('Filho pródigo',new Map(pairs.map((lyrics,i)=>[i+1,lyrics])),reviewHymns,{
-  context:{narrative:'voltar para o pai depois de se afastar e ser recebido de volta'}
+  context:{narrative}
 });
 if (!review) throw Error('A revisão automática precisa de quatro hinos.');
 fs.writeFileSync('app/src/androidTest/assets/lfm3-review.json',JSON.stringify({

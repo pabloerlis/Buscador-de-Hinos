@@ -748,8 +748,10 @@ const GGUF=(()=>{
     if(task.judgments.length<task.requests.length){advanceReview(task);return;}
     const results=LocalHymnAI.applyReview(state.lastResults,task.judgments);
     if(!results){resetTask('A lista mudou durante a revisão.');return;}
+    if(results===state.lastResults){resetTask('A revisão não identificou encaixe direto.');return;}
     const list=$('results-list');
-    const focus=document.activeElement?.dataset;
+    const active=document.activeElement;
+    const focus=active&&list.contains(active)?active.dataset:null;
     const focusId=Number(focus?.hymnId||focus?.repertoireId);
     state.lastResults=results;
     list.innerHTML=results.map(resultCard).join('');

@@ -138,6 +138,11 @@ assert.equal(merged.added,1);
 assert.equal(merged.hymns.at(-1).id,6);
 
 
+const storyDb = JSON.parse(read('app/src/main/assets/semantic-stories.json'));
+const stories = vm.runInNewContext(read('app/src/main/assets/story-engine.js')+'\nStoryEngine').create(storyDb);
+assert.equal(stories.interpret('Filho Pródigo').matches[0].reviewFocus,storyDb.stories[0].review_focus);
+assert.ok(storyDb.stories.every(story=>story.review_focus?.length>=8));
+
 const reviewLyrics=new Map([
   [1,'O Pai acolhe os seus no céu.\nCantaremos na glória.'],
   [2,'Eu me afastei de ti, meu pai.\nHoje volto ao teu lar.\nTu me recebes e me perdoas.'],
@@ -162,7 +167,7 @@ for(const invalid of ['talvez','sim\nnão','','sim 2']){
   assert.throws(()=>ai.readReview(invalid,review.requests[0].candidate));
 }
 assert.equal(ai.applyReview(reviewHymns.slice(1),judgments),null);
-assert.deepEqual(Array.from(ai.applyReview(reviewHymns,review.requests.map(({candidate})=>ai.readReview('não',candidate))),x=>x.id),[1,2,3,4,5,6]);
+assert.equal(ai.applyReview(reviewHymns,review.requests.map(({candidate})=>ai.readReview('não',candidate))),reviewHymns);
 assert.equal(ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns.slice(0,3)),null);
 
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));

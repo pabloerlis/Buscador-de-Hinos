@@ -724,7 +724,7 @@ const OfflineAPI = (() => {
       not_learned_has_more:hiddenFrom+hiddenSize<notLearned.length,
       topics:selectedTopics,story_matches:reading,
       ai_context:{
-        narrative:storyIntent?.matches?.length===1&&!storyIntent.residual?storyIntent.matches[0].description||null:null,
+        narrative:storyIntent?.matches?.length===1&&!storyIntent.residual?storyIntent.matches[0].reviewFocus||storyIntent.matches[0].description||null:null,
         reference:graphCtx?.reference||scripture?.reference||null,
         passage:(graphCtx?.sourceText||scripture?.text||'').slice(0,220),
         topics:[...new Set([...(graphCtx?.concepts||[]).map(topic=>topic.label),...selectedTopics])].slice(0,4)

@@ -79,6 +79,7 @@
         "perdao",
         "graca"
       ],
+      "review_focus": "voltar para o pai depois de se afastar e ser recebido de volta",
       "description": "Retorno a Deus após afastamento, arrependimento e acolhimento do Pai."
     },
     {
@@ -130,6 +131,7 @@
         "protecao",
         "graca"
       ],
+      "review_focus": "um pastor procurar e resgatar uma ovelha que se perdeu",
       "description": "O cuidado do pastor ao procurar e resgatar quem se perdeu."
     },
     {
@@ -179,6 +181,7 @@
         "servico",
         "humildade"
       ],
+      "review_focus": "socorrer e cuidar de um desconhecido ferido e deixado à beira do caminho",
       "description": "Compaixão ativa e cuidado ao próximo, especialmente ao necessitado."
     },
     {
@@ -229,6 +232,7 @@
         "protecao",
         "direcao"
       ],
+      "review_focus": "um pastor cuidar das suas ovelhas, protegê-las e dar a vida por elas",
       "description": "Deus conduz, sustenta e protege seu povo como pastor."
     },
     {
@@ -279,6 +283,7 @@
         "confianca",
         "tribulacao"
       ],
+      "review_focus": "Jesus acalmar o vento e o mar durante uma tempestade no barco",
       "description": "Confiança em Jesus diante das tempestades da vida."
     },
     {
@@ -324,6 +329,7 @@
         "comunhao",
         "esperanca"
       ],
+      "review_focus": "reconhecer Jesus ressuscitado depois de caminhar com ele e partir o pão",
       "description": "O reconhecimento do Cristo ressurreto no caminho."
     },
     {
@@ -372,6 +378,7 @@
         "vida_eterna",
         "graca"
       ],
+      "review_focus": "Jesus oferecer água viva em uma conversa junto ao poço",
       "description": "Jesus oferece água viva e vida transformada."
     },
     {
@@ -417,6 +424,7 @@
         "fe",
         "vida_eterna"
       ],
+      "review_focus": "Jesus chamar Lázaro de volta à vida depois da sua morte",
       "description": "Jesus chama Lázaro à vida e manifesta seu poder sobre a morte."
     },
     {
@@ -460,6 +468,7 @@
         "espirito_santo",
         "esperanca"
       ],
+      "review_focus": "ossos secos voltarem à vida pela palavra e pelo sopro de Deus",
       "description": "Restauração de esperança e vida figurada pelo vale de ossos secos."
     },
     {
@@ -507,6 +516,7 @@
         "confianca",
         "vitoria"
       ],
+      "review_focus": "orar e cantar na prisão até que as portas se abram e as correntes caiam",
       "description": "Oração e louvor mesmo na prisão, seguidos de libertação."
     },
     {
@@ -554,6 +564,7 @@
         "volta_jesus",
         "perseveranca"
       ],
+      "review_focus": "esperar a chegada do noivo com azeite suficiente para manter a lâmpada acesa",
       "description": "Vigilância e preparo espiritual para a vinda do Noivo."
     },
     {
@@ -599,6 +610,7 @@
         "vitoria",
         "confianca"
       ],
+      "review_focus": "enfrentar e vencer um gigante confiando em Deus",
       "description": "A vitória alcançada pela confiança em Deus diante de um desafio maior."
     },
     {
@@ -641,6 +653,7 @@
         "confianca",
         "protecao"
       ],
+      "review_focus": "Jesus repartir poucos pães e peixes para alimentar uma multidão",
       "description": "Provisão abundante a partir de poucos recursos."
     }
   ]

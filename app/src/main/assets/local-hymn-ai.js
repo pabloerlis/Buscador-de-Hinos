@@ -176,11 +176,10 @@ const LocalHymnAI = (() => {
 
   function applyReview(hymns, judgments) {
     if (!judgments.every(({id},i)=>hymns[i]?.id===id)) return null;
+    if (!judgments.some(({grade})=>grade==='D')) return hymns;
     const priority = {D:1,I:0};
     const reviewed = judgments.map((review,i)=>({...hymns[i],aiReview:review}));
-    if (judgments.some(item=>item.grade==='D')) {
-      reviewed.sort((a,b)=>priority[b.aiReview.grade]-priority[a.aiReview.grade]);
-    }
+    reviewed.sort((a,b)=>priority[b.aiReview.grade]-priority[a.aiReview.grade]);
     return [...reviewed,...hymns.slice(reviewed.length)];
   }
 
