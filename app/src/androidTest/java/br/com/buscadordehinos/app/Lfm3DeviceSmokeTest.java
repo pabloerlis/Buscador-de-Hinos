@@ -136,6 +136,66 @@ public class Lfm3DeviceSmokeTest {
                     +scoringError.toString());
             }
 
+            // Diagnósticos sem gramática e com classificações binárias: isolam
+            // possível viés da lista/gramática sem abrandar o teste bloqueante.
+            String freePrompt="Analise os eventos, não apenas palavras. História: "
+                +"um filho abandona o pai, arrepende-se, volta e é acolhido e perdoado. "
+                +"Candidatos: (1) Noite de Paz fala do nascimento de Jesus e anjos; "
+                +"(2) Gratidão agradece a Deus; (3) Um dia eu quis te deixar "
+                +"começa com saída do filho e termina com o retorno e perdão do pai; "
+                +"(4) No Mar fala de tempestade; (5) Manhã Gloriosa fala da ressurreição. "
+                +"Qual candidato realmente corresponde à história? "
+                +"Explique por que o candidato 1 é ou não é adequado e indique o número correto.";
+            long[] freeMetrics=new long[4];
+            long freeStarted=SystemClock.elapsedRealtime();
+            try {
+                byte[] free=(byte[])generate.invoke(null,new Object[]{
+                    freePrompt.getBytes(StandardCharsets.UTF_8),
+                    new byte[0],96,120_000,freeMetrics
+                });
+                android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=free-reason total_ms="
+                    +(SystemClock.elapsedRealtime()-freeStarted)
+                    +" setup_ms="+freeMetrics[0]+" prefill_ms="+freeMetrics[1]
+                    +" first_token_ms="+freeMetrics[2]+" generated="+freeMetrics[3]);
+                android.util.Log.i("LFM3_BENCH","MODEL_RESPONSE case=free-reason output="
+                    +new String(free,StandardCharsets.UTF_8).replace('\\n',' '));
+            } catch(Exception e) {
+                android.util.Log.e("LFM3_BENCH","FREE_REASON_DIAGNOSTIC_ERROR "+e.toString());
+            }
+            String[] binaryCases={
+                "Noite de Paz: nascimento de Jesus, anjos e manjedoura.",
+                "Um dia eu quis te deixar: filho abandona o pai, arrepende-se, "
+                    +"regressa e recebe perdão do pai."
+            };
+            String binaryGrammar="root ::= \\"S\\" | \\"N\\"\\n";
+            for(int i=0;i<binaryCases.length;i++){
+                String binaryPrompt="História alvo: filho abandona a casa do pai, "
+                    +"arrepende-se, retorna e é acolhido e perdoado. "
+                    +"Candidato: "+binaryCases[i]
+                    +" O candidato relata a MESMA sequência completa? "
+                    +"Responda S se SIM ou N se NÃO.";
+                long[] binaryMetrics=new long[4];
+                long binaryStarted=SystemClock.elapsedRealtime();
+                try {
+                    byte[] binary=(byte[])generate.invoke(null,new Object[]{
+                        binaryPrompt.getBytes(StandardCharsets.UTF_8),
+                        binaryGrammar.getBytes(StandardCharsets.UTF_8),
+                        8,90_000,binaryMetrics
+                    });
+                    android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=binary-"+i
+                        +" total_ms="+(SystemClock.elapsedRealtime()-binaryStarted)
+                        +" setup_ms="+binaryMetrics[0]+" prefill_ms="+binaryMetrics[1]
+                        +" first_token_ms="+binaryMetrics[2]
+                        +" generated="+binaryMetrics[3]);
+                    android.util.Log.i("LFM3_BENCH","MODEL_RESPONSE case=binary-"+i
+                        +" expected="+(i==0?"N":"S")+" output="
+                        +new String(binary,StandardCharsets.UTF_8));
+                } catch(Exception e) {
+                    android.util.Log.e("LFM3_BENCH","BINARY_DIAGNOSTIC_ERROR case="+i
+                        +" error="+e.toString());
+                }
+            }
+
             assertEquals("Reranking errou a narrativa do filho pródigo",3,resultJson.getInt("id"));
             assertTrue("Justificativa curta ausente",resultJson.getString("motivo").trim().length()>=8);
             assertTrue("Não houve geração real",compareMetrics[3]>0);

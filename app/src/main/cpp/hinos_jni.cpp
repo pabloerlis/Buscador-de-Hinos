@@ -185,11 +185,20 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         const char* tmpl=llama_model_chat_template(g_model,nullptr);
         llama_chat_message message={"user",prompt.c_str()};
         int formattedSize=llama_chat_apply_template(tmpl,&message,1,true,nullptr,0);
+        bool templateApplied=false;
         if(formattedSize>0&&formattedSize<11000){
             std::vector<char> formatted(formattedSize+1,0);
             int used=llama_chat_apply_template(tmpl,&message,1,true,formatted.data(),formattedSize+1);
-            if(used>0&&used<=(int)formattedSize)prompt.assign(formatted.data(),used);
+            if(used>0&&used<=(int)formattedSize){
+                prompt.assign(formatted.data(),used);
+                templateApplied=true;
+            }
         }
+        // Somente metadados do template: NUNCA registrar o prompt ou letras.
+        __android_log_print(ANDROID_LOG_INFO,"LFM3_TEMPLATE",
+            "available=%d applied=%d rendered_bytes=%d prefix_think=%d grammar=%d",
+            tmpl!=nullptr,templateApplied,formattedSize,
+            endsWithOpenThinking(prompt),!grammar.empty());
         if (!grammar.empty() && endsWithOpenThinking(prompt)) {
             prompt += "</think>\n";
             __android_log_print(ANDROID_LOG_INFO,"LFM3_TEMPLATE",
