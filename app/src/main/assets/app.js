@@ -383,7 +383,14 @@ async function submitRefinement(message){
       chatSay('assistant','Mantive a lista. Posso procurar outro hino se você me disser o que prefere.');
       return true;
     }
-    const lookup=await jsonRequest('/api/chat-candidates',{message,settings:state.searchSettings,...searchRestrictions()});
+    const explaining=/\b(?:explique|por que|qual a diferen[cç]a)\b/i.test(message);
+    const keepList=/^(?:não|nao)\s+(?:retire|remova|tire|exclua|acrescente|adicione|inclua|coloque)\b[^,.!?]*[.!?]?$/i.test(message);
+    if(keepList&&!explaining){
+      chatSay('assistant','Mantive a lista como está.');
+      return true;
+    }
+    const lookup=explaining?{hymns:[]}:
+      await jsonRequest('/api/chat-candidates',{message,settings:state.searchSettings,...searchRestrictions()});
     if(!current())return false;
     if(lookup.refine){
       state.chatQuestion=null;
@@ -439,7 +446,6 @@ async function submitRefinement(message){
       found=[...options.values()].slice(0,3);
     }
     const pick=OfflineAPI.chatSearchIntent(message).list;
-    const explaining=/\b(?:explique|por que|qual a diferen[cç]a)\b/i.test(message);
     const preference=!explaining&&(Boolean(state.chatQuestion&&state.chatQuestion!=='hino')||
       /^(?:mais|menos|prefiro|quero|gostaria|tamb[eé]m gostaria|priorize|com foco|para (?:o|a))\s+/i.test(message));
     state.chatQuestion=null;

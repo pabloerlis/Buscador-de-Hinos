@@ -426,7 +426,9 @@ async function checkBridge(){
   assert.ok(!chat.visible().some(h=>h.id===1));
   assert.ok(chat.visible().some(h=>h.id===6));
 
-  const noEdits=setup();
+  const noEdits=setup({chatLookup:()=>({refine:true,hymns:[]})});
+  assert.equal(await noEdits.refine('Não retire nenhum hino.'),true);
+  assert.equal(noEdits.calls.length,0);
   const explanation=noEdits.refine('Não retire nenhum hino. Só me explique a lista.');
   await tick();
   assert.match(noEdits.calls[0][2],/^root ::= falar\n/);

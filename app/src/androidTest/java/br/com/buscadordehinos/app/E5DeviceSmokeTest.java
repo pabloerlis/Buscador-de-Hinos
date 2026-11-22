@@ -213,8 +213,10 @@ public class E5DeviceSmokeTest {
                 "const inclusion=added&&visibleHymns().some(h=>h.number==='102');" +
                 "const absent=await submitRefinement('Retire o hino sobre tempestade distante');" +
                 "const preserved=!absent&&visibleHymns().some(h=>h.number==='101');" +
+                "const explained=await submitRefinement('Não retire nenhum hino. Só me explique a lista.');" +
+                "const sameList=explained&&visibleHymns().some(h=>h.number==='101')&&visibleHymns().some(h=>h.number==='102');" +
                 "const removed=await submitRefinement('Retire o hino 102');" +
-                "window.__chatQa=greeting&&inclusion&&preserved&&removed&&!visibleHymns().some(h=>h.number==='102');" +
+                "window.__chatQa=greeting&&inclusion&&preserved&&sameList&&removed&&!visibleHymns().some(h=>h.number==='102');" +
                 "})().catch(error=>{window.__chatQa=String(error);});true;"));
             limit=System.currentTimeMillis()+45_000;
             String chat="null";
