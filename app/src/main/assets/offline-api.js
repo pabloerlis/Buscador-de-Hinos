@@ -446,6 +446,42 @@ const OfflineAPI = (() => {
     if(exactNumber)return 100;
     return Math.max(20, Math.min(98, Math.round(30 + 68*(1-Math.exp(-score/22)))));
   }
+  function chatSearchIntent(message) {
+    const text=String(message||'').trim();
+    const norm=normalize(text);
+    const exact=/^(?:(?:coletanea|principal|avulsos?|cia|criancas|infantil)\s+)?(?:hino\s*|louvor\s*)?\d{1,4}$/.test(norm)||
+      titleIndex.has(normalizeLyrics(text))||/["“”]/.test(text)||
+      (typeof BibleContext!=='undefined' && BibleContext.looksLikeReference(text));
+    const flags=contextQuery(text,'');
+    return {
+      eligible:Boolean(text&&!exact&&!flags.fresh),
+      list:/\b(?:entre (?:esses|estes|essas|estas|os resultados|as sugestoes)|desses|destes|dessas|destas|nessa lista|nesta lista|hinos (?:exibidos|sugeridos))\b/.test(norm),
+      canPick:!flags.excluded.length&&!flags.required.length&&!flags.deprioritized.length
+    };
+  }
+  function chatCandidates(payload) {
+    const message=String(payload?.message||'').trim();
+    if(!message||message.length>MAX_QUERY_LENGTH)return {hymns:[]};
+    const norm=normalize(message);
+    const command=norm.match(/(?:^|[.!?]\s+)(?:(?:por favor|pode|quero(?: que)?)\s+)?(acrescent(?:e|ar)|adicion(?:e|ar)|inclu(?:a|ir)|colo(?:que|car)|retir(?:e|ar)|remov(?:a|er)|tir(?:e|ar)|exclu(?:a|ir))\s+(?:(?:o|a)\s+)?(?:hino\s+)?(.+?)[.!?]*$/);
+    const opts=searchOptions(payload?.settings);
+    if(command){
+      const verb=/^(?:retir|remov|tir|exclu)/.test(command[1])?'retirar':'acrescentar';
+      const selector=command[2].replace(/\s+(?:na|da|dessa|desta)\s+lista$/,'');
+      const number=selector.match(/^(\d{1,4})(?:\s+(?:da|dos|do|de)\s+(coletanea|principal|avulsos?|cia|infantil|criancas)(?:\s+2018)?)?$/);
+      const quote=selector.match(/^["“](.+)["”]$/);
+      const exactTitle=titleIndex.has(normalizeLyrics(quote?.[1]||selector));
+      if(number||quote||exactTitle){
+        const query=number?(number[2]?number[2]+' ':'')+'hino '+number[1]:(quote?.[1]||selector);
+        const result=search({query,settings:{...opts,minAffinity:0,pageSize:25}});
+        return {verb,selector,exact:true,hymns:result.results.filter(hymn=>number||hymn.match_type==='titulo_exato')};
+      }
+      if(verb==='retirar')return {verb,hymns:[]};
+    }
+    const result=search({query:message,settings:{...opts,pageSize:8},exclude:payload.exclude,require:payload.require});
+    return {verb:command?'acrescentar':undefined,hymns:result.results};
+  }
+
   function search(payload){
     let query=String(payload?.query||'').trim();if(!query||query.length>MAX_QUERY_LENGTH)throw Error(`Digite uma consulta de até ${MAX_QUERY_LENGTH} caracteres.`);
     const opts=searchOptions(payload?.settings);
@@ -453,13 +489,22 @@ const OfflineAPI = (() => {
     const refine=Boolean(payload?.refine);
     const ctx=payload?.parsed_query===true&&!refine?{query,excluded:[],deprioritized:[],required:[],fresh:false}:
       contextQuery(query,refine?payload.previous:'',{refine,literal:opts.mode==='literal',keepTitle:!refine&&titleIndex.has(normalizeLyrics(query))});
-    query=ctx.query;
+    const proposed=typeof payload?.model_query==='string'?payload.model_query.trim():'';
+    const canApplyModel=refine&&opts.mode!=='literal'&&proposed.length>=3&&proposed.length<=116&&
+      chatSearchIntent(query).eligible&&!/["“”\r\n]/.test(ctx.query)&&/[A-Za-zÀ-ÿ]/.test(proposed)&&
+      !/["“”\r\n]/.test(proposed)&&chatSearchIntent(proposed).eligible;
     const excluded=combineRestrictions(ctx.fresh?[]:payload?.exclude,ctx.excluded);
     const excludedTerms=new Set(excluded.map(normalizeLyrics));
     const deprioritized=combineRestrictions(ctx.fresh?[]:payload?.deprioritize,ctx.deprioritized)
       .filter(term=>!excludedTerms.has(normalizeLyrics(term)));
     const required=combineRestrictions(ctx.fresh?[]:payload?.require,ctx.required);
-    const criteria={effective_query:query,excluded,deprioritized,required,reset_context:ctx.fresh};
+    const proposedText=normalizeLyrics(proposed);
+    const modelQuery=canApplyModel&&!excluded.some(term=>hasWord(proposedText,normalizeLyrics(term)))?proposed:'';
+    // O pedido original e seus filtros continuam contribuindo mesmo se o modelo omitir um detalhe.
+    query=modelQuery&&ctx.query&&normalize(ctx.query)!==normalize(modelQuery)
+      ? (modelQuery+'. '+ctx.query).slice(0,MAX_QUERY_LENGTH)
+      : ctx.query;
+    const criteria={effective_query:query,excluded,deprioritized,required,reset_context:ctx.fresh,model_refinement:modelQuery};
     if(!query)return {results:[],page,page_size:opts.pageSize,total:0,has_more:false,...criteria,used_ai:false,summary:'Nenhum critério positivo informado.'};
     const norm=normalize(query), numberMatch=norm.match(/^(?:(coletanea|principal|avulsos?|cia|criancas|infantil)\s+)?(?:hino\s*|louvor\s*)?(\d{1,4})$/);
     const bible=typeof BibleContext!=='undefined'?BibleContext.lookup(query):null;
@@ -724,6 +769,7 @@ const OfflineAPI = (() => {
       not_learned_has_more:hiddenFrom+hiddenSize<notLearned.length,
       topics:selectedTopics,story_matches:reading,
       ai_context:{
+        narrative:storyIntent?.matches?.length===1&&!storyIntent.residual?storyIntent.matches[0].reviewFocus||storyIntent.matches[0].description||null:null,
         reference:graphCtx?.reference||scripture?.reference||null,
         passage:(graphCtx?.sourceText||scripture?.text||'').slice(0,220),
         topics:[...new Set([...(graphCtx?.concepts||[]).map(topic=>topic.label),...selectedTopics])].slice(0,4)
@@ -830,10 +876,11 @@ const OfflineAPI = (() => {
     if(url==='/api/import')return importJson(payload.data);
     if(url==='/api/import-remote')return downloadRemote();
     if(url==='/api/search')return search(payload);
+    if(url==='/api/chat-candidates')return chatCandidates(payload);
     if(url==='/api/recommend')return recommendRelated(payload);
     const match=url.match(/^\/api\/hymns\/(\d+)$/);
     if(match)return hymnDetail(Number(match[1]));
     throw Error('Operação não reconhecida.');
   }
-   return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions};
+   return {request,chatSearchIntent,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions};
 })();

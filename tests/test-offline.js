@@ -123,6 +123,32 @@ const samples=[
  const resetRequired=await api.request('/api/search',{query:'nova busca por Maranata',refine:true,previous:required.effective_query,require:required.required});
  assert.equal(resetRequired.required.length,0);
  assert.equal(resetRequired.results[0].number,'003');
+ const rewritten=await api.request('/api/search',{query:'mais foco em fé, somente alegria, evite medo',
+   refine:true,previous:'gratidão',model_query:'gratidão e fé',exclude:['tristeza']});
+ assert.match(rewritten.effective_query,/^gratidão e fé\. gratidão/);
+ assert.equal(rewritten.model_refinement,'gratidão e fé');
+ assert.equal(rewritten.required.join(),'alegria');
+ assert.deepEqual(Array.from(rewritten.excluded),['tristeza','medo']);
+ const resetWithModel=await api.request('/api/search',{query:'nova busca por Maranata',refine:true,
+   previous:'gratidão',model_query:'outro tema'});
+ assert.equal(resetWithModel.model_refinement,'');
+ assert.equal(resetWithModel.results[0].number,'003');
+ const literalWithModel=await api.request('/api/search',{query:'apenas os de vigilância',refine:true,
+   previous:'Segunda vinda',model_query:'Maranata',settings:{mode:'literal'}});
+ assert.equal(literalWithModel.model_refinement,'');
+ assert.equal(literalWithModel.total,0);
+ assert.equal(api.chatSearchIntent('Qual desses hinos tem mais esperança?').list,true);
+ assert.equal(api.chatSearchIntent('Entre esses, somente alegria').canPick,false);
+ const targeted=await api.request('/api/chat-candidates',{message:'Acrescente o hino 003'});
+ assert.equal(targeted.verb,'acrescentar');
+ assert.equal(targeted.exact,true);
+ assert.ok(targeted.hymns.some(hymn=>hymn.number==='003'));
+ const absent=await api.request('/api/chat-candidates',{message:'Retire o hino 9999'});
+ assert.equal(absent.verb,'retirar');
+ assert.equal(absent.hymns.length,0);
+ const described=await api.request('/api/chat-candidates',{message:'Prefiro o filho pródigo. Pode retirar o da tempestade?'});
+ assert.equal(described.verb,'retirar');
+ assert.notEqual(described.exact,true);
  const watchTheme=await api.request('/api/search',{query:'somente os de vigilância',refine:true,previous:'Segunda vinda'});
  assert.equal(watchTheme.results[0].number,'003');
  assert.match(watchTheme.results[0].snippet,/vigiar/);

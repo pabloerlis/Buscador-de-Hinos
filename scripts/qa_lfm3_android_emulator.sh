@@ -58,6 +58,9 @@ for mode in optimized baseline; do
       exit 1
     fi
   fi
+  if [ "$mode" = optimized ]; then
+    grep -q 'BENCHMARK_RESULT case=review-four ' "$log"
+  fi
   rm -f "$log"
   adb shell run-as "$pkg" rm -f files/qa-lfm3.gguf
   adb shell rm -f /data/local/tmp/hinos-lfm3.gguf

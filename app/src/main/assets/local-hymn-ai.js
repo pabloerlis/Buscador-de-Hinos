@@ -125,5 +125,160 @@ const LocalHymnAI = (() => {
     };
   }
 
-  return { diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  const REVIEW_LIMIT = 4;
+  const REVIEW_TIMEOUT_MS = 30000;
+  const reviewLabels = { D: 'Encaixe direto', I: 'Encaixe direto não identificado' };
+
+  function reviewPassages(snippet, lyrics) {
+    const stanzas = String(lyrics||'').split(/\r?\n[ \t]*\r?\n+/)
+      .map(stanza=>stanza.split(/\r?\n/).map(line=>clip(line, 100)).filter(Boolean))
+      .filter(lines=>lines.length);
+    if (!stanzas.length) return [];
+    const key = text => text.normalize('NFC').toLocaleLowerCase('pt-BR');
+    const lineHint = clip(String(snippet||'').split(/\s+\/\s+/)[0], 45);
+    const hint = key(lineHint);
+    const match = hint.length>=6 ? stanzas.findIndex(lines=>lines.some(line=>key(line).includes(hint))) : -1;
+    const lines = stanzas[Math.max(0, match)];
+    const anchor = match<0 ? 0 : lines.findIndex(line=>key(line).includes(hint));
+    const excerpt = clip(lines.slice(Math.max(0, anchor-1), anchor+2).join(' / '), 150);
+    const alternatives = [stanzas.at(-1), stanzas[0]].filter(stanza=>stanza!==lines)
+      .map(stanza=>clip(stanza.join(' / '), 75));
+    const second = alternatives.find(text=>!key(excerpt).includes(key(text)));
+    return second ? [excerpt, second] : [excerpt];
+  }
+
+  function prepareReview(query, lyricsById, hymns, {exclude=[], required=[], context}={}) {
+    const candidates = hymns.slice(0, REVIEW_LIMIT).map(hymn=>({
+      id: hymn.id, excerpts: reviewPassages(hymn.snippet, lyricsById.get(hymn.id))
+    }));
+    if (candidates.length!==REVIEW_LIMIT || candidates.some(item=>!item.excerpts.length) ||
+        new Set(candidates.map(item=>item.id)).size!==REVIEW_LIMIT) return null;
+    const subject = promptText(context?.narrative || query, 145).replace(/[.!?]+$/, '');
+    const requests = candidates.map(candidate=>{
+      const excerpt = candidate.excerpts.join(' / ');
+      const prompt = [
+        'Este trecho fala especificamente de '+subject+'? Responda sim ou não.',
+        exclude.length && 'Exclua: '+promptText(exclude.join(', '), 65),
+        required.length && 'Obrigatório: '+promptText(required.join(', '), 65),
+        'Trecho: '+promptText(excerpt, 228)
+      ].filter(Boolean).join('\n');
+      return { prompt, candidate, grammar:'root ::= "sim" | "não"', maxTokens:5 };
+    });
+    return { requests, timeoutMs:REVIEW_TIMEOUT_MS };
+  }
+
+  function readReview(response, candidate) {
+    if (response!=='sim' && response!=='não') throw Error('Resposta de revisão inválida.');
+    const grade = response==='sim'?'D':'I';
+    return {id:candidate.id, grade, label:reviewLabels[grade],
+      excerpt:grade==='D'?candidate.excerpts.join(' / '):''};
+  }
+
+  function applyReview(hymns, judgments) {
+    if (!judgments.every(({id},i)=>hymns[i]?.id===id)) return null;
+    if (!judgments.some(({grade})=>grade==='D')) return hymns;
+    const priority = {D:1,I:0};
+    const reviewed = judgments.map((review,i)=>({...hymns[i],aiReview:review}));
+    reviewed.sort((a,b)=>priority[b.aiReview.grade]-priority[a.aiReview.grade]);
+    return [...reviewed,...hymns.slice(reviewed.length)];
+  }
+
+  const CHAT_TEXT=String.raw`A-Za-zÀ-ÖØ-öø-ÿ0-9 .,:;!?()/'’–\-`;
+  const invalidChatText=new RegExp('[^'+CHAT_TEXT+']');
+  const preferenceQuestions={
+    clima:'Você prefere hinos mais alegres ou mais solenes?',
+    ritmo:'Você prefere hinos mais animados ou mais tranquilos?',
+    tema:'Qual tema você quer enfatizar? Há algum tema que prefere evitar?',
+    ocasiao:'Para qual momento do culto você está escolhendo os hinos?',
+    hino:'Qual hino você quer manter ou mudar? Pode me dizer o número ou o título.'
+  };
+
+  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,forced=null}) {
+    const candidates=new Map();
+    const addRow=(hymn,inList)=>{
+      if(!Number.isSafeInteger(hymn.id)||[...candidates.values()].some(item=>item.id===hymn.id))return;
+      candidates.set(candidates.size+1,{...hymn,inList});
+    };
+    shown.slice(0,6).forEach(hymn=>addRow(hymn,true));
+    found.slice(0,3).forEach(hymn=>addRow(hymn,false));
+    const positions=predicate=>[...candidates].filter(([,h])=>predicate(h)).map(([position])=>position);
+    const editKeys={
+      acrescentar:positions(h=>!h.inList),
+      retirar:positions(h=>h.inList),
+      destacar:positions(h=>h.inList)
+    };
+    const forcedPosition=forced&&[...candidates].find(([,hymn])=>hymn.id===forced.id)?.[0];
+    if(forcedPosition&&forced.verb in editKeys)editKeys[forced.verb]=[forcedPosition];
+
+    const rules=[
+      'falar ::= '+JSON.stringify('["falar",')+' text "]"',
+      'perguntar ::= '+JSON.stringify('["perguntar",')+' preference "]"',
+      'preference ::= '+Object.keys(preferenceQuestions).map(key=>JSON.stringify(JSON.stringify(key))).join(' | '),
+      'buscar ::= '+JSON.stringify('["buscar",')+' query-text "]"'
+    ];
+    for(const [verb,keys] of Object.entries(editKeys)){
+      if(!keys.length)continue;
+      rules.push(verb+' ::= '+JSON.stringify('["'+verb+'",')+' '+verb+'-position "]"');
+      rules.push(verb+'-position ::= '+keys.map(key=>JSON.stringify(String(key))).join(' | '));
+    }
+    const uncertain=/\b(?:em dúvida|não sei|não tenho certeza|me ajude a decidir)\b/i.test(message);
+    const edit=editIntent&&editKeys[editIntent]?.length?editIntent:null;
+    const actions=forcedPosition?[forced.verb]:edit?[edit,'perguntar']:uncertain?['perguntar']:
+      ['falar','perguntar','buscar',...Object.keys(editKeys).filter(verb=>editKeys[verb].length)];
+    const prompt=[
+      'Você ajuda a escolher hinos em português. Responda só com uma ação JSON.',
+      forcedPosition
+        ?'Pedido explícito confirmado pelo catálogo. Use a ação '+forced.verb+' na posição '+forcedPosition+' para confirmar.'
+        :edit
+          ?'Para '+edit+' um hino, escolha a linha que atende ao pedido. Se não estiver claro, pergunte.'
+          :uncertain
+            ?'Escolha qual preferência perguntar: clima, ritmo, tema, ocasiao ou hino.'
+            :'Se falta uma preferência, use perguntar. Use falar para responder sem mudar nada. Use buscar com os temas desejados.',
+      !forcedPosition&&!uncertain&&'Edite a lista quando houver pedido ou aceitação. Use a posição da linha.',
+      'Busca: '+promptText(query,90),
+      constraints&&'Filtros: '+promptText(constraints,90),
+      ...history.slice(-5).map(item=>(item.kind==='user'?'Usuário: ':'Você: ')+promptText(item.text,80)),
+      'Usuário agora: '+promptText(message,185),
+      ...(candidates.size?[...candidates].map(([position,h])=>position+' '+(h.inList?'na lista':'catálogo')+
+        ' · '+promptText(h.number,8)+' '+promptText(h.title,37)+' '+promptText(h.snippet,40)):[])
+    ].filter(Boolean).join('\n');
+    const grammar=[
+      'root ::= '+actions.join(' | '),...rules,
+      'text ::= ' + JSON.stringify('"') + ' ['+CHAT_TEXT+']{4,132} ' +JSON.stringify('"'),
+      'query-text ::= '+JSON.stringify('"')+' ['+CHAT_TEXT+']{3,92} '+JSON.stringify('"')
+    ].join('\n');
+    return {prompt,grammar,maxTokens:60,timeoutMs:35000,candidates,actions,editKeys};
+  }
+
+  function cleanChatText(value,max) {
+    if(typeof value!=='string'||value.length>max||invalidChatText.test(value)||value.includes('://')||
+        value.replace(/\s/g,'').length<3)throw Error('Texto do chat inválido.');
+    return value.trim().replace(/\s+/g,' ');
+  }
+
+  function readChat(answer,{actions,editKeys,candidates}) {
+    const value=JSON.parse(answer);
+    if(!Array.isArray(value)||!actions.includes(value[0]))throw Error('Ação do chat inválida.');
+    const [verb,arg]=value;
+    if(value.length!==2)throw Error('Resposta inválida.');
+    if(verb==='perguntar'){
+      if(!Object.hasOwn(preferenceQuestions,arg))throw Error('Preferência inválida.');
+      return {reply:preferenceQuestions[arg]};
+    }
+    if(verb==='falar'){
+      const text=cleanChatText(arg,132);
+      if(/^(?:\/|busca:|filtros:|usu[aá]rio(?: agora)?:)/i.test(text))throw Error('Resposta sem conteúdo.');
+      return {reply:text};
+    }
+    if(verb==='buscar'){
+      const query=cleanChatText(arg,92);
+      if(!/^[A-Za-zÀ-ÿ0-9]/.test(query)||/\b(?:query|theme|usu[aá]rio|user|remove):/i.test(query))throw Error('Consulta inválida.');
+      return {query};
+    }
+    const hymn=candidates.get(arg);
+    if(!hymn||!editKeys[verb].includes(arg))throw Error('Hino fora do contexto.');
+    return {verb,hymn};
+  }
+
+  return { prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
 })();
