@@ -182,34 +182,54 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         if (prompt.empty()) { javaException(env,"Consulta vazia."); return nullptr; }
         if (shouldCancel(&deadline)) { javaException(env,"Geração cancelada."); return nullptr; }
         g_generation_stage.store(1,std::memory_order_relaxed);
+        // A API C legada llama_chat_apply_template detecta modelos por heurística:
+        // templates com <|im_start|> são reduzidos a ChatML genérico, perdendo
+        // <|startoftext|> e <think> do LFM3. Usar o formato oficial mínimo
+        // para a arquitetura LFM3; preservar o caminho original das demais.
+        char architecture[64]={0};
+        const int archLength=llama_model_meta_val_str(
+            g_model,"general.architecture",architecture,sizeof(architecture));
+        const bool lfm3=archLength>0 && std::string(architecture)=="lfm3";
         const char* tmpl=llama_model_chat_template(g_model,nullptr);
-        llama_chat_message message={"user",prompt.c_str()};
-        int formattedSize=llama_chat_apply_template(tmpl,&message,1,true,nullptr,0);
+        int formattedSize=0;
         bool templateApplied=false;
-        if(formattedSize>0&&formattedSize<11000){
-            std::vector<char> formatted(formattedSize+1,0);
-            int used=llama_chat_apply_template(tmpl,&message,1,true,formatted.data(),formattedSize+1);
-            if(used>0&&used<=(int)formattedSize){
-                prompt.assign(formatted.data(),used);
-                templateApplied=true;
+        if(lfm3){
+            const std::string userPrompt=prompt;
+            prompt="<|startoftext|><|im_start|>user\n"
+                +userPrompt+"<|im_end|>\n<|im_start|>assistant\n";
+            // Gramáticas JSON precisam começar diretamente na resposta final.
+            // Sem gramática, permitir raciocínio nativo do LFM3.
+            prompt += grammar.empty()?"<think>":"<think></think>";
+            templateApplied=true;
+        }else{
+            llama_chat_message message={"user",prompt.c_str()};
+            formattedSize=llama_chat_apply_template(tmpl,&message,1,true,nullptr,0);
+            if(formattedSize>0&&formattedSize<11000){
+                std::vector<char> formatted(formattedSize+1,0);
+                int used=llama_chat_apply_template(
+                    tmpl,&message,1,true,formatted.data(),formattedSize+1);
+                if(used>0&&used<=(int)formattedSize){
+                    prompt.assign(formatted.data(),used);
+                    templateApplied=true;
+                }
             }
         }
-        // Somente metadados do template: NUNCA registrar o prompt ou letras.
+        // Somente atributos: jamais registrar conteúdo do usuário ou das letras.
         __android_log_print(ANDROID_LOG_INFO,"LFM3_TEMPLATE",
-            "available=%d applied=%d rendered_bytes=%d prefix_think=%d grammar=%d",
-            tmpl!=nullptr,templateApplied,formattedSize,
+            "architecture_lfm3=%d available=%d applied=%d manual=%d rendered_bytes=%d prefix_think=%d grammar=%d",
+            lfm3,tmpl!=nullptr,templateApplied,lfm3,formattedSize,
             endsWithOpenThinking(prompt),!grammar.empty());
-        if (!grammar.empty() && endsWithOpenThinking(prompt)) {
+        if (!lfm3 && !grammar.empty() && endsWithOpenThinking(prompt)) {
             prompt += "</think>\n";
             __android_log_print(ANDROID_LOG_INFO,"LFM3_TEMPLATE",
                 "Closed thinking prefix for constrained output");
         }
         const llama_vocab* vocab=llama_model_get_vocab(g_model);
-        int n_tokens=llama_tokenize(vocab,prompt.c_str(),prompt.size(),nullptr,0,true,true);
+        int n_tokens=llama_tokenize(vocab,prompt.c_str(),prompt.size(),nullptr,0,!lfm3,true);
         if(n_tokens<0)n_tokens=-n_tokens;
         if(n_tokens<=0||n_tokens>1000){javaException(env,"A consulta ultrapassou 1000 tokens para o contexto econômico. Reduza o texto.");return nullptr;}
         std::vector<llama_token> tokens(n_tokens);
-        int count=llama_tokenize(vocab,prompt.c_str(),prompt.size(),tokens.data(),n_tokens,true,true);
+        int count=llama_tokenize(vocab,prompt.c_str(),prompt.size(),tokens.data(),n_tokens,!lfm3,true);
         if(count<0){javaException(env,"Falha na tokenização do prompt.");return nullptr;}
         g_prompt_tokens.store(count);
         const int predict=std::clamp(static_cast<int>(tokenLimit),1,120);
