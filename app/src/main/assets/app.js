@@ -427,8 +427,9 @@ function showChatScripture(bubble,scripture){
   scrollChat();
 }
 async function refineChatSearch(request,turn){
+  let scripture=null;
   if(request.context&&request.query){
-    const scripture=await chatScripture(request.context);
+    scripture=await chatScripture(request.context);
     if(state.chatPending!==turn)return false;
     if(scripture&&(scripture.narrative||request.context.length>500)){
       const anchor=[scripture.narrative,scripture.reference].filter(Boolean).join(' ');
@@ -471,6 +472,20 @@ async function refineChatSearch(request,turn){
     bubble.appendChild(button);
     scrollChat();
   }
+  const candidates=visibleHymns().slice(0,4);
+  if(request.context&&candidates.length>1){
+    turn.searching=false;
+    updateChatControls();
+    const result=await GGUF.refineChat({recommendation:true,message:request.context,shown:candidates,scripture});
+    if(state.chatPending===turn&&result?.recommendation){
+      const hymn=result.recommendation;
+      const recommendation=chatSay('assistant','Sugestão da IA · '+chatHymnName(hymn)+'\n'+result.reason);
+      const evidence=document.createElement('p');
+      evidence.textContent='Trecho do hino: '+hymn.snippet;
+      recommendation.appendChild(evidence);
+      scrollChat();
+    }
+  }
   return true;
 }
 async function submitRefinement(message,{viaButton=false}={}){
@@ -480,6 +495,8 @@ async function submitRefinement(message,{viaButton=false}={}){
     return false;
   }
   const history=state.chatHistory.slice();
+  const lastQuestion=history.at(-1)?.intent;
+  const answeringPreference=typeof lastQuestion==='string'&&lastQuestion.startsWith('preference:')&&message.length<=100;
   const pick=!viaButton&&OfflineAPI.chatSearchIntent(message).list;
   const request=pick?null:LocalHymnAI.chatSearchRequest(message,history,viaButton);
   const editCommand=!request&&OfflineAPI.chatEditCommand(message);
@@ -562,7 +579,7 @@ async function submitRefinement(message,{viaButton=false}={}){
       (message.length<120&&previousNote?await chatScripture(previousNote):null));
     if(!current())return false;
     const response=await GGUF.refineChat({message,history,shown,found,editIntent:lookup.verb,explaining,pick,scripture,
-      asked:[...state.chatQuestions]});
+      asked:[...state.chatQuestions],answeringPreference});
     if(!current())return false;
     if(response?.cancelled){chatSay('assistant','Conversa interrompida.');return false;}
     if(response?.verb==='destacar'&&pick)return applyChatEdit('destacar',response.hymn);
@@ -573,7 +590,11 @@ async function submitRefinement(message,{viaButton=false}={}){
     }
     if(response?.reply){
       if(response.question)state.chatQuestions.add(response.question);
-      showChatScripture(chatSay('assistant',response.reply),scripture);
+      showChatScripture(chatSay('assistant',response.reply,response.question?'preference:'+response.question:undefined),scripture);
+      return true;
+    }
+    if(answeringPreference&&!explaining&&!lookup.verb){
+      chatSay('assistant','Vou considerar essa preferência quando você pedir sugestões.');
       return true;
     }
     if(explaining){
@@ -1097,7 +1118,9 @@ const GGUF=(()=>{
       state.deprioritize?.length&&'menos foco em '+state.deprioritize.join(', '),
       state.requiredTerms?.length&&'obrigatório '+state.requiredTerms.join(', ')
     ].filter(Boolean).join(' · ');
-    const request=LocalHymnAI.prepareChat({...context,query:state.effectiveQuery,constraints});
+    const request=context.recommendation?LocalHymnAI.prepareRecommendation(context.message,context.shown,context.scripture):
+      LocalHymnAI.prepareChat({...context,query:state.effectiveQuery,constraints});
+    if(!request)return Promise.resolve(null);
     return new Promise(resolve=>{
       const chat={request,resolve,epoch:state.searchEpoch};
       if(selectedState.task?.type==='review'){

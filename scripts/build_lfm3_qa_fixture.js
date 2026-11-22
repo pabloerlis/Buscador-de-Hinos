@@ -53,7 +53,14 @@ const chatRequests=[
   ai.prepareChat({query:'Hinos para o culto',message:'Pode retirar o da tempestade?',forced:{verb:'retirar',id:27},
     history:[{kind:'assistant',text:'Qual tema você quer enfatizar? Há algum tema que prefere evitar?'}],
     shown:[{id:27,number:'027',title:'Vento no mar',snippet:'Cristo acalmou a tempestade.'},
-      {id:38,number:'038',title:'Volta ao pai',snippet:'Eu me arrependi e voltei para meu pai.'}]})
+      {id:38,number:'038',title:'Volta ao pai',snippet:'Eu me arrependi e voltei para meu pai.'}]}),
+  ai.prepareChat({message:'Solenes',answeringPreference:true,asked:['clima','ocasiao'],
+    history:[{kind:'user',text:'Culto de velório. Hinos de consolo e encorajamento.'},
+      {kind:'assistant',text:'Você prefere hinos mais alegres ou mais solenes?'}]}),
+  ai.prepareRecommendation('Culto de velório. Hinos solenes, de consolo e encorajamento.',[
+    {id:71,title:'Canto da colheita',snippet:'Vamos celebrar a colheita com danças e alegria.'},
+    {id:82,title:'Consolo na dor',snippet:'Deus consola quem chora e sustenta o coração na dor.'}
+  ])
 ];
 fs.writeFileSync('app/src/androidTest/assets/lfm3-chat.json',JSON.stringify({
   requests:chatRequests.map(({prompt,grammar,maxTokens,timeoutMs})=>({prompt,grammar,maxTokens,timeoutMs}))

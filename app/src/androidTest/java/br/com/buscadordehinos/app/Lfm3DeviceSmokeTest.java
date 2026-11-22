@@ -150,7 +150,7 @@ public class Lfm3DeviceSmokeTest {
 
     private static void verifyChat(Method generate) throws Exception {
         JSONArray requests=fixture("lfm3-chat.json").getJSONArray("requests");
-        assertEquals("Todos os cenários do chat devem ser executados",4,requests.length());
+        assertEquals("Todos os cenários do chat devem ser executados",6,requests.length());
         long start=SystemClock.elapsedRealtime();
         for(int i=0;i<requests.length();i++){
             JSONObject item=requests.getJSONObject(i);
@@ -167,6 +167,17 @@ public class Lfm3DeviceSmokeTest {
                 assertEquals(2,result.length());
                 assertEquals("A dúvida sobre estilo deve gerar uma pergunta","perguntar",result.getString(0));
                 assertTrue(result.getString(1).matches("clima|ritmo|tema|ocasiao|hino"));
+            }else if(i==4){
+                assertEquals(2,result.length());
+                assertEquals("falar",result.getString(0));
+                String reply=result.getString(1);
+                assertTrue("A resposta de velório deve ser uma frase afirmativa em linguagem natural",
+                    reply.matches("^\\p{L}[^?]*$")&&reply.replaceAll("[^\\p{L}]","").length()>=4);
+            }else if(i==5){
+                assertEquals(3,result.length());
+                assertEquals("indicar",result.getString(0));
+                assertEquals("A recomendação deve seguir o trecho sobre consolo",2,result.getInt(1));
+                assertTrue(result.getString(2).matches("^\\p{L}.*$"));
             }else{
                 assertEquals(2,result.length());
                 assertEquals(i==2?"acrescentar":"retirar",result.getString(0));
