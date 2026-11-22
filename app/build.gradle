@@ -26,8 +26,8 @@ android {
                 }
             }
         }
-        versionCode 41
-        versionName '2.6.22'
+        versionCode 42
+        versionName '2.6.23'
         buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
         buildConfigField 'boolean', 'ENABLE_LOCAL_EMBEDDINGS', enableLocalEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'

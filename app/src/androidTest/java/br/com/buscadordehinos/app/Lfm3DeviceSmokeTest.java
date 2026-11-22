@@ -150,6 +150,7 @@ public class Lfm3DeviceSmokeTest {
 
     private static void verifyChat(Method generate) throws Exception {
         JSONArray requests=fixture("lfm3-chat.json").getJSONArray("requests");
+        assertEquals("Todos os cenários do chat devem ser executados",4,requests.length());
         long start=SystemClock.elapsedRealtime();
         for(int i=0;i<requests.length();i++){
             JSONObject item=requests.getJSONObject(i);

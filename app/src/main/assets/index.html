@@ -104,13 +104,13 @@
           <div class="results-layout">
             <aside class="results-tools" aria-label="Ações da busca">
               <div class="results-actions">
-                <button id="refine-toggle" class="secondary-btn" type="button" aria-controls="refine-panel" aria-expanded="false">Chat de busca</button>
+                <button id="refine-toggle" class="secondary-btn" type="button" aria-controls="refine-panel" aria-expanded="false">Escolher hinos em conjunto</button>
                 <button id="gguf-compare" class="secondary-btn" type="button" disabled>Comparar hinos</button>
               </div>
               <div id="refine-panel" class="refine-panel hidden">
                 <p id="refine-mode" class="subtle-note">Refinamento pela busca local</p>
                 <div id="conversation" class="conversation" aria-live="polite"></div>
-                <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: prefiro hinos mais animados" maxlength="500" enterkeyhint="send" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
+                <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Mensagem para a IA</label><input id="refine-input" placeholder="Ex.: prefiro hinos mais animados" maxlength="320" enterkeyhint="send" required><button id="refine-send" aria-label="Enviar mensagem" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
                 <p class="privacy-note">Use “apenas” para exigir um tema, “sem” para excluir, “sem foco em” para reduzir a prioridade ou “nova busca por” para recomeçar.</p>
               </div>
             </aside>

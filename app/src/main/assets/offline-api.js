@@ -463,7 +463,10 @@ const OfflineAPI = (() => {
     const message=String(payload?.message||'').trim();
     if(!message||message.length>MAX_QUERY_LENGTH)return {hymns:[]};
     const norm=normalize(message);
-    const command=norm.match(/(?:^|[.!?]\s+)(?:(?:por favor|pode|quero(?: que)?)\s+)?(acrescent(?:e|ar)|adicion(?:e|ar)|inclu(?:a|ir)|colo(?:que|car)|retir(?:e|ar)|remov(?:a|er)|tir(?:e|ar)|exclu(?:a|ir))\s+(?:(?:o|a)\s+)?(?:hino\s+)?(.+?)[.!?]*$/);
+    const context=contextQuery(message,'',{refine:true});
+    if(context.fresh||context.excluded.length||context.required.length||context.deprioritized.length)
+      return {hymns:[],refine:true};
+    const command=norm.match(/^(?:(?:por favor|pode|quero(?: que)?)[,\s]+)?(acrescent(?:e|ar)|adicion(?:e|ar)|inclu(?:a|ir)|colo(?:que|car)|retir(?:e|ar)|remov(?:a|er)|tir(?:e|ar)|exclu(?:a|ir))\s+(?:(?:o|a)\s+)?(?:hino\s+)?(.+?)[.!?]*$/);
     const opts=searchOptions(payload?.settings);
     if(command){
       const verb=/^(?:retir|remov|tir|exclu)/.test(command[1])?'retirar':'acrescentar';
@@ -472,14 +475,17 @@ const OfflineAPI = (() => {
       const quote=selector.match(/^["“](.+)["”]$/);
       const exactTitle=titleIndex.has(normalizeLyrics(quote?.[1]||selector));
       if(number||quote||exactTitle){
-        const query=number?(number[2]?number[2]+' ':'')+'hino '+number[1]:(quote?.[1]||selector);
-        const result=search({query,settings:{...opts,minAffinity:0,pageSize:25}});
+        const collection=number?.[2]==='coletanea'?'principal':number?.[2];
+        const query=number?(collection?collection+' ':'')+'hino '+number[1]:(quote?.[1]||selector);
+        const result=search({query,settings:{...opts,minAffinity:0,pageSize:25},
+          ...(verb==='acrescentar'?{exclude:payload.exclude,require:payload.require}:{})});
         return {verb,selector,exact:true,hymns:result.results.filter(hymn=>number||hymn.match_type==='titulo_exato')};
       }
-      if(verb==='retirar')return {verb,hymns:[]};
+      if(verb==='retirar')return {verb,selector,hymns:[]};
+      const result=search({query:selector,settings:{...opts,pageSize:25},exclude:payload.exclude,require:payload.require});
+      return {verb,hymns:result.results};
     }
-    const result=search({query:message,settings:{...opts,pageSize:8},exclude:payload.exclude,require:payload.require});
-    return {verb:command?'acrescentar':undefined,hymns:result.results};
+    return {hymns:[]};
   }
 
   function search(payload){
@@ -550,6 +556,17 @@ const OfflineAPI = (() => {
     const requiredCriteria=required.map(term=>searchCriterion(term,allowTopics));
     const excludedCriteria=excluded.map(term=>searchCriterion(term,allowTopics));
     const lowerCriteria=deprioritized.map(term=>searchCriterion(term,allowTopics));
+    const matchesCriterion=(song,{title,lyrics},criterion)=>criterion.normalized&&(
+      hasWord(title,criterion.normalized)||hasWord(lyrics,criterion.normalized)||
+      (criterion.thematic&&(song.semantic_profile?.some(topic=>criterion.topicIds.has(topic.id))||
+        song.topics.some(topic=>normalizeLyrics(topic)===criterion.normalized))));
+    const meetsFilters=(song,indexed)=>requiredCriteria.every(term=>matchesCriterion(song,indexed,term))&&
+      !excludedCriteria.some(term=>matchesCriterion(song,indexed,term));
+    const curatedIds=(Array.isArray(payload.curated_ids)?payload.curated_ids:[]).filter(id=>{
+      if(!Number.isSafeInteger(id))return false;
+      const song=hymns[id-1];
+      return song&&collectionEnabled(song,opts)&&!RepertoireStore.isNotLearned(song)&&meetsFilters(song,searchTexts.get(id));
+    });
     const snippetPhrases=[...new Set([...requiredCriteria.map(item=>item.normalized).filter(Boolean),...(quoted.length?quoted:exactPhrase.length>=4?[exactPhrase]:[])])];
     // A proximidade complementa buscas temáticas livres e preserva a evidência de consultas exatas.
     const usePassages=semanticWeight>0&&!numberMatch&&!quoted.length&&!required.length&&
@@ -566,11 +583,7 @@ const OfflineAPI = (() => {
       const {title,lyrics,titleWords,words}=indexedText;
       const matchesText=term=>hasWord(title,term)||hasWord(lyrics,term);
       if(quoted.some(phrase=>!matchesText(phrase)))continue;
-      const matchesTopic=criterion=>song.semantic_profile?.find(topic=>criterion.topicIds.has(topic.id));
-      const matchesCriterion=criterion=>criterion.normalized&&(matchesText(criterion.normalized)||
-        (criterion.thematic&&(matchesTopic(criterion)||song.topics.some(topic=>normalizeLyrics(topic)===criterion.normalized))));
-      if(requiredCriteria.some(criterion=>!matchesCriterion(criterion)))continue;
-      if(excludedCriteria.some(matchesCriterion))continue;
+      if(!meetsFilters(song,indexedText))continue;
       const namedCollection=numberMatch?.[1]?collectionId(numberMatch[1]):null;
       if(numberMatch&&!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2]) && (!namedCollection||ref.id===namedCollection) && opts.collections[ref.id]!==false))continue;
       let score=0;let lexicalSignal=0,semanticSignal=0,biblicalSignal=0,narrativeSignal=0,vectorSignal=0;
@@ -668,7 +681,7 @@ const OfflineAPI = (() => {
         semanticSignal+=9*Math.min(semanticWeight,1);
         evidence.unshift(sharedPassage.reason);
       }
-      const lowered=numberMatch?[]:lowerCriteria.filter(matchesCriterion).map(criterion=>criterion.term);
+      const lowered=numberMatch?[]:lowerCriteria.filter(term=>matchesCriterion(song,indexedText,term)).map(criterion=>criterion.term);
       if(lowered.length)score*=1-Math.min(.45,lowered.length*.25);
       const matchedTokens=qTokens.filter(x=>words.has(x));
       const reason=numberMatch?'Número exato do hino.':evidence.length?evidence.slice(0,2).join('. ')+'.':matchedTokens.length?'A letra contém termos relacionados: '+matchedTokens.slice(0,3).join(', ')+'.':'Possível relação temática; confira a letra antes de utilizar.';
@@ -762,7 +775,7 @@ const OfflineAPI = (() => {
       ...(bridgeIntent?.aliases||[]).map(t=>'Associação lexical: '+t),
       ...(storyIntent?.matches.length&&storyIntent.residual&&tokens(storyIntent.residual).length?['Outros termos: '+tokens(storyIntent.residual).join(', ')]:[])
     ]:[];
-    return {page,page_size:opts.pageSize,total:available.length,has_more:from+opts.pageSize<available.length,
+    return {page,page_size:opts.pageSize,curated_ids:curatedIds,total:available.length,has_more:from+opts.pageSize<available.length,
       results:available.slice(from,from+opts.pageSize).map(withSnippet),
       not_learned_total:notLearned.length,not_learned_page:hiddenPage,
       not_learned_results:notLearned.slice(hiddenFrom,hiddenFrom+hiddenSize).map(withSnippet),

@@ -193,7 +193,7 @@ const LocalHymnAI = (() => {
     hino:'Qual hino você quer manter ou mudar? Pode me dizer o número ou o título.'
   };
 
-  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,forced=null}) {
+  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,preference=false,explaining=false,forced=null}) {
     const candidates=new Map();
     const addRow=(hymn,inList)=>{
       if(!Number.isSafeInteger(hymn.id)||[...candidates.values()].some(item=>item.id===hymn.id))return;
@@ -222,23 +222,25 @@ const LocalHymnAI = (() => {
       rules.push(verb+'-position ::= '+keys.map(key=>JSON.stringify(String(key))).join(' | '));
     }
     const uncertain=/\b(?:em dúvida|não sei|não tenho certeza|me ajude a decidir)\b/i.test(message);
-    const edit=editIntent&&editKeys[editIntent]?.length?editIntent:null;
+    const edit=editIntent==='acrescentar'&&editKeys.acrescentar.length?'acrescentar':null;
     const actions=forcedPosition?[forced.verb]:edit?[edit,'perguntar']:uncertain?['perguntar']:
-      ['falar','perguntar','buscar',...Object.keys(editKeys).filter(verb=>editKeys[verb].length)];
+      explaining?['falar']:preference?['buscar','perguntar']:['falar','perguntar','buscar'];
     const prompt=[
       'Você ajuda a escolher hinos em português. Responda só com uma ação JSON.',
       forcedPosition
         ?'Pedido explícito confirmado pelo catálogo. Use a ação '+forced.verb+' na posição '+forcedPosition+' para confirmar.'
         :edit
-          ?'Para '+edit+' um hino, escolha a linha que atende ao pedido. Se não estiver claro, pergunte.'
+          ?'Escolha um hino do catálogo para propor. Se não houver boa opção, pergunte qual hino o usuário procura.'
           :uncertain
             ?'Escolha qual preferência perguntar: clima, ritmo, tema, ocasiao ou hino.'
-            :'Se falta uma preferência, use perguntar. Use falar para responder sem mudar nada. Use buscar com os temas desejados.',
-      !forcedPosition&&!uncertain&&'Edite a lista quando houver pedido ou aceitação. Use a posição da linha.',
+            :preference
+              ?'Aplique a preferência com buscar usando os temas pedidos. Pergunte se a preferência ainda estiver vaga.'
+              :'Converse sobre a escolha. Use perguntar para entender tema, ocasião ou estilo, falar para explicar e buscar quando o usuário pedir outros resultados.',
+      explaining&&'Explique as sugestões usando apenas os títulos e trechos apresentados. Não execute ações.',
       'Busca: '+promptText(query,90),
       constraints&&'Filtros: '+promptText(constraints,90),
       ...history.slice(-5).map(item=>(item.kind==='user'?'Usuário: ':'Você: ')+promptText(item.text,80)),
-      'Usuário agora: '+promptText(message,185),
+      'Usuário agora: '+promptText(message,320),
       ...(candidates.size?[...candidates].map(([position,h])=>position+' '+(h.inList?'na lista':'catálogo')+
         ' · '+promptText(h.number,8)+' '+promptText(h.title,37)+' '+promptText(h.snippet,40)):[])
     ].filter(Boolean).join('\n');
@@ -263,11 +265,11 @@ const LocalHymnAI = (() => {
     if(value.length!==2)throw Error('Resposta inválida.');
     if(verb==='perguntar'){
       if(!Object.hasOwn(preferenceQuestions,arg))throw Error('Preferência inválida.');
-      return {reply:preferenceQuestions[arg]};
+      return {reply:preferenceQuestions[arg],question:arg};
     }
     if(verb==='falar'){
       const text=cleanChatText(arg,132);
-      if(/^(?:\/|busca:|filtros:|usu[aá]rio(?: agora)?:)/i.test(text))throw Error('Resposta sem conteúdo.');
+      if(/^(?:\/|(?:buscar|busca|perguntar|retirar|acrescentar|destacar|filtros|usu[aá]rio(?: agora)?)\s*:)/i.test(text))throw Error('Resposta sem conteúdo.');
       return {reply:text};
     }
     if(verb==='buscar'){

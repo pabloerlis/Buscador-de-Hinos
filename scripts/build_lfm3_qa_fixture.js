@@ -50,7 +50,7 @@ const chatRequests=[
   ai.prepareChat({query:'Hinos para o culto',message:'Quero refinar, mas ainda estou em dúvida sobre o estilo.',shown:chatHymns.slice(0,2)}),
   ai.prepareChat({query:'Regresso ao Pai',message:'Retire o hino 027.',shown:chatHymns.slice(0,2),forced:{verb:'retirar',id:27}}),
   ai.prepareChat({query:'Regresso ao Pai',message:'Acrescente o hino 049.',shown:chatHymns.slice(1,2),found:chatHymns.slice(2),forced:{verb:'acrescentar',id:49}}),
-  ai.prepareChat({query:'Hinos para o culto',message:'Prefiro o filho pródigo. Pode retirar o da tempestade?',editIntent:'retirar',
+  ai.prepareChat({query:'Hinos para o culto',message:'Pode retirar o da tempestade?',forced:{verb:'retirar',id:27},
     history:[{kind:'assistant',text:'Qual tema você quer enfatizar? Há algum tema que prefere evitar?'}],
     shown:[{id:27,number:'027',title:'Vento no mar',snippet:'Cristo acalmou a tempestade.'},
       {id:38,number:'038',title:'Volta ao pai',snippet:'Eu me arrependi e voltei para meu pai.'}]})
