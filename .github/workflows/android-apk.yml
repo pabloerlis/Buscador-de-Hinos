@@ -1,7 +1,7 @@
 name: Android APK - verificacao por agentes
 on:
   push:
-    branches: ['**']
+    branches: ['**', '!delivery/apk-2.6.19-e555e30']
   pull_request:
     branches: [main]
   workflow_dispatch:

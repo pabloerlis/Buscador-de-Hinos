@@ -1,0 +1,80 @@
+name: Entregar APK 2.6.19 verificado
+on:
+  push:
+    branches: ['delivery/apk-2.6.19-e555e30']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_SHA: 'e555e30611dc5a6c9c67484c5aab4cf012729c16'
+      RUN_ID: '44979179076'
+      APK_NAME: Buscador-de-Hinos-2.6.19.apk
+      RELEASE_TAG: v2.6.19-qa
+    steps:
+      - name: Confirmar que a execução aprovada é do commit final
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" |
+            jq -e --arg sha "$SOURCE_SHA" '.head_sha == $sha and .conclusion == "success"'
+      - name: Extrair pacote aprovado sem recompilar
+        uses: actions/download-artifact@v4
+        with:
+          name: Buscador-de-Hinos-v2.6.19-QA-aprovado
+          run-id: 44979179076
+          github-token: ${{ github.token }}
+          path: verified
+      - name: Publicar e verificar os bytes do APK direto
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=verified/apk-candidate/app-debug.apk
+          audit=verified/qa-report/apk-audit.json
+          review=verified/qa-report/independent-review.json
+          test -s "$apk"
+          sha="$(jq -er 'select(.passed==true and .local_gguf_engine_embedded==true and .local_e5_embedded==true) | .sha256' "$audit")"
+          [[ "$sha" =~ ^[a-f0-9]{64}$ ]]
+          jq -e --arg sha "$sha" '.decision=="approved" and .errors==[] and .apk.sha256==$sha' "$review"
+          printf '%s  %s\n' "$sha" "$apk" | sha256sum --check --strict
+          review_ms="$(sed -n 's/.*BENCHMARK_RESULT case=review-four total_ms=\([0-9][0-9]*\).*/\1/p' verified/qa-report/lfm3-device-evidence.log)"
+          [[ "$review_ms" =~ ^[0-9]+$ ]]
+          cp -- "$apk" "$APK_NAME"
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            printf 'APK de QA 2.6.19 (versionCode 38) extraído da execução aprovada #354, commit %s.\n\nSHA-256: `%s`\n' "$SOURCE_SHA" "$sha" >/tmp/notes.md
+            gh release create "$RELEASE_TAG" "$APK_NAME" --prerelease --latest=false \
+              --target "$SOURCE_SHA" --title 'Buscador de Hinos 2.6.19 (QA)' --notes-file /tmp/notes.md
+          fi
+          gh release view "$RELEASE_TAG" --json isPrerelease,targetCommitish |
+            jq -e --arg sha "$SOURCE_SHA" '.isPrerelease and .targetCommitish==$sha'
+          mkdir -p downloaded previous
+          gh release download "$RELEASE_TAG" --pattern "$APK_NAME" --dir downloaded
+          printf '%s  %s\n' "$sha" "downloaded/$APK_NAME" | sha256sum --check --strict
+          gh release download v2.6.17-qa --pattern Buscador-de-Hinos-2.6.17.apk --dir previous
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print -quit)"
+          test -x "$apksigner"
+          current="$("$apksigner" verify --print-certs "downloaded/$APK_NAME" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          previous="$("$apksigner" verify --print-certs "previous/Buscador-de-Hinos-2.6.17.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          test -n "$current"
+          test -n "$previous"
+          url="https://github.com/$GITHUB_REPOSITORY/releases/download/$RELEASE_TAG/$APK_NAME"
+          jq -n --arg link "$url" --arg sha "$sha" --arg commit "$SOURCE_SHA" --arg current "$current" --arg previous "$previous" \
+            --argjson run "$RUN_ID" --argjson review_ms "$review_ms" --argjson bytes "$(wc -c < "downloaded/$APK_NAME")" \
+            '{link:$link,sha256:$sha,source_sha:$commit,version_name:"2.6.19",version_code:38,bytes:$bytes,run:$run,review_android_ms:$review_ms,signature_matches_2_6_17:($current==$previous)}' >/tmp/delivery.json
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/delivery-2.6.19.json" \
+            -f branch="$GITHUB_REF_NAME" -f message='Registra verificação do APK baixado' \
+            -f content="$(base64 -w0 /tmp/delivery.json)"
+      - name: Registrar execução para diagnóstico se a entrega falhar
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          jq -n --argjson run "$GITHUB_RUN_ID" '{delivery_failed_run:$run}' >/tmp/delivery-error.json
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/delivery-error-2.6.19.json" \
+            -f branch="$GITHUB_REF_NAME" -f message='Registra execução da entrega para diagnóstico' \
+            -f content="$(base64 -w0 /tmp/delivery-error.json)"
