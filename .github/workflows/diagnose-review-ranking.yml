@@ -8,7 +8,7 @@ permissions:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 22
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -35,31 +35,13 @@ jobs:
           set -euo pipefail
           echo "43a7d09a0e9cba91b63eb7052488b9564569bddfd65754d2e426465e572a7452  /tmp/LFM3-1.7B-QAD-Q4_0.gguf" | sha256sum --check
           mkdir -p /tmp/hinos-review
+          git fetch --depth=1 origin 'e555e30611dc5a6c9c67484c5aab4cf012729c16'
+          for name in local-hymn-ai.js offline-api.js story-engine.js semantic-stories.json; do
+            file="app/src/main/assets/$name"
+            git show 'e555e30611dc5a6c9c67484c5aab4cf012729c16':"$file" > "$file"
+          done
           curl --fail --location --silent --show-error --retry 3 --max-time 90 'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' --output /tmp/hinos-avaliacao.json
-          sed -i '/fs.writeFileSync.*grammar-/a\    fs.writeFileSync("/tmp/hinos-review/segments-"+i+".json",JSON.stringify(item.candidate.excerpts));' tests/diagnose-review-ranking.js
           node tests/diagnose-review-ranking.js /tmp/hinos-avaliacao.json
-          mkdir -p /tmp/hinos-review/variants
-          node - <<'JS'
-          const fs=require('node:fs');
-          const root='/tmp/hinos-review';
-          const variants={
-            curto:(query,e)=>'Este trecho fala especificamente de '+query+'? Responda sim ou não.\nTrecho: '+e[0],
-            rotulo:(query,e)=>'Este trecho fala especificamente da parábola do filho pródigo? Responda sim ou não.\nTrecho: '+e.join(' / '),
-            acao:(query,e)=>'Este trecho fala especificamente de voltar para o pai depois de se afastar e ser recebido de volta? Responda sim ou não.\nTrecho: '+e.join(' / '),
-            acao_curta:(query,e)=>'Este trecho fala especificamente de voltar para o pai depois de se afastar e ser recebido de volta? Responda sim ou não.\nTrecho: '+e[0],
-            pergunta:(query,e)=>'Neste trecho, alguém volta para o pai após ter se afastado? Responda sim ou não.\nTrecho: '+e.join(' / '),
-            parafrase:(query,e)=>'A mensagem deste trecho é sobre '+query+'? Responda sim ou não.\nTrecho: '+e.join(' / '),
-          };
-          for(let i=0;i<4;i++){
-            const input=fs.readFileSync(root+'/input-'+i+'.txt','utf8');
-            const raw=input.slice('Este trecho fala especificamente de '.length,input.indexOf('?'));
-            const query=raw[0].toLocaleLowerCase('pt-BR')+raw.slice(1);
-            const excerpts=JSON.parse(fs.readFileSync(root+'/segments-'+i+'.json'));
-            for(const [name,render] of Object.entries(variants)){
-              fs.writeFileSync(root+'/variants/'+name+'-'+i+'.txt',render(query,excerpts));
-            }
-          }
-          JS
           cp -r app/src/main/cpp /tmp/hinos-review/cpp
           sed -i '/^project/a set(CMAKE_POSITION_INDEPENDENT_CODE ON)\nset(LLAMA_BUILD_TOOLS OFF CACHE BOOL "" FORCE)\nfind_package(JNI REQUIRED)' /tmp/hinos-review/cpp/CMakeLists.txt
           sed -i 's/PRIVATE llama ggml log/PRIVATE llama ggml/; s/PRIVATE \${llamacpp_SOURCE_DIR}\/include/PRIVATE \${JNI_INCLUDE_DIRS} \${llamacpp_SOURCE_DIR}\/include/' /tmp/hinos-review/cpp/CMakeLists.txt
@@ -74,18 +56,9 @@ jobs:
           sed -e 's/int remaining=30_000/int remaining=120_000/' -e '/rows.add(grade/i\                System.out.println("candidate="+(i+1)+" decision="+grade+" prefill_ms="+stats[1]);' tests/diagnostic/MainActivity.java >/tmp/hinos-review/MainActivity.java
           javac -encoding UTF-8 -d /tmp/hinos-review/classes /tmp/hinos-review/MainActivity.java
           library="$(find /tmp/hinos-review/build -name libhinosllm.so -print -quit)"
-          mkdir -p /tmp/hinos-review/results
-          for variant in curto rotulo acao acao_curta pergunta parafrase; do
-            for i in 0 1 2 3; do
-              cp "/tmp/hinos-review/variants/$variant-$i.txt" "/tmp/hinos-review/input-$i.txt"
-            done
-            echo "variant=$variant"
-            LD_LIBRARY_PATH="$(dirname "$library")" java -cp /tmp/hinos-review/classes br.com.buscadordehinos.app.MainActivity "$library" /tmp/LFM3-1.7B-QAD-Q4_0.gguf
-            python3 tests/diagnostic/report-review.py
-            cp /tmp/hinos-review/result.json "/tmp/hinos-review/results/$variant.json"
-          done
-          jq -s 'map({variant:input_filename,before: [.before[]|{number,fits,inference_ms}],after: [.after[]|{number,new_rank}],total_inference_ms})' /tmp/hinos-review/results/*.json >/tmp/hinos-review/variants.json
+          java -cp /tmp/hinos-review/classes br.com.buscadordehinos.app.MainActivity "$library" /tmp/LFM3-1.7B-QAD-Q4_0.gguf
+          python3 tests/diagnostic/report-review.py
           test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/variantes-revisao-filho-prodigo-2619.json" \
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/confirmacao-revisao-filho-prodigo-2619.json" \
             -f branch="$GITHUB_REF_NAME" -f message='Registra posições antes e depois da revisão, sem letras' \
-            -f content="$(base64 -w0 /tmp/hinos-review/variants.json)"
+            -f content="$(base64 -w0 /tmp/hinos-review/result.json)"
