@@ -44,6 +44,16 @@ assert.match(cpp,/progress_callback=modelProgress/);
 assert.match(cpp,/cp\.n_ctx=1280/);
 assert.match(cpp,/cp\.n_batch=96/);
 assert.match(cpp,/llama_chat_apply_template/);
+// LFM3 possui prefixos especiais de BOS e raciocínio: a API C antiga
+// classifica seu Jinja apenas como ChatML genérico, perdendo essas marcas.
+assert.match(cpp,/llama_model_meta_val_str\(/);
+assert.match(cpp,/general\.architecture/);
+assert.match(cpp,/std::string\(architecture\)=="lfm3"/);
+assert.match(cpp,/<\|startoftext\|><\|im_start\|>user/);
+assert.match(cpp,/<think><\/think>/);
+assert.match(cpp,/llama_tokenize\(vocab,prompt\.c_str\(\),prompt\.size\(\),nullptr,0,!lfm3,true\)/);
+assert.match(cpp,/llama_tokenize\(vocab,prompt\.c_str\(\),prompt\.size\(\),tokens\.data\(\),n_tokens,!lfm3,true\)/);
+
 assert.match(cpp,/llama_decode/);
 assert.match(cpp,/llama_sampler_sample/);
 assert.match(cmake,/ggml-org\/llama.cpp/);
