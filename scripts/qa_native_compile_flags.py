@@ -3,6 +3,7 @@
 Requer os compile_commands.json gerados pelo Gradle externalNativeBuild.
 """
 import argparse
+import os
 import json
 import re
 import shlex
@@ -14,6 +15,7 @@ parser.add_argument("--root", default="app/.cxx")
 parser.add_argument("--output", default=None)
 args=parser.parse_args()
 wanted="ON" if args.mode=="optimized" else "OFF"
+expect_kleidiai=os.environ.get("HINOS_EXPECT_KLEIDIAI","false").lower() in ("1","true","yes")
 report={"mode":args.mode,"abis":{},"errors":[],"passed":False}
 required_targets=("ggml-base","ggml-cpu","llama","hinosllm")
 files=sorted(Path(args.root).rglob("compile_commands.json"))
@@ -27,7 +29,25 @@ for f in files:
     abi=next((x for x in ("arm64-v8a","x86_64") if x in f.parts),None)
     if not abi:
         continue
+    if expect_kleidiai:
+        cache_text=cache.read_text(errors="replace")
+        desired="ON" if abi=="arm64-v8a" else "OFF"
+        for flag,expected in (("HINOS_ENABLE_KLEIDIAI","ON"),("GGML_CPU_KLEIDIAI",desired)):
+            match_flag=re.search(rf"^{flag}:(?:BOOL|UNINITIALIZED)=(ON|OFF)$",cache_text,re.M)
+            if not match_flag or match_flag.group(1)!=expected:
+                report["errors"].append(f"{abi}: {flag} deveria ser {expected} no CMakeCache")
     entries=json.loads(f.read_text())
+    if expect_kleidiai:
+        sources=[entry.get("file","").replace(chr(92),"/") for entry in entries]
+        compiled=any("/ggml-cpu/kleidiai/kleidiai.cpp" in source for source in sources)
+        if compiled!=(abi=="arm64-v8a"):
+            report["errors"].append(f"{abi}: KleidiAI compilado na ABI incorreta")
+        for entry in entries:
+            argv=entry.get("arguments") or shlex.split(entry.get("command",""))
+            flags=[v for v in argv if v.startswith(("-march=","-mcpu="))]
+            if any(re.search(r"(?:\+|,)(?:i8mm|dotprod)",v) for v in flags):
+                report["errors"].append(f"{abi}: ISA obrigatória sem fallback: {flags}")
+                break
     targets={}
     for target in required_targets:
         matching=[]
@@ -52,7 +72,8 @@ for f in files:
             elif m["effective"] in ("-O2","-O3","-Ofast"):
                 report["errors"].append(f"{abi}/{target}/{m['file']}: baseline não representa Debug {m['effective']}")
         targets[target]=matching
-    report["abis"][abi]={"compile_commands":str(f),"targets":targets}
+    report["abis"][abi]={"compile_commands":str(f),"targets":targets,
+                         "kleidiai_expected":expect_kleidiai and abi=="arm64-v8a"}
 for abi in ("arm64-v8a","x86_64"):
     if abi not in report["abis"]:
         report["errors"].append(f"Falta a ABI {abi} no modo {args.mode}")
