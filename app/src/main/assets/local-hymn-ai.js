@@ -183,62 +183,101 @@ const LocalHymnAI = (() => {
     return [...reviewed,...hymns.slice(reviewed.length)];
   }
 
-  const CHAT_LIMIT=4;
-  const CHAT_QUERY_CHARACTERS=String.raw`A-Za-zÀ-ÖØ-öø-ÿ0-9 .,:;!?()/'’–\-`;
-  const invalidChatQuery=new RegExp('[^'+CHAT_QUERY_CHARACTERS+']');
+  const CHAT_TEXT=String.raw`A-Za-zÀ-ÖØ-öø-ÿ0-9 .,:;!?()/'’–\-`;
+  const invalidChatText=new RegExp('[^'+CHAT_TEXT+']');
+  const preferenceQuestions={
+    clima:'Você prefere hinos mais alegres ou mais solenes?',
+    ritmo:'Você prefere hinos mais animados ou mais tranquilos?',
+    tema:'Qual tema você quer enfatizar? Há algum tema que prefere evitar?',
+    ocasiao:'Para qual momento do culto você está escolhendo os hinos?',
+    hino:'Qual hino você quer manter ou mudar? Pode me dizer o número ou o título.'
+  };
 
-  function prepareChat({query, rootQuery, message, previous, hymns, constraints, canPick}) {
+  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,forced=null}) {
     const candidates=new Map();
-    if(canPick)for(const hymn of hymns.slice(0,CHAT_LIMIT)){
-      if(!Number.isSafeInteger(hymn.id)||!hymn.snippet||hymn.snippet==='Nenhum trecho disponível')continue;
-      candidates.set(candidates.size+1,hymn.id);
+    const addRow=(hymn,inList)=>{
+      if(!Number.isSafeInteger(hymn.id)||[...candidates.values()].some(item=>item.id===hymn.id))return;
+      candidates.set(candidates.size+1,{...hymn,inList});
+    };
+    shown.slice(0,6).forEach(hymn=>addRow(hymn,true));
+    found.slice(0,3).forEach(hymn=>addRow(hymn,false));
+    const positions=predicate=>[...candidates].filter(([,h])=>predicate(h)).map(([position])=>position);
+    const editKeys={
+      acrescentar:positions(h=>!h.inList),
+      retirar:positions(h=>h.inList),
+      destacar:positions(h=>h.inList)
+    };
+    const forcedPosition=forced&&[...candidates].find(([,hymn])=>hymn.id===forced.id)?.[0];
+    if(forcedPosition&&forced.verb in editKeys)editKeys[forced.verb]=[forcedPosition];
+
+    const rules=[
+      'falar ::= '+JSON.stringify('["falar",')+' text "]"',
+      'perguntar ::= '+JSON.stringify('["perguntar",')+' preference "]"',
+      'preference ::= '+Object.keys(preferenceQuestions).map(key=>JSON.stringify(JSON.stringify(key))).join(' | '),
+      'buscar ::= '+JSON.stringify('["buscar",')+' query-text "]"'
+    ];
+    for(const [verb,keys] of Object.entries(editKeys)){
+      if(!keys.length)continue;
+      rules.push(verb+' ::= '+JSON.stringify('["'+verb+'",')+' '+verb+'-position "]"');
+      rules.push(verb+'-position ::= '+keys.map(key=>JSON.stringify(String(key))).join(' | '));
     }
-    const prompt=(candidates.size?[
-      'Qual hino se encaixa exatamente no novo pedido? Responda só com a posição ou [].',
-      'Novo pedido: '+promptText(message,165),
-      message.length<=44&&'Busca atual: '+promptText(query,115),
-      message.length<=44&&previous&&'Pedido anterior: '+promptText(previous,85),
-      ...[...candidates].map(([position,id])=>{
-        const hymn=hymns.find(item=>item.id===id);
-        return position+' | '+promptText(hymn.snippet,95);
-      })
-    ]:[
-      'Use o pedido para refinar a pesquisa de hinos. Responda só com uma lista JSON.',
-      'Para pesquisar, escreva uma frase curta com o contexto que continua valendo.',
-      'Use uma lista vazia se o pedido não for uma pesquisa ou estiver ambíguo.',
-      rootQuery&&rootQuery!==query&&'Tema inicial: '+promptText(rootQuery,80),
-      'Busca atual: '+promptText(query,115),
-      previous&&'Pedido anterior: '+promptText(previous,85),
-      constraints&&'Filtros da pesquisa: '+promptText(constraints,105),
-      'Novo pedido: '+promptText(message,165)
-    ]).filter(Boolean).join('\n');
+    const uncertain=/\b(?:em dúvida|não sei|não tenho certeza|me ajude a decidir)\b/i.test(message);
+    const edit=editIntent&&editKeys[editIntent]?.length?editIntent:null;
+    const actions=forcedPosition?[forced.verb]:edit?[edit,'perguntar']:uncertain?['perguntar']:
+      ['falar','perguntar','buscar',...Object.keys(editKeys).filter(verb=>editKeys[verb].length)];
+    const prompt=[
+      'Você ajuda a escolher hinos em português. Responda só com uma ação JSON.',
+      forcedPosition
+        ?'Pedido explícito confirmado pelo catálogo. Use a ação '+forced.verb+' na posição '+forcedPosition+' para confirmar.'
+        :edit
+          ?'Para '+edit+' um hino, escolha a linha que atende ao pedido. Se não estiver claro, pergunte.'
+          :uncertain
+            ?'Escolha qual preferência perguntar: clima, ritmo, tema, ocasiao ou hino.'
+            :'Se falta uma preferência, use perguntar. Use falar para responder sem mudar nada. Use buscar com os temas desejados.',
+      !forcedPosition&&!uncertain&&'Edite a lista quando houver pedido ou aceitação. Use a posição da linha.',
+      'Busca: '+promptText(query,90),
+      constraints&&'Filtros: '+promptText(constraints,90),
+      ...history.slice(-5).map(item=>(item.kind==='user'?'Usuário: ':'Você: ')+promptText(item.text,80)),
+      'Usuário agora: '+promptText(message,185),
+      ...(candidates.size?[...candidates].map(([position,h])=>position+' '+(h.inList?'na lista':'catálogo')+
+        ' · '+promptText(h.number,8)+' '+promptText(h.title,37)+' '+promptText(h.snippet,40)):[])
+    ].filter(Boolean).join('\n');
     const grammar=[
-      'root ::= "[" ws ('+(candidates.size?'picks':'query')+')? ws "]"',
-      ...(candidates.size?[
-        'picks ::= id',
-        'id ::= '+[...candidates.keys()].map(key=>JSON.stringify(String(key))).join(' | ')
-      ]:[
-        String.raw`query ::= "\"" query-text "\""`,
-        'query-text ::= ['+CHAT_QUERY_CHARACTERS+']{3,116}'
-      ]),
-      'ws ::= " "?'
+      'root ::= '+actions.join(' | '),...rules,
+      'text ::= ' + JSON.stringify('"') + ' ['+CHAT_TEXT+']{4,132} ' +JSON.stringify('"'),
+      'query-text ::= '+JSON.stringify('"')+' ['+CHAT_TEXT+']{3,92} '+JSON.stringify('"')
     ].join('\n');
-    return {prompt,grammar,maxTokens:52,timeoutMs:30000,candidates};
+    return {prompt,grammar,maxTokens:60,timeoutMs:35000,candidates,actions,editKeys};
   }
 
-  function readChat(answer,{candidates}) {
-    const result=JSON.parse(answer);
-    if(!Array.isArray(result)||result.length>1)throw Error('Formato de refinamento inválido.');
-    if(!result.length)return null;
-    if(!candidates.size&&result.length===1&&typeof result[0]==='string'){
-      const query=result[0].trim().replace(/\s+/g,' ');
-      if(query.length>=3&&result[0].length<=116&&!invalidChatQuery.test(result[0])&&!query.includes('://')&&/[a-zÀ-ÿ]/i.test(query))
-        return {query};
-      throw Error('Consulta proposta inválida.');
+  function cleanChatText(value,max) {
+    if(typeof value!=='string'||value.length>max||invalidChatText.test(value)||value.includes('://')||
+        value.replace(/\s/g,'').length<3)throw Error('Texto do chat inválido.');
+    return value.trim().replace(/\s+/g,' ');
+  }
+
+  function readChat(answer,{actions,editKeys,candidates}) {
+    const value=JSON.parse(answer);
+    if(!Array.isArray(value)||!actions.includes(value[0]))throw Error('Ação do chat inválida.');
+    const [verb,arg]=value;
+    if(value.length!==2)throw Error('Resposta inválida.');
+    if(verb==='perguntar'){
+      if(!Object.hasOwn(preferenceQuestions,arg))throw Error('Preferência inválida.');
+      return {reply:preferenceQuestions[arg]};
     }
-    const ids=result.map(id=>candidates.get(id));
-    if(ids.some(id=>id===undefined)||new Set(ids).size!==ids.length)throw Error('Posição de hino inválida.');
-    return {ids};
+    if(verb==='falar'){
+      const text=cleanChatText(arg,132);
+      if(/^(?:\/|busca:|filtros:|usu[aá]rio(?: agora)?:)/i.test(text))throw Error('Resposta sem conteúdo.');
+      return {reply:text};
+    }
+    if(verb==='buscar'){
+      const query=cleanChatText(arg,92);
+      if(!/^[A-Za-zÀ-ÿ0-9]/.test(query)||/\b(?:query|theme|usu[aá]rio|user|remove):/i.test(query))throw Error('Consulta inválida.');
+      return {query};
+    }
+    const hymn=candidates.get(arg);
+    if(!hymn||!editKeys[verb].includes(arg))throw Error('Hino fora do contexto.');
+    return {verb,hymn};
   }
 
   return { prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };

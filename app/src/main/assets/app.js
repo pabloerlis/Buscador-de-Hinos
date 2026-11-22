@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,lastRefinement:'',
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatOptions:[],
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -54,7 +54,7 @@ function resultCard(hymn,{unlearned=false}={}){
   const scoreLabel=hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
   const score=Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
   return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
-  <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
+  <h3>${escapeHTML(hymn.title)}</h3>${collection}${hymn.curated?'<span class="library-tag">Acrescentado no chat</span>':''}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
   ${hymn.aiReview?`<p class="why"><strong>Revisão da IA: ${escapeHTML(hymn.aiReview.label)}</strong>${hymn.aiReview.excerpt?` · “${escapeHTML(hymn.aiReview.excerpt)}”`:''}</p>`:''}
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
@@ -80,7 +80,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     $('gguf-comparison').classList.add('hidden');
     if(!preserveContext){
       state.vectorQuery=null;
-      if(!refine){state.searchRootQuery=query;state.lastRefinement='';}
+      if(!refine){state.searchRootQuery=query;clearChatContext();}
       state.originalQuery=query;
       state.hymnTrail=[];
     }
@@ -117,8 +117,10 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
       for(const text of concepts){const item=document.createElement('span');item.className='concept-chip';item.textContent=text;$('search-concepts').appendChild(item);}
     }else state.lastResults.push(...data.results);
     state.page=data.page;state.total=data.total;state.hasMore=data.has_more;
-    if(data.results.length)$('results-list').insertAdjacentHTML('beforeend',data.results.map(resultCard).join(''));
-    else if(page===1)$('results-list').innerHTML=data.not_learned_total?'<div class="empty-results"><h3>Sem hinos disponíveis para indicação</h3><p>Os hinos relacionados estão na seção «Não aprendidos» abaixo.</p></div>':'<div class="empty-results"><h3>Nenhum hino encontrado</h3><p>Experimente termos mais gerais, outro tema ou uma frase da letra. Não apresentamos sugestões sem evidência mínima.</p></div>';
+    if(!renderCuratedResults()){
+      if(data.results.length)$('results-list').insertAdjacentHTML('beforeend',data.results.map(resultCard).join(''));
+      else if(page===1)$('results-list').innerHTML=data.not_learned_total?'<div class="empty-results"><h3>Sem hinos disponíveis para indicação</h3><p>Os hinos relacionados estão na seção «Não aprendidos» abaixo.</p></div>':'<div class="empty-results"><h3>Nenhum hino encontrado</h3><p>Experimente termos mais gerais, outro tema ou uma frase da letra. Não apresentamos sugestões sem evidência mínima.</p></div>';
+    }
     $('load-more').classList.toggle('hidden',!data.has_more);
     if(page===1)RepertoireUI.renderSearch(data);
     $('load-more').textContent='Carregar mais '+data.page_size+' hinos';
@@ -255,53 +257,142 @@ $('refine-toggle').addEventListener('click',()=>{
   setRefineOpen(open);
   if(open)$('refine-input').focus();
 });
+function clearChatContext(){
+  state.chatHistory=[];
+  state.chatAdded=new Map();
+  state.chatRemoved=new Set();
+  state.chatChoices=null;
+  state.chatOptions=[];
+  $('curation-status')?.classList.add('hidden');
+}
+function chatSay(kind,text){
+  state.chatHistory.push({kind,text});
+  if(state.chatHistory.length>10)state.chatHistory.shift();
+  return appendConversation(kind,text);
+}
+function visibleHymns(){
+  const additions=[...state.chatAdded.values()].filter(hymn=>{
+    const collections=state.searchSettings.collections;
+    return !collections||!hymn.collection_ids?.length||hymn.collection_ids.some(id=>collections[id]!==false);
+  });
+  const raw=state.lastResults.filter(hymn=>!state.chatRemoved.has(hymn.id)&&!state.chatAdded.has(hymn.id));
+  return [...additions,...raw];
+}
+function renderCuratedResults(){
+  const edited=state.chatAdded.size+state.chatRemoved.size>0;
+  const note=$('curation-status');
+  if(note)note.classList.toggle('hidden',!edited);
+  if(!edited)return false;
+  if(note)note.textContent='Nesta conversa · '+state.chatAdded.size+' acrescentados · '+state.chatRemoved.size+' retirados';
+  const hymns=visibleHymns();
+  $('results-list').innerHTML=hymns.length?hymns.map(resultCard).join(''):
+    '<p class="subtle-note">Nenhum hino nesta página. Você pode pedir outras indicações no chat.</p>';
+  return true;
+}
+function chatHymnName(hymn){
+  return (hymn.number?'Hino '+hymn.number+' · ':'')+hymn.title;
+}
+function applyChatEdit(verb,hymn){
+  const current=visibleHymns().some(item=>item.id===hymn.id);
+  if(verb==='retirar'&&current){
+    state.chatAdded.delete(hymn.id);
+    state.chatRemoved.add(hymn.id);
+  }else if(verb==='acrescentar'&&!current){
+    state.chatRemoved.delete(hymn.id);
+    state.chatAdded.set(hymn.id,{...hymn,curated:true,aiReview:null});
+  }else if(verb==='destacar'&&current){
+    const bubble=chatSay('assistant','Destaque da lista');
+    const button=document.createElement('button');
+    button.className='secondary-btn';button.type='button';
+    button.textContent=chatHymnName(hymn);
+    button.addEventListener('click',()=>openHymn(hymn.id));
+    bubble.appendChild(button);
+    return true;
+  }else return false;
+  renderCuratedResults();
+  chatSay('assistant',(verb==='retirar'?'Retirado da lista · ':'Acrescentado à lista · ')+chatHymnName(hymn));
+  return true;
+}
+function resolveChatChoice(message,choices){
+  const text=OfflineAPI.normalize(message);
+  const aliases=[['cia',/\b(?:cia|criancas|infantil)\b/],['avulsos',/\bavulsos?\b/],['principal',/\b(?:coletanea|principal)\b/]];
+  const group=aliases.find(([,pattern])=>pattern.test(text))?.[0];
+  const matches=choices.filter(hymn=>group?hymn.collection_ids?.includes(group):
+    OfflineAPI.normalize(hymn.title)===text.replace(/^["“]|["”]$/g,''));
+  return matches.length===1?matches[0]:null;
+}
 async function submitRefinement(message){
   if(!message||state.busy||state.chatPending)return false;
   const turn={epoch:state.searchEpoch};
+  const history=state.chatHistory.slice();
   state.chatPending=turn;
   $('refine-send').disabled=true;
   $('refine-form').setAttribute('aria-busy','true');
-  appendConversation('user',message);
+  chatSay('user',message);
+  const current=()=>state.chatPending===turn&&turn.epoch===state.searchEpoch;
   try{
-    const intent=OfflineAPI.chatSearchIntent(message);
-    const response=await GGUF.refineChat(message,intent);
-    if(state.chatPending!==turn||turn.epoch!==state.searchEpoch)return false;
-    if(response?.cancelled){
-      appendConversation('assistant','Refinamento interrompido.');
-      return false;
-    }
-    if(response?.ids){
-      const byId=new Map(state.lastResults.map(hymn=>[hymn.id,hymn]));
-      const picks=response.ids.map(id=>byId.get(id));
-      if(picks.every(Boolean)){
-        const bubble=appendConversation('assistant','A IA destacou estes hinos pelos trechos exibidos.');
-        for(const hymn of picks){
-          const button=document.createElement('button');
-          button.className='secondary-btn';button.type='button';
-          button.textContent=hymn.number?'Hino '+hymn.number+' · '+hymn.title:hymn.title;
-          button.addEventListener('click',()=>openHymn(hymn.id));
-          bubble.appendChild(button);
-        }
-        state.lastRefinement=message;
+    const lookup=await jsonRequest('/api/chat-candidates',{message,settings:state.searchSettings,...searchRestrictions()});
+    if(!current())return false;
+    const visible=visibleHymns();
+    let shown=visible.slice(0,6);
+    let found=[];
+    let forced=null;
+    const clarified=state.chatChoices&&resolveChatChoice(message,state.chatChoices.hymns);
+    const reference=lookup.exact?lookup:clarified?{verb:state.chatChoices.verb,hymns:[clarified]}:null;
+    if(reference){
+      const wantsOnList=reference.verb==='retirar';
+      const matches=reference.hymns.filter(hymn=>visible.some(h=>h.id===hymn.id)===wantsOnList);
+      const alternatives=wantsOnList&&matches.length?matches:reference.hymns;
+      if(alternatives.length>1){
+        state.chatChoices={verb:reference.verb,hymns:alternatives};
+        chatSay('assistant','Qual deles você quer? '+alternatives.slice(0,5).map(hymn=>chatHymnName(hymn)+' ('+hymn.collection+')').join(' · '));
+        return false;
+      }
+      state.chatChoices=null;
+      if(wantsOnList&&!matches.length&&alternatives.length===1){
+        const hymn=alternatives[0];
+        state.chatRemoved.add(hymn.id);
+        renderCuratedResults();
+        chatSay('assistant','Ficará fora das sugestões desta conversa · '+chatHymnName(hymn));
         return true;
       }
+      if(!matches.length){
+        chatSay('assistant',alternatives.length?
+          (wantsOnList?'Esse hino já está fora da lista.':'Esse hino já está na lista.'):
+          'Não encontrei esse hino nas coletâneas selecionadas. Você pode indicar o título ou a coletânea.');
+        return false;
+      }
+      const target=matches[0];
+      forced={verb:reference.verb,id:target.id,hymn:target};
+      if(wantsOnList)shown=[target,...shown.filter(h=>h.id!==target.id)].slice(0,6);
+      else found=[target];
+    }else{
+      state.chatChoices=null;
+      const onList=new Set(visible.map(h=>h.id));
+      const options=new Map();
+      for(const h of [...lookup.hymns,...state.chatOptions])if(!onList.has(h.id)&&!options.has(h.id))options.set(h.id,h);
+      found=[...options.values()].slice(0,3);
+      state.chatOptions=found;
     }
-    if(response?.noAction&&!intent.list){
-      appendConversation('assistant','Que tema ou detalhe você gostaria de acrescentar à busca?');
-      return false;
+    const response=await GGUF.refineChat({message,history,shown,found,forced,editIntent:lookup.verb});
+    if(!current())return false;
+    if(response?.cancelled){chatSay('assistant','Conversa interrompida.');return false;}
+    if(response?.reply)chatSay('assistant',response.reply);
+    if(response?.verb)return applyChatEdit(response.verb,response.hymn);
+    if(forced)return applyChatEdit(forced.verb,forced.hymn);
+    if(response?.query||(response?.unavailable&&!lookup.verb)){
+      const success=await performSearch(message,{refine:true,autoAI:false,modelQuery:response.query});
+      if(state.chatPending===turn)
+        chatSay('assistant',success?'Busca refinada · '+state.total+(state.total===1?' resultado.':' resultados.'):
+          'Não foi possível refinar a busca.');
+      return success;
     }
-    if(intent.list){
-      appendConversation('assistant','Não consegui destacar um hino desta lista para esse pedido.');
-      return false;
-    }
-    const success=await performSearch(message,{refine:true,autoAI:false,modelQuery:response?.query});
-    if(state.chatPending!==turn)return success;
-    if(success){
-      state.lastRefinement=message;
-      const detail=state.modelRefinement?'A IA acrescentou “'+state.modelRefinement+'” à busca.':'Busca local refinada.';
-      appendConversation('assistant',detail+' '+state.total+(state.total===1?' resultado.':' resultados.'));
-    }else appendConversation('assistant','Não foi possível refinar a busca.');
-    return success;
+    if(response?.reply)return true;
+    chatSay('assistant','A IA local não respondeu. Você pode tentar novamente ou indicar um hino pelo número ou título.');
+    return false;
+  }catch(error){
+    if(current())chatSay('assistant','Não foi possível continuar a conversa.');
+    return false;
   }finally{
     if(state.chatPending===turn){
       state.chatPending=null;
@@ -320,7 +411,7 @@ $('refine-form').addEventListener('submit',async ev=>{
 });
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.chatPending=null;state.lastRefinement='';$('refine-form').setAttribute('aria-busy','false');$('refine-send').disabled=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.chatPending=null;clearChatContext();$('refine-form').setAttribute('aria-busy','false');$('refine-send').disabled=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
 
 const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
@@ -532,7 +623,8 @@ const RepertoireUI=(()=>{
         if(epoch===state.searchEpoch){
           state.page=1;state.total=response.total;state.hasMore=response.has_more;state.lastResults=response.results.slice();
           state.aiContext=response.ai_context;
-          $('results-list').innerHTML=response.results.length?response.results.map(resultCard).join(''):
+          if(flag)state.chatAdded.delete(Number(id));
+          if(!renderCuratedResults())$('results-list').innerHTML=response.results.length?response.results.map(resultCard).join(''):
             response.not_learned_total?'<div class="empty-results"><h3>Todos os hinos relacionados estão em Não aprendidos</h3></div>':'<div class="empty-results"><h3>Nenhum hino encontrado</h3></div>';
           $('load-more').classList.toggle('hidden',!response.has_more);
           $('results-subtitle').textContent=`${response.total} hinos disponíveis para indicação · ${response.not_learned_total} não aprendidos relacionados`;
@@ -616,7 +708,7 @@ const EmbeddingSearch=(()=>{
       state.vectorQuery=answer.vector;
       state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
       state.aiContext=result.ai_context;
-      $('results-list').innerHTML=result.results.length?result.results.map(resultCard).join(''):
+      if(!renderCuratedResults())$('results-list').innerHTML=result.results.length?result.results.map(resultCard).join(''):
         result.not_learned_total?'<div class="empty-results"><h3>Somente hinos ainda não aprendidos</h3><p>Veja a seção separada abaixo.</p></div>':'<div class="empty-results"><h3>Nenhum resultado</h3><p>Experimente ampliar o contexto.</p></div>';
       RepertoireUI.renderSearch(result);
       $('load-more').classList.toggle('hidden',!result.has_more);
@@ -723,12 +815,14 @@ const GGUF=(()=>{
     if(queuedChat){queuedChat.resolve({cancelled:true});queuedChat=null;}
     if(selectedState.task?.type!=='diagnostic')cancelIfBusy();
   }
-  function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired,themeLabels}){
+  function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired,themeLabels,actions,editKeys}){
     task.id=String(++nextRequest);
     task.candidates=candidates;
     task.canLookup=canLookup;
     task.lookupRequired=lookupRequired;
     task.themeLabels=themeLabels;
+    task.actions=actions;
+    task.editKeys=editKeys;
     setActivity(true,generationStages[0]);
     try{native().generate(prompt,task.id,grammar,maxTokens,timeoutMs);}
     catch(error){
@@ -751,18 +845,14 @@ const GGUF=(()=>{
       showTask('Refinando pelo chat','Você pode continuar consultando os resultados enquanto a IA responde.');
     }else chat.resolve(null);
   }
-  function refineChat(message,intent){
-    if(!state.effectiveQuery||state.searchSettings.mode==='literal'||!intent.eligible||!selectedState.ready||
-        (intent.list&&!intent.canPick))
-      return Promise.resolve(null);
+  function refineChat(context){
+    if(!state.effectiveQuery||!selectedState.ready)return Promise.resolve({unavailable:true});
     const constraints=[
       state.exclude.length&&'excluir '+state.exclude.join(', '),
       state.deprioritize?.length&&'menos foco em '+state.deprioritize.join(', '),
       state.requiredTerms?.length&&'obrigatório '+state.requiredTerms.join(', ')
-    ].filter(Boolean).join('; ');
-    const request=LocalHymnAI.prepareChat({query:state.effectiveQuery,rootQuery:state.searchRootQuery,
-      message,previous:state.lastRefinement,hymns:state.lastResults,constraints,canPick:intent.list});
-    if(intent.list&&!request.candidates.size)return Promise.resolve(null);
+    ].filter(Boolean).join(' · ');
+    const request=LocalHymnAI.prepareChat({...context,query:state.effectiveQuery,constraints});
     return new Promise(resolve=>{
       const chat={request,resolve,epoch:state.searchEpoch};
       if(selectedState.task?.type==='review'){
@@ -845,7 +935,7 @@ const GGUF=(()=>{
     const focus=active&&list.contains(active)?active.dataset:null;
     const focusId=Number(focus?.hymnId||focus?.repertoireId);
     state.lastResults=results;
-    list.innerHTML=results.map(resultCard).join('');
+    if(!renderCuratedResults())list.innerHTML=results.map(resultCard).join('');
     if(focusId>0){
       const attribute=focus.hymnId?'data-hymn-id':'data-repertoire-id';
       list.querySelector('['+attribute+'="'+focusId+'"]')?.focus({preventScroll:true});
@@ -976,8 +1066,8 @@ const GGUF=(()=>{
     if(task.type==='review'){finishReview(task,ok,answer);return;}
     if(task.type==='chat'){
       let result=null;
-      try{if(ok)result=LocalHymnAI.readChat(answer,task)||{noAction:true};}catch(error){ /* A busca local continua disponível. */ }
-      resetTask(result?'Resposta do chat pronta.':'Aplicando refinamento pela busca local.',false,result);
+      try{if(ok)result=LocalHymnAI.readChat(answer,task);}catch(error){ /* A busca local continua disponível. */ }
+      resetTask(result?'Resposta do chat pronta.':'A IA não conseguiu concluir a resposta.',false,result);
       return;
     }
     if(!ok){resetTask('IA falhou: '+value,true);return;}

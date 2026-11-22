@@ -174,29 +174,25 @@ assert.equal(ai.applyReview(reviewHymns.slice(1),judgments),null);
 assert.equal(ai.applyReview(reviewHymns,review.requests.map(({candidate})=>ai.readReview('não',candidate))),reviewHymns);
 assert.equal(ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns.slice(0,3)),null);
 
-const chatRequest=ai.prepareChat({query:'Consolo',rootQuery:'Luto',message:'Quais destes?',
-  previous:'Sem foco em sofrimento',hymns:reviewHymns,constraints:'excluir medo',canPick:true});
-assert.match(chatRequest.prompt,/Busca atual: Consolo/);
-assert.match(chatRequest.prompt,/Pedido anterior: Sem foco em sofrimento/);
-assert.match(chatRequest.prompt,/Novo pedido: Quais destes/);
-assert.match(chatRequest.prompt,/4 \| Deus acolhe/);
-assert.doesNotMatch(chatRequest.prompt,/5 \|/);
-assert.match(chatRequest.grammar,/\(picks\)/);
-assert.throws(()=>ai.readChat('["Consolo, fé e esperança"]',chatRequest));
-assert.deepEqual(Array.from(ai.readChat('[4]',chatRequest).ids),[4]);
-assert.equal(ai.readChat('[]',chatRequest),null);
-for(const response of ['[1,1]','[5]','[1,2,3]','{"query":"fé"}','["https://exemplo.com"]','["123"]'])
+const chatRequest=ai.prepareChat({query:'Consolo',message:'Prefiro hinos mais animados.',shown:reviewHymns.slice(0,2),
+  found:reviewHymns.slice(2,4),history:[{kind:'assistant',text:'Você prefere hinos alegres ou solenes?'}]});
+assert.match(chatRequest.prompt,/Você prefere hinos alegres ou solenes/);
+assert.match(chatRequest.grammar,/root ::= falar \| perguntar \| buscar \| acrescentar \| retirar \| destacar/);
+assert.equal(ai.readChat('["perguntar","clima"]',chatRequest).reply,'Você prefere hinos mais alegres ou mais solenes?');
+assert.equal(ai.readChat('["acrescentar",3]',chatRequest).hymn.id,3);
+assert.equal(ai.readChat('["retirar",2]',chatRequest).hymn.id,2);
+assert.equal(ai.readChat('["buscar","Consolo e esperança"]',chatRequest).query,'Consolo e esperança');
+for(const response of ['["retirar",3]','["acrescentar",9]',
+  '["acrescentar",1]','["falar","https://exemplo.com"]','[]','["buscar"]'])
   assert.throws(()=>ai.readChat(response,chatRequest));
-const scoped=ai.prepareChat({query:'Paz',message:'Somente fé',hymns:reviewHymns,canPick:false});
-assert.equal(scoped.candidates.size,0);
-assert.equal(ai.readChat('["Consolo, fé e esperança"]',scoped).query,'Consolo, fé e esperança');
-assert.throws(()=>ai.readChat('["https://exemplo.com"]',scoped));
-assert.throws(()=>ai.readChat('[1]',scoped));
+const forcedChat=ai.prepareChat({query:'Paz',message:'Retire o hino 2',shown:reviewHymns,forced:{verb:'retirar',id:2}});
+assert.match(forcedChat.grammar,/^root ::= retirar\n/);
+assert.throws(()=>ai.readChat('["retirar",1]',forcedChat));
 
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
-const turnSource=js.slice(js.indexOf('async function submitRefinement('),js.indexOf("$('refine-form').addEventListener"));
+const turnSource=js.slice(js.indexOf('function clearChatContext('),js.indexOf("$('refine-form').addEventListener"));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
-function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,embeddingTask=null}={}){
+function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,embeddingTask=null,chatLookup=null}={}){
   const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];
   let now=0;
   const $=id=>{
@@ -211,18 +207,19 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
     generate:(...args)=>calls.push(args),cancel:id=>cancelled.push(id)}}:{};
   const vector=Array(384).fill(0.1);
   const settings={mode:'balanced',vectorMode:nativeModel?'balanced':'off',collections:{principal:true,avulsos:false}};
-  const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector};
-  const {gguf,search,refine}=vm.runInNewContext(aiSource+searchSource+turnSource+ggufSource+'\n({gguf:GGUF,search:performSearch,refine:submitRefinement})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>{messages.push(text);return $('conversation');},showResults(){},
+  const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatOptions:[]};
+  const {gguf,search,refine,visible}=vm.runInNewContext(aiSource+searchSource+turnSource+ggufSource+'\n({gguf:GGUF,search:performSearch,refine:submitRefinement,visible:visibleHymns})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>{messages.push(text);return $('conversation');},showResults(){},
     document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
     OfflineAPI:{chatSearchIntent:text=>({eligible:true,canPick:true,list:/entre esses|desses/i.test(text)}),normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
     jsonRequest:async(url,payload)=>{
       if(url.startsWith('/api/hymns/'))return {lyrics:reviewLyrics.get(Number(url.split('/').at(-1)))};
+      if(url==='/api/chat-candidates')return chatLookup?chatLookup(payload.message):{hymns:hymns.slice(3)};
       requests.push(payload);
       if(additionalSearch&&payload.settings.pageSize===10)return additionalSearch();
       return {results:hymns,effective_query:payload.model_query||payload.query,model_refinement:payload.model_query||'',excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
     },
-    busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>{embeddings.push(args);return embeddingTask?.();}}});
-  return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,refine,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
+    busySearch:value=>{state.busy=value;},resultCard:hymn=>'[hino:'+hymn.id+']',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>{embeddings.push(args);return embeddingTask?.();}}});
+  return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,refine,visible,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
 }
 
 async function checkBridge(){
@@ -373,48 +370,69 @@ async function checkBridge(){
   await exactTitle.gguf.maybeAuto('Hino de teste 1');
   assert.equal(exactTitle.calls.length,0);
 
-  const chat=setup({initialResults:reviewHymns});
-  const firstTurn=chat.refine('Prefiro hinos de reconciliação');
-  assert.equal(chat.calls.length,1);
-  assert.deepEqual(chat.state.lastResults,reviewHymns);
-  chat.complete(chat.calls[0][1],'["Voltar para Deus e reconciliação"]');
+  const chosen=hymns[4];
+  const cia={...hymns[5],number:chosen.number,collection:'CIA',collection_ids:['cia']};
+  const chat=setup({initialResults:reviewHymns.slice(0,4),chatLookup:message=>
+    /Acrescente o hino/.test(message)?{exact:true,verb:'acrescentar',hymns:[chosen,cia]}:{hymns:[chosen]}});
+  const firstTurn=chat.refine('Ainda estou em dúvida sobre o estilo');
+  await tick();
+  chat.complete(chat.calls[0][1],'["perguntar","clima"]');
   assert.equal(await firstTurn,true);
-  assert.equal(chat.requests[0].query,'Prefiro hinos de reconciliação');
+  assert.equal(chat.requests.length,0);
+  const choose=chat.refine('Mais alegres, por favor');
+  await tick();
+  assert.match(chat.calls[1][0],/prefere hinos mais alegres ou mais solenes/);
+  chat.complete(chat.calls[1][1],'["retirar",1]');
+  assert.equal(await choose,true);
+  assert.deepEqual(Array.from(chat.visible(),h=>h.id),[2,3,4]);
+  assert.doesNotMatch(chat.$('results-list').innerHTML, /hino:1/);
+
+  const lookup=await chat.refine('Acrescente o hino 5');
+  assert.equal(lookup,false);
+  assert.match(chat.messages.at(-1),/Qual deles você quer/);
+  const add=chat.refine('O da CIA');
+  await tick();
+  assert.match(chat.calls[2][2],/^root ::= acrescentar/);
+  chat.complete(chat.calls[2][1],'["acrescentar",4]');
+  assert.equal(await add,true);
+  assert.deepEqual(Array.from(chat.visible(),h=>h.id),[6,2,3,4]);
+  assert.match(chat.$('results-list').innerHTML,/^\[hino:6\]/);
+  const revise=chat.refine('Também gostaria de reconciliação');
+  await tick();
+  chat.complete(chat.calls[3][1],'["buscar","Voltar para Deus e reconciliação"]');
+  assert.equal(await revise,true);
   assert.equal(chat.requests[0].model_query,'Voltar para Deus e reconciliação');
   assert.equal(chat.requests[0].exclude[0],'tristeza');
-  assert.match(chat.messages.at(-1),/IA acrescentou/);
-  const highlight=chat.refine('Qual desses se encaixa melhor?');
-  assert.match(chat.calls[1][0],/Pedido anterior: Prefiro hinos/);
-  chat.complete(chat.calls[1][1],'[2]');
-  assert.equal(await highlight,true);
-  assert.equal(chat.requests.length,1);
-  chat.$('conversation').children.at(-1).click();
-  assert.deepEqual(chat.opened,[2]);
+  assert.ok(!chat.visible().some(h=>h.id===1));
+  assert.equal(chat.visible()[0].id,6);
 
   const expiredChat=setup();
   const expiredTurn=expiredChat.refine('Quero esperança');
+  await tick();
   expiredChat.complete(expiredChat.calls[0][1],'Tempo limite',false);
-  assert.equal(await expiredTurn,true);
-  assert.equal(expiredChat.requests[0].model_query,undefined);
-  assert.match(expiredChat.messages.at(-1),/Busca local refinada/);
+  assert.equal(await expiredTurn,false);
+  assert.equal(expiredChat.requests.length,0);
+  assert.match(expiredChat.messages.at(-1),/não respondeu/);
 
   const staleChat=setup();
   const staleTurn=staleChat.refine('Agora mais sobre vigiar');
+  await tick();
   staleChat.state.searchEpoch++;
   staleChat.gguf.cancelSearchTask();
-  staleChat.complete(staleChat.calls[0][1],'["Vigilância"]');
+  staleChat.complete(staleChat.calls[0][1],'["retirar",1]');
   assert.equal(await staleTurn,false);
-  assert.equal(staleChat.requests.length,0);
+  assert.equal(staleChat.state.chatRemoved.size,0);
 
   const prefersChat=setup({auto:true,initialResults:reviewHymns});
   await prefersChat.gguf.maybeAuto('Paz');
   const reviewId=prefersChat.calls[0][1];
   const chatTurn=prefersChat.refine('E entre esses?');
+  await tick();
   assert.deepEqual(prefersChat.cancelled,[reviewId]);
   prefersChat.complete(reviewId,'sim');
-  prefersChat.complete(prefersChat.calls[1][1],'[1]');
+  prefersChat.complete(prefersChat.calls[1][1],'["destacar",1]');
   assert.equal(await chatTurn,true);
-  assert.match(prefersChat.messages.at(-1),/destacou estes hinos/);
+  assert.match(prefersChat.messages.at(-1),/Destaque da lista/);
 
   const literal=setup({auto:true});
   literal.state.searchSettings.mode='literal';

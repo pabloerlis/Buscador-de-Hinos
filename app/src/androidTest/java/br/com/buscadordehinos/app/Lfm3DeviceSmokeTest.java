@@ -162,13 +162,17 @@ public class Lfm3DeviceSmokeTest {
             assertNotNull(answer);
             assertTrue("O chat precisa gerar tokens",metrics[3]>0);
             JSONArray result=new JSONArray(new String(answer,StandardCharsets.UTF_8).trim());
-            assertEquals(1,result.length());
             if(i==0) {
-                String query=result.getString(0).toLowerCase(java.util.Locale.ROOT);
-                assertTrue("O chat deve entender o contexto de perda: "+query,query.contains("perda")||query.contains("luto"));
-            }else assertEquals("O destaque deve corresponder ao trecho direto",2,result.getInt(0));
+                assertEquals(2,result.length());
+                assertEquals("A dúvida sobre estilo deve gerar uma pergunta","perguntar",result.getString(0));
+                assertTrue(result.getString(1).matches("clima|ritmo|tema|ocasiao|hino"));
+            }else{
+                assertEquals(2,result.length());
+                assertEquals(i==2?"acrescentar":"retirar",result.getString(0));
+                assertEquals("O modelo deve apontar a indicação correta",i==2?2:1,result.getInt(1));
+            }
         }
-        android.util.Log.i("LFM3_BENCH","CHAT_RESULT rewrite=true grounded_pick=true total_ms="+(SystemClock.elapsedRealtime()-start));
+        android.util.Log.i("LFM3_BENCH","CHAT_RESULT dialogue=true remove=true add=true contextual_remove=true total_ms="+(SystemClock.elapsedRealtime()-start));
     }
 
     private static void verifyReview(Method generate) throws Exception {

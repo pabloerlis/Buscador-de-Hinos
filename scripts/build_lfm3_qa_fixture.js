@@ -40,17 +40,21 @@ fs.writeFileSync('app/src/androidTest/assets/lfm3-review.json',JSON.stringify({
   timeoutMs:review.timeoutMs
 })+'\n');
 
+
 const chatHymns=[
-  {id:27,snippet:'Cristo disse ao vento que se aquietasse.'},
-  {id:38,snippet:'Deixei meu pai, me arrependi e voltei para casa.'},
-  {id:49,snippet:'Os filhos entram no céu e os anjos cantam.'}
+  {id:27,number:'027',title:'Vento no mar',snippet:'Cristo disse ao vento que se aquietasse.'},
+  {id:38,number:'038',title:'Volta ao pai',snippet:'Deixei meu pai, me arrependi e voltei para casa.'},
+  {id:49,number:'049',title:'Morar no céu',snippet:'Os filhos entram no céu e os anjos cantam.'}
 ];
 const chatRequests=[
-  ai.prepareChat({query:'Consolo e fé',rootQuery:'Consolo',message:'Quero consolo depois de uma perda.',
-    previous:'No luto',hymns:[],constraints:'excluir medo',canPick:false}),
-  ai.prepareChat({query:'Consolo e fé',message:'Entre esses, qual hino fala de voltar ao pai depois de se afastar?',
-    hymns:chatHymns,canPick:true})
+  ai.prepareChat({query:'Hinos para o culto',message:'Quero refinar, mas ainda estou em dúvida sobre o estilo.',shown:chatHymns.slice(0,2)}),
+  ai.prepareChat({query:'Regresso ao Pai',message:'Retire o hino 027.',shown:chatHymns.slice(0,2),forced:{verb:'retirar',id:27}}),
+  ai.prepareChat({query:'Regresso ao Pai',message:'Acrescente o hino 049.',shown:chatHymns.slice(1,2),found:chatHymns.slice(2),forced:{verb:'acrescentar',id:49}}),
+  ai.prepareChat({query:'Hinos para o culto',message:'Prefiro o filho pródigo. Pode retirar o da tempestade?',editIntent:'retirar',
+    history:[{kind:'assistant',text:'Qual tema você quer enfatizar? Há algum tema que prefere evitar?'}],
+    shown:[{id:27,number:'027',title:'Vento no mar',snippet:'Cristo acalmou a tempestade.'},
+      {id:38,number:'038',title:'Volta ao pai',snippet:'Eu me arrependi e voltei para meu pai.'}]})
 ];
-fs.writeFileSync('app/src/androidTest/assets/lfm3-chat.json',JSON.stringify(
-  {requests:chatRequests.map(({prompt,grammar,maxTokens,timeoutMs})=>({prompt,grammar,maxTokens,timeoutMs}))}
-)+'\n');
+fs.writeFileSync('app/src/androidTest/assets/lfm3-chat.json',JSON.stringify({
+  requests:chatRequests.map(({prompt,grammar,maxTokens,timeoutMs})=>({prompt,grammar,maxTokens,timeoutMs}))
+})+'\n');

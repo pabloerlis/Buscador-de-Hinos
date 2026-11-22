@@ -139,6 +139,16 @@ const samples=[
  assert.equal(literalWithModel.total,0);
  assert.equal(api.chatSearchIntent('Qual desses hinos tem mais esperança?').list,true);
  assert.equal(api.chatSearchIntent('Entre esses, somente alegria').canPick,false);
+ const targeted=await api.request('/api/chat-candidates',{message:'Acrescente o hino 003'});
+ assert.equal(targeted.verb,'acrescentar');
+ assert.equal(targeted.exact,true);
+ assert.ok(targeted.hymns.some(hymn=>hymn.number==='003'));
+ const absent=await api.request('/api/chat-candidates',{message:'Retire o hino 9999'});
+ assert.equal(absent.verb,'retirar');
+ assert.equal(absent.hymns.length,0);
+ const described=await api.request('/api/chat-candidates',{message:'Prefiro o filho pródigo. Pode retirar o da tempestade?'});
+ assert.equal(described.verb,'retirar');
+ assert.notEqual(described.exact,true);
  const watchTheme=await api.request('/api/search',{query:'somente os de vigilância',refine:true,previous:'Segunda vinda'});
  assert.equal(watchTheme.results[0].number,'003');
  assert.match(watchTheme.results[0].snippet,/vigiar/);

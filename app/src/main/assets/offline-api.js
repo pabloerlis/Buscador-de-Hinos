@@ -459,6 +459,29 @@ const OfflineAPI = (() => {
       canPick:!flags.excluded.length&&!flags.required.length&&!flags.deprioritized.length
     };
   }
+  function chatCandidates(payload) {
+    const message=String(payload?.message||'').trim();
+    if(!message||message.length>MAX_QUERY_LENGTH)return {hymns:[]};
+    const norm=normalize(message);
+    const command=norm.match(/(?:^|[.!?]\s+)(?:(?:por favor|pode|quero(?: que)?)\s+)?(acrescent(?:e|ar)|adicion(?:e|ar)|inclu(?:a|ir)|colo(?:que|car)|retir(?:e|ar)|remov(?:a|er)|tir(?:e|ar)|exclu(?:a|ir))\s+(?:(?:o|a)\s+)?(?:hino\s+)?(.+?)[.!?]*$/);
+    const opts=searchOptions(payload?.settings);
+    if(command){
+      const verb=/^(?:retir|remov|tir|exclu)/.test(command[1])?'retirar':'acrescentar';
+      const selector=command[2].replace(/\s+(?:na|da|dessa|desta)\s+lista$/,'');
+      const number=selector.match(/^(\d{1,4})(?:\s+(?:da|dos|do|de)\s+(coletanea|principal|avulsos?|cia|infantil|criancas)(?:\s+2018)?)?$/);
+      const quote=selector.match(/^["“](.+)["”]$/);
+      const exactTitle=titleIndex.has(normalizeLyrics(quote?.[1]||selector));
+      if(number||quote||exactTitle){
+        const query=number?(number[2]?number[2]+' ':'')+'hino '+number[1]:(quote?.[1]||selector);
+        const result=search({query,settings:{...opts,minAffinity:0,pageSize:25}});
+        return {verb,selector,exact:true,hymns:result.results.filter(hymn=>number||hymn.match_type==='titulo_exato')};
+      }
+      if(verb==='retirar')return {verb,hymns:[]};
+    }
+    const result=search({query:message,settings:{...opts,pageSize:8},exclude:payload.exclude,require:payload.require});
+    return {verb:command?'acrescentar':undefined,hymns:result.results};
+  }
+
   function search(payload){
     let query=String(payload?.query||'').trim();if(!query||query.length>MAX_QUERY_LENGTH)throw Error(`Digite uma consulta de até ${MAX_QUERY_LENGTH} caracteres.`);
     const opts=searchOptions(payload?.settings);
@@ -853,6 +876,7 @@ const OfflineAPI = (() => {
     if(url==='/api/import')return importJson(payload.data);
     if(url==='/api/import-remote')return downloadRemote();
     if(url==='/api/search')return search(payload);
+    if(url==='/api/chat-candidates')return chatCandidates(payload);
     if(url==='/api/recommend')return recommendRelated(payload);
     const match=url.match(/^\/api\/hymns\/(\d+)$/);
     if(match)return hymnDetail(Number(match[1]));
