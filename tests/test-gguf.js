@@ -24,6 +24,10 @@ assert.match(js,/function compare/);
 assert.match(js,/function detail/);
 assert.match(java,/ACTION_OPEN_DOCUMENT/);
 assert.match(java,/takePersistableUriPermission/);
+assert.match(java,/contains\(MODEL_URI_KEY\)\) \{\s*modelBridge\.loadModel\(\)/);
+assert.match(java,/modelBridge\.loadSelection\(uri\)/);
+assert.match(java,/private static final ExecutorService llmExecutor/);
+assert.match(java,/long size=selection==null\?preferences\.getLong\(MODEL_BYTES_KEY,-1\)/);
 assert.doesNotMatch(java,/nativeLoad\("\/proc\/self\/fd\/"/);
 assert.match(java,/getContentResolver\(\)\.openInputStream\(uri\)/);
 assert.match(java,/getFilesDir\(\)/);
@@ -53,7 +57,7 @@ assert.match(build,/versionName '\d+\.\d+\.\d+'/);
 assert.match(build,/abiFilters 'arm64-v8a'/);
 assert.match(build,/ndkVersion '27\.2\.12479018'/);
 assert.match(build,/gradleProperty\('enableLocalModels'\).*orElse\(false\)/);
-assert.match(java,/if\(BuildConfig\.ENABLE_LOCAL_MODELS\)\{\s*web\.addJavascriptInterface\(new ModelBridge/);
+assert.match(java,/web\.addJavascriptInterface\(modelBridge, "NativeGGUF"\)/);
 assert.ok(workflow.includes('ndk;27.2.12479018'),'Full build requires the Android NDK');
 assert.ok(workflow.includes('scripts/build_e5_assets.py'));
 assert.ok(workflow.includes('scripts/qa_e5.py'));
@@ -137,16 +141,69 @@ const merged=ai.mergeCandidates(hymns.slice(0,5),[hymns[0],hymns[5],hymns[5]]);
 assert.equal(merged.added,1);
 assert.equal(merged.hymns.at(-1).id,6);
 
+
+const storyDb = JSON.parse(read('app/src/main/assets/semantic-stories.json'));
+const stories = vm.runInNewContext(read('app/src/main/assets/story-engine.js')+'\nStoryEngine').create(storyDb);
+assert.equal(stories.interpret('Filho Pródigo').matches[0].reviewFocus,storyDb.stories[0].review_focus);
+assert.ok(storyDb.stories.every(story=>story.review_focus?.length>=8));
+
+const reviewLyrics=new Map([
+  [1,'O Pai acolhe os seus no céu.\nCantaremos na glória.'],
+  [2,'Eu me afastei de ti, meu pai.\nHoje volto ao teu lar.\nTu me recebes e me perdoas.'],
+  [3,'O sol nasceu sobre as montanhas.'],
+  [4,'Em ti confio na noite.\n\nCantarei tua misericórdia.']
+]);
+const reviewHymns=hymns.map(hymn=>({...hymn,snippet:hymn.id===2?'Hoje volto ao teu lar.':hymn.snippet}));
+const review=ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns,{
+  context:{narrative:'voltar ao pai depois de se afastar'}
+});
+assert.match(review.requests[1].prompt,/voltar ao pai depois de se afastar/);
+assert.match(review.requests[1].prompt,/Eu me afastei.*Hoje volto.*Tu me recebes/);
+assert.match(review.requests[3].prompt,/Em ti confio.*Cantarei tua misericórdia/);
+assert.equal(review.requests.length,4);
+assert.equal(review.timeoutMs,30000);
+const grades=['não','sim','não','não'];
+const judgments=review.requests.map(({candidate},i)=>ai.readReview(grades[i],candidate));
+assert.deepEqual(Array.from(ai.applyReview(reviewHymns,judgments),x=>x.id),[2,1,3,4,5,6]);
+assert.match(judgments[1].excerpt,/Hoje volto ao teu lar/);
+assert.equal(judgments[3].excerpt,'');
+for(const invalid of ['talvez','sim\nnão','','sim 2']){
+  assert.throws(()=>ai.readReview(invalid,review.requests[0].candidate));
+}
+assert.equal(ai.applyReview(reviewHymns.slice(1),judgments),null);
+assert.equal(ai.applyReview(reviewHymns,review.requests.map(({candidate})=>ai.readReview('não',candidate))),reviewHymns);
+assert.equal(ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns.slice(0,3)),null);
+
+const chatRequest=ai.prepareChat({query:'Consolo',rootQuery:'Luto',message:'Quais destes?',
+  previous:'Sem foco em sofrimento',hymns:reviewHymns,constraints:'excluir medo',canPick:true});
+assert.match(chatRequest.prompt,/Busca atual: Consolo/);
+assert.match(chatRequest.prompt,/Pedido anterior: Sem foco em sofrimento/);
+assert.match(chatRequest.prompt,/Novo pedido: Quais destes/);
+assert.match(chatRequest.prompt,/4 \| Deus acolhe/);
+assert.doesNotMatch(chatRequest.prompt,/5 \|/);
+assert.match(chatRequest.grammar,/\(picks\)/);
+assert.throws(()=>ai.readChat('["Consolo, fé e esperança"]',chatRequest));
+assert.deepEqual(Array.from(ai.readChat('[4]',chatRequest).ids),[4]);
+assert.equal(ai.readChat('[]',chatRequest),null);
+for(const response of ['[1,1]','[5]','[1,2,3]','{"query":"fé"}','["https://exemplo.com"]','["123"]'])
+  assert.throws(()=>ai.readChat(response,chatRequest));
+const scoped=ai.prepareChat({query:'Paz',message:'Somente fé',hymns:reviewHymns,canPick:false});
+assert.equal(scoped.candidates.size,0);
+assert.equal(ai.readChat('["Consolo, fé e esperança"]',scoped).query,'Consolo, fé e esperança');
+assert.throws(()=>ai.readChat('["https://exemplo.com"]',scoped));
+assert.throws(()=>ai.readChat('[1]',scoped));
+
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
+const turnSource=js.slice(js.indexOf('async function submitRefinement('),js.indexOf("$('refine-form').addEventListener"));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
-function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true}={}){
+function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,embeddingTask=null}={}){
   const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];
   let now=0;
   const $=id=>{
     if(!elements.has(id)){
       const classes=new Set(['hidden']);
       elements.set(id,{classes,textContent:'',children:[],classList:{add:c=>classes.add(c),remove:c=>classes.delete(c),toggle(){}},
-        addEventListener(name,handler){if(name==='click')this.click=handler;},replaceChildren(){this.children=[];},appendChild(child){this.children.push(child);},insertAdjacentHTML(){}});
+        addEventListener(name,handler){if(name==='click')this.click=handler;},setAttribute(){},replaceChildren(){this.children=[];},appendChild(child){this.children.push(child);},insertAdjacentHTML(){}});
     }
     return elements.get(id);
   };
@@ -155,16 +212,17 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
   const vector=Array(384).fill(0.1);
   const settings={mode:'balanced',vectorMode:nativeModel?'balanced':'off',collections:{principal:true,avulsos:false}};
   const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector};
-  const {gguf,search}=vm.runInNewContext(aiSource+searchSource+ggufSource+'\n({gguf:GGUF,search:performSearch})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>messages.push(text),showResults(){},
+  const {gguf,search,refine}=vm.runInNewContext(aiSource+searchSource+turnSource+ggufSource+'\n({gguf:GGUF,search:performSearch,refine:submitRefinement})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>{messages.push(text);return $('conversation');},showResults(){},
     document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
-    OfflineAPI:{normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
+    OfflineAPI:{chatSearchIntent:text=>({eligible:true,canPick:true,list:/entre esses|desses/i.test(text)}),normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
     jsonRequest:async(url,payload)=>{
+      if(url.startsWith('/api/hymns/'))return {lyrics:reviewLyrics.get(Number(url.split('/').at(-1)))};
       requests.push(payload);
       if(additionalSearch&&payload.settings.pageSize===10)return additionalSearch();
-      return {results:hymns,effective_query:payload.query,excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
+      return {results:hymns,effective_query:payload.model_query||payload.query,model_refinement:payload.model_query||'',excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
     },
-    busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>embeddings.push(args)}});
-  return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
+    busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>{embeddings.push(args);return embeddingTask?.();}}});
+  return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,refine,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
 }
 
 async function checkBridge(){
@@ -270,15 +328,93 @@ async function checkBridge(){
   assert.equal(enrichment.requests[0].vector_query,enrichment.vector);
   assert.equal(enrichment.embeddings.length,0);
 
+  const automatic=setup({auto:true,initialResults:reviewHymns});
+  await automatic.gguf.maybeAuto('Filho Pródigo');
+  assert.equal(automatic.calls.length,1);
+  assert.match(automatic.calls[0][0],/Filho Pródigo/);
+  assert.deepEqual(automatic.state.lastResults.map(x=>x.id),[1,2,3,4,5,6]);
+  for(const [index,grade] of grades.entries()){
+    if(index===1)automatic.setTime(3000);
+    automatic.complete(automatic.calls[index][1],grade);
+    if(index<grades.length-1)assert.equal(automatic.state.lastResults,reviewHymns);
+  }
+  assert.equal(automatic.calls[2][4],27000);
+  assert.deepEqual(Array.from(automatic.state.lastResults,x=>x.id),[2,1,3,4,5,6]);
+  assert.match(automatic.state.lastResults[0].aiReview.excerpt,/Hoje volto/);
+
+  for(const [value,ok] of [['Tempo limite',false],['resposta inválida',true]]){
+    const aborted=setup({auto:true,initialResults:reviewHymns});
+    await aborted.gguf.maybeAuto('Filho Pródigo');
+    aborted.complete(aborted.calls[0][1],value,ok);
+    assert.equal(aborted.state.lastResults,reviewHymns);
+  }
   const queued=setup({auto:true});
-  queued.gguf.maybeAuto(queued.state.effectiveQuery);
+  await queued.gguf.maybeAuto(queued.state.effectiveQuery);
   const first=queued.calls[0][1];
   queued.state.searchEpoch++;
   queued.gguf.cancelSearchTask();
-  queued.gguf.maybeAuto('Paz na dificuldade');
-  queued.complete(first,'["Arrependimento"]');
+  await queued.gguf.maybeAuto('Paz na dificuldade');
+  queued.complete(first,'sim');
+  await tick();
   assert.equal(queued.calls.length,2);
+  assert.equal(queued.state.lastResults,hymns);
   assert.match(queued.calls[1][0],/Paz na dificuldade/);
+
+  let finishEmbedding;
+  const immediateSearch=setup({auto:true,embeddingTask:()=>new Promise(resolve=>{finishEmbedding=resolve;})});
+  immediateSearch.state.vectorQuery=null;
+  assert.equal(await immediateSearch.search('Filho Pródigo'),true);
+  assert.equal(immediateSearch.state.lastResults.length,6);
+  assert.equal(immediateSearch.calls.length,0);
+  finishEmbedding();
+  await tick();
+  assert.equal(immediateSearch.calls.length,1);
+  const exactTitle=setup({auto:true,initialResults:[{...hymns[0],match_type:'titulo_exato'},...hymns.slice(1)]});
+  await exactTitle.gguf.maybeAuto('Hino de teste 1');
+  assert.equal(exactTitle.calls.length,0);
+
+  const chat=setup({initialResults:reviewHymns});
+  const firstTurn=chat.refine('Prefiro hinos de reconciliação');
+  assert.equal(chat.calls.length,1);
+  assert.deepEqual(chat.state.lastResults,reviewHymns);
+  chat.complete(chat.calls[0][1],'["Voltar para Deus e reconciliação"]');
+  assert.equal(await firstTurn,true);
+  assert.equal(chat.requests[0].query,'Prefiro hinos de reconciliação');
+  assert.equal(chat.requests[0].model_query,'Voltar para Deus e reconciliação');
+  assert.equal(chat.requests[0].exclude[0],'tristeza');
+  assert.match(chat.messages.at(-1),/IA acrescentou/);
+  const highlight=chat.refine('Qual desses se encaixa melhor?');
+  assert.match(chat.calls[1][0],/Pedido anterior: Prefiro hinos/);
+  chat.complete(chat.calls[1][1],'[2]');
+  assert.equal(await highlight,true);
+  assert.equal(chat.requests.length,1);
+  chat.$('conversation').children.at(-1).click();
+  assert.deepEqual(chat.opened,[2]);
+
+  const expiredChat=setup();
+  const expiredTurn=expiredChat.refine('Quero esperança');
+  expiredChat.complete(expiredChat.calls[0][1],'Tempo limite',false);
+  assert.equal(await expiredTurn,true);
+  assert.equal(expiredChat.requests[0].model_query,undefined);
+  assert.match(expiredChat.messages.at(-1),/Busca local refinada/);
+
+  const staleChat=setup();
+  const staleTurn=staleChat.refine('Agora mais sobre vigiar');
+  staleChat.state.searchEpoch++;
+  staleChat.gguf.cancelSearchTask();
+  staleChat.complete(staleChat.calls[0][1],'["Vigilância"]');
+  assert.equal(await staleTurn,false);
+  assert.equal(staleChat.requests.length,0);
+
+  const prefersChat=setup({auto:true,initialResults:reviewHymns});
+  await prefersChat.gguf.maybeAuto('Paz');
+  const reviewId=prefersChat.calls[0][1];
+  const chatTurn=prefersChat.refine('E entre esses?');
+  assert.deepEqual(prefersChat.cancelled,[reviewId]);
+  prefersChat.complete(reviewId,'sim');
+  prefersChat.complete(prefersChat.calls[1][1],'[1]');
+  assert.equal(await chatTurn,true);
+  assert.match(prefersChat.messages.at(-1),/destacou estes hinos/);
 
   const literal=setup({auto:true});
   literal.state.searchSettings.mode='literal';

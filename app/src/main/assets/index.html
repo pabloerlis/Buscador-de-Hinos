@@ -104,13 +104,13 @@
           <div class="results-layout">
             <aside class="results-tools" aria-label="Ações da busca">
               <div class="results-actions">
-                <button id="refine-toggle" class="secondary-btn" type="button" aria-controls="refine-panel" aria-expanded="false">Refinar</button>
+                <button id="refine-toggle" class="secondary-btn" type="button" aria-controls="refine-panel" aria-expanded="false">Chat de busca</button>
                 <button id="gguf-compare" class="secondary-btn" type="button" disabled>Comparar hinos</button>
               </div>
               <div id="refine-panel" class="refine-panel hidden">
-                <p id="refine-mode" class="subtle-note">Busca contextual</p>
+                <p id="refine-mode" class="subtle-note">Refinamento pela busca local</p>
                 <div id="conversation" class="conversation" aria-live="polite"></div>
-                <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" enterkeyhint="send" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
+                <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: mais sobre reconciliação" maxlength="500" enterkeyhint="send" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
                 <p class="privacy-note">Use “apenas” para exigir um tema, “sem” para excluir, “sem foco em” para reduzir a prioridade ou “nova busca por” para recomeçar.</p>
               </div>
             </aside>
@@ -269,12 +269,12 @@
       <div id="settings-panel-ai" role="tabpanel" aria-labelledby="settings-tab-ai" tabindex="0" hidden>
       <section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (GGUF)</h3>
-        <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. O modelo pode sugerir temas, comparar até cinco trechos e solicitar uma busca complementar na coletânea. Use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
+        <p>Escolha um arquivo <code>.gguf</code> no telefone. O app carrega o modelo ao selecionar e ao abrir. O modelo pode sugerir temas, comparar até cinco trechos e solicitar uma busca complementar na coletânea. Use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
         <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
         <p id="gguf-phase" class="gguf-phase">Estado: verificando</p><p id="gguf-model-meta" class="subtle-note">Nenhum modelo foi carregado na memória.</p>
-        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Usar IA automaticamente para sugerir palavras-chave (desativado por padrão). A busca offline sempre aparece primeiro.</span></label>
+        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Revisar os quatro primeiros resultados com a IA local. A busca aparece primeiro.</span></label>
         <p id="gguf-last" class="gguf-phase" aria-live="polite">Última execução: nenhuma</p>
-        <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
+        <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Tentar carregar novamente</button></div>
         <div class="settings-actions"><button id="gguf-test" class="secondary-btn" type="button" disabled>Testar modelo</button><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div>
         <p id="gguf-test-result" class="subtle-note" role="status" aria-live="polite">Carregue o GGUF para testar a geração no aparelho.</p>
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>

@@ -31,7 +31,7 @@ for(const f of ['semantic-engine.js','story-engine.js','bridge-engine.js','bible
   'recommendation-engine.js','repertoire-store.js','offline-api.js'])vm.runInContext(read(f),env,{filename:f});
 const api=vm.runInContext('OfflineAPI',env);
 const cases=[
-  {query:'Filho Pródigo', expected:['Coletânea 2018:286','Coletânea 2018:264','Coletânea 2018:191'],negative:['Coletânea 2018:206']},
+  {query:'Filho Pródigo', expected:['Coletânea 2018:286','Coletânea 2018:191'],negative:['Coletânea 2018:206','Coletânea 2018:264']},
   {query:'Lucas 15:11',expected:['Coletânea 2018:286']},
   {query:'Ovelha perdida',expected:['Avulsos 2018:ERAM CEM OVELHAS','Coletânea 2018:259']},
   {query:'Lázaro',expected:['Coletânea 2018:704']},

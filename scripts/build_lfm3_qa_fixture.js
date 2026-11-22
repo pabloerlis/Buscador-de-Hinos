@@ -20,3 +20,37 @@ fs.writeFileSync(out,JSON.stringify({
   prompt:request.prompt, grammar:request.grammar, maxTokens:request.maxTokens,
   timeoutMs:request.timeoutMs, expected:3
 })+'\n');
+
+const pairs = [
+  'Os filhos entram no céu.\nOs anjos cantam ao recebê-los.',
+  'Deixei meu pai.\nArrependido, voltei para casa.\nEle me abraçou e me perdoou.',
+  'O vento cessou no mar.\nO barco chegou à praia.',
+  'Deus me consola na dor.\nSeu amor me dá forças.'
+];
+
+const reviewHymns = pairs.map((lyrics,i)=>({id:i+1,snippet:lyrics.split('\n')[i===1?1:0]}));
+const stories = JSON.parse(fs.readFileSync('app/src/main/assets/semantic-stories.json','utf8'));
+const narrative = stories.stories.find(story=>story.id==='filho_prodigo').review_focus;
+const review = ai.prepareReview('Filho pródigo',new Map(pairs.map((lyrics,i)=>[i+1,lyrics])),reviewHymns,{
+  context:{narrative}
+});
+if (!review) throw Error('A revisão automática precisa de quatro hinos.');
+fs.writeFileSync('app/src/androidTest/assets/lfm3-review.json',JSON.stringify({
+  requests:review.requests.map(({prompt,grammar,maxTokens})=>({prompt,grammar,maxTokens})),
+  timeoutMs:review.timeoutMs
+})+'\n');
+
+const chatHymns=[
+  {id:27,snippet:'Cristo disse ao vento que se aquietasse.'},
+  {id:38,snippet:'Deixei meu pai, me arrependi e voltei para casa.'},
+  {id:49,snippet:'Os filhos entram no céu e os anjos cantam.'}
+];
+const chatRequests=[
+  ai.prepareChat({query:'Consolo e fé',rootQuery:'Consolo',message:'Quero consolo depois de uma perda.',
+    previous:'No luto',hymns:[],constraints:'excluir medo',canPick:false}),
+  ai.prepareChat({query:'Consolo e fé',message:'Entre esses, qual hino fala de voltar ao pai depois de se afastar?',
+    hymns:chatHymns,canPick:true})
+];
+fs.writeFileSync('app/src/androidTest/assets/lfm3-chat.json',JSON.stringify(
+  {requests:chatRequests.map(({prompt,grammar,maxTokens,timeoutMs})=>({prompt,grammar,maxTokens,timeoutMs}))}
+)+'\n');

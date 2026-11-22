@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,lastRefinement:'',
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -42,7 +42,7 @@ async function refreshStatus(){
   return result;
 }
 function busySearch(value){
-  state.busy=value; $('search-button').disabled=value;$('refine-send').disabled=value;$('load-more').disabled=value;
+  state.busy=value; $('search-button').disabled=value;$('refine-send').disabled=value||Boolean(state.chatPending);$('load-more').disabled=value;
   $('search-button').textContent=value?'Buscando…':'Buscar';
   if(!value)$('search-button').innerHTML='Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
 }
@@ -56,6 +56,7 @@ function resultCard(hymn,{unlearned=false}={}){
   return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
   <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
+  ${hymn.aiReview?`<p class="why"><strong>Revisão da IA: ${escapeHTML(hymn.aiReview.label)}</strong>${hymn.aiReview.excerpt?` · “${escapeHTML(hymn.aiReview.excerpt)}”`:''}</p>`:''}
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
 }
@@ -69,7 +70,7 @@ function setRefineOpen(open) {
   $('refine-toggle').setAttribute('aria-expanded', String(open));
   $('refine-panel').classList.toggle('hidden', !open);
 }
-async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false}={}){
+async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false,modelQuery}={}){
   if(state.busy)return false;
   if(!state.ready){toast('Importe a coletânea para começar.');$('import-panel').scrollIntoView({behavior:'smooth',block:'center'});return false;}
   if(!String(query).trim())return false;
@@ -79,7 +80,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     $('gguf-comparison').classList.add('hidden');
     if(!preserveContext){
       state.vectorQuery=null;
-      if(!refine)state.searchRootQuery=query;
+      if(!refine){state.searchRootQuery=query;state.lastRefinement='';}
       state.originalQuery=query;
       state.hymnTrail=[];
     }
@@ -90,18 +91,20 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     let data;
     if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
     else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),semantic_hints:semanticHints,settings:state.searchSettings});
+    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),model_query:refine?modelQuery:undefined,semantic_hints:semanticHints,settings:state.searchSettings});
     if(page===1){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.deprioritize=data.deprioritized||[];state.requiredTerms=data.required||[];state.semanticHints=semanticHints;
       if(data.reset_context||(!refine&&!preserveContext))state.searchRootQuery=state.effectiveQuery;
       state.lastResults=data.results.slice();
       state.aiContext=data.ai_context;
+      state.modelRefinement=data.model_refinement||'';
       state.exactNumber=Boolean(data.exact_number);
       $('results-list').innerHTML='';$('results-title').textContent=refine?'Pesquisa refinada':'Hinos encontrados';
       $('results-subtitle').textContent=`${data.total} resultado${data.total===1?'':'s'} para “${query}”`;
       const fragments=[];
-      if(data.used_ai)fragments.push('IA local sugeriu conceitos; a classificação foi conferida na letra original.');
+      if(data.model_refinement)fragments.push('Consulta reformulada pela IA local.');
+      else if(data.used_ai)fragments.push('IA local sugeriu conceitos; a classificação foi conferida na letra original.');
       else if(refine)fragments.push('Critérios contextuais aplicados localmente.');
       if(data.summary)fragments.push(data.summary);
       if(data.excluded?.length)fragments.push('Excluindo: '+data.excluded.join(', ')+'.');
@@ -128,15 +131,23 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     }
     toast(error.message);
   }finally{busySearch(false);}
-  if(succeeded&&page===1&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
-  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
+  if(succeeded&&page===1&&!state.exactNumber){
+    const epoch=state.searchEpoch;
+    const embeddings=!isBibleSearch&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off'
+      ?EmbeddingSearch.maybeUpdate(state.effectiveQuery,epoch):undefined;
+    if(autoAI&&!semanticHints.length){
+      Promise.resolve(embeddings).then(()=>{
+        if(epoch===state.searchEpoch)GGUF.maybeAuto(state.effectiveQuery);
+      });
+    }
+  }
   GGUF.info?.();
   return succeeded;
 }
 function searchRestrictions(){
   return {exclude:state.exclude,deprioritize:state.deprioritize,require:state.requiredTerms};
 }
-function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;}
+function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;return el;}
 function relatedCard(hymn,{unlearned=false}={}){
   const percent=Math.min(100,Math.max(0,Number(hymn.compatibility_percent)||0));
   const components=Number.isFinite(hymn.similarity_percent)?`<span>${Math.round(hymn.similarity_percent)}% com a letra</span>${Number.isFinite(hymn.query_percent)?`<span>${Math.round(hymn.query_percent)}% com a busca</span>`:''}`:'';
@@ -233,6 +244,8 @@ async function submitSearch(query) {
     $('search-diagnostics').open=false;
     setRefineOpen(false);
     $('conversation').replaceChildren();
+    state.chatPending=null;
+    $('refine-form').setAttribute('aria-busy','false');
   }
   if (await performSearch(query)) $('results-title').focus({preventScroll:true});
 }
@@ -242,22 +255,72 @@ $('refine-toggle').addEventListener('click',()=>{
   setRefineOpen(open);
   if(open)$('refine-input').focus();
 });
+async function submitRefinement(message){
+  if(!message||state.busy||state.chatPending)return false;
+  const turn={epoch:state.searchEpoch};
+  state.chatPending=turn;
+  $('refine-send').disabled=true;
+  $('refine-form').setAttribute('aria-busy','true');
+  appendConversation('user',message);
+  try{
+    const intent=OfflineAPI.chatSearchIntent(message);
+    const response=await GGUF.refineChat(message,intent);
+    if(state.chatPending!==turn||turn.epoch!==state.searchEpoch)return false;
+    if(response?.cancelled){
+      appendConversation('assistant','Refinamento interrompido.');
+      return false;
+    }
+    if(response?.ids){
+      const byId=new Map(state.lastResults.map(hymn=>[hymn.id,hymn]));
+      const picks=response.ids.map(id=>byId.get(id));
+      if(picks.every(Boolean)){
+        const bubble=appendConversation('assistant','A IA destacou estes hinos pelos trechos exibidos.');
+        for(const hymn of picks){
+          const button=document.createElement('button');
+          button.className='secondary-btn';button.type='button';
+          button.textContent=hymn.number?'Hino '+hymn.number+' · '+hymn.title:hymn.title;
+          button.addEventListener('click',()=>openHymn(hymn.id));
+          bubble.appendChild(button);
+        }
+        state.lastRefinement=message;
+        return true;
+      }
+    }
+    if(response?.noAction&&!intent.list){
+      appendConversation('assistant','Que tema ou detalhe você gostaria de acrescentar à busca?');
+      return false;
+    }
+    if(intent.list){
+      appendConversation('assistant','Não consegui destacar um hino desta lista para esse pedido.');
+      return false;
+    }
+    const success=await performSearch(message,{refine:true,autoAI:false,modelQuery:response?.query});
+    if(state.chatPending!==turn)return success;
+    if(success){
+      state.lastRefinement=message;
+      const detail=state.modelRefinement?'A IA acrescentou “'+state.modelRefinement+'” à busca.':'Busca local refinada.';
+      appendConversation('assistant',detail+' '+state.total+(state.total===1?' resultado.':' resultados.'));
+    }else appendConversation('assistant','Não foi possível refinar a busca.');
+    return success;
+  }finally{
+    if(state.chatPending===turn){
+      state.chatPending=null;
+      $('refine-send').disabled=state.busy;
+      $('refine-form').setAttribute('aria-busy','false');
+    }
+  }
+}
 $('refine-form').addEventListener('submit',async ev=>{
   ev.preventDefault();
-  const message=$('refine-input').value.trim();
-  if(!message||state.busy)return;
-  appendConversation('user',message);
-  $('refine-input').value='';
-  const success=await performSearch(message,{refine:true});
-  appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados.`:'Não consegui refinar a pesquisa.');
-  if(success){
-    setRefineOpen(false);
-    $('results-title').focus({preventScroll:true});
-  }
+  const input=$('refine-input');
+  const message=input.value.trim();
+  if(!message||state.busy||state.chatPending)return;
+  input.value='';
+  await submitRefinement(message);
 });
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.chatPending=null;state.lastRefinement='';$('refine-form').setAttribute('aria-busy','false');$('refine-send').disabled=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
 
 const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
@@ -546,10 +609,11 @@ const EmbeddingSearch=(()=>{
     try{
       const answer=await request(query);
       if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off')return;
-      state.vectorQuery=answer.vector;
+      if(state.page!==1||state.busy)return;
       const result=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
         semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings});
-      if(epoch!==state.searchEpoch)return;
+      if(epoch!==state.searchEpoch||state.page!==1||state.busy)return;
+      state.vectorQuery=answer.vector;
       state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
       state.aiContext=result.ai_context;
       $('results-list').innerHTML=result.results.length?result.results.map(resultCard).join(''):
@@ -567,7 +631,7 @@ const EmbeddingSearch=(()=>{
 const GGUF=(()=>{
   const native=()=>window.NativeGGUF||null;
   const selectedState={ready:false,busy:false,task:null};
-  let nextRequest=0,queuedAuto=null;
+  let nextRequest=0,queuedAuto=null,queuedChat=null;
   const aiCache=new Map();
   const MAX_AI_MS=12000;
   const canUseTopics=()=>!state.exactNumber&&state.searchSettings.mode!=='literal';
@@ -593,14 +657,14 @@ const GGUF=(()=>{
       if(task?.type==='diagnostic')$('gguf-test-result').textContent=`${message} ${seconds} s`;
     }
     if(phase==='ready'&&!selectedState.task){setActivity(false);}
-    if(phase==='selected'&&!selectedState.task){setActivity(false);showTask('Modelo selecionado, não carregado','Abra configurações e toque em “Carregar modelo”. Selecionar não significa executar.');}
+    if(phase==='selected'&&!selectedState.task){setActivity(false);showTask('Modelo selecionado, não carregado','Aguarde o carregamento automático ou tente novamente nas configurações.');}
     if(phase==='error'){setActivity(false);showTask('Modelo não foi carregado','Confira os detalhes do erro nas configurações. A busca offline continua disponível.');}
     if(phase==='none'||phase==='unavailable'){setActivity(false);showTask('Busca local disponível','Você pode carregar um GGUF para interpretação contextual complementar.');}
   }
   function info(){
     const status=nativeStatus();selectedState.ready=Boolean(status.loaded);selectedState.busy=Boolean(status.busy||selectedState.task);
     const available=Boolean(status.available); const phase=status.phase||(status.loaded?'ready':status.selected?'selected':'none');
-    $('gguf-select').disabled=!available||selectedState.busy;$('gguf-load').disabled=!available||!status.selected||selectedState.busy;
+    $('gguf-select').disabled=!available||selectedState.busy;$('gguf-load').disabled=!available||!status.selected||selectedState.busy||selectedState.ready;
     $('gguf-improve').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||!canUseTopics();
     $('gguf-compare').disabled=!state.lastResults.length;
     $('gguf-compare-model').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
@@ -622,18 +686,29 @@ const GGUF=(()=>{
     $('gguf-banner').classList.toggle('hidden',!state.ready||!selectedState.ready);
     $('ai-workspace').classList.toggle('hidden',!selectedState.ready&&!selectedState.busy);
     $('gguf-banner-text').textContent=selectedState.ready?'IA local disponível':'Carregue um GGUF em Configurações para usar a IA.';
+    $('refine-mode').textContent=selectedState.ready?'Chat com IA local':'Refinamento pela busca local';
     updateIndicator(status);
     return status;
   }
-  function resetTask(message,failed=false){
-    selectedState.task=null;setActivity(false);
+  function resetTask(message,failed=false,chatResult=null){
+    const completed=selectedState.task;
+    selectedState.task=null;
+    if(completed?.chatResolve)completed.chatResolve(chatResult||
+      (completed.cancelled||completed.epoch!==state.searchEpoch?{cancelled:true}:null));setActivity(false);
     $('ai-timer').textContent='';$('ai-last').textContent=message;
     if(failed){toast(message);showTask('IA encontrou um erro','A pesquisa local permanece disponível. Veja o erro nas configurações.');}
     else showTask('Análise concluída',message);
     info();
     const next=queuedAuto;
     queuedAuto=null;
-    if(next?.epoch===state.searchEpoch)maybeAuto(next.query);
+    if(queuedChat){
+      const chat=queuedChat;
+      queuedChat=null;
+      if(chat.epoch===state.searchEpoch)startChat(chat);
+      else chat.resolve({cancelled:true});
+      return;
+    }
+    if(next?.epoch===state.searchEpoch)void maybeAuto(next.query);
   }
   function cancelIfBusy(){
     const task=selectedState.task;
@@ -645,6 +720,7 @@ const GGUF=(()=>{
   }
   function cancelSearchTask(){
     queuedAuto=null;
+    if(queuedChat){queuedChat.resolve({cancelled:true});queuedChat=null;}
     if(selectedState.task?.type!=='diagnostic')cancelIfBusy();
   }
   function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired,themeLabels}){
@@ -655,7 +731,11 @@ const GGUF=(()=>{
     task.themeLabels=themeLabels;
     setActivity(true,generationStages[0]);
     try{native().generate(prompt,task.id,grammar,maxTokens,timeoutMs);}
-    catch(error){resetTask('Não foi possível iniciar a IA: '+error.message,true);return false;}
+    catch(error){
+      if(task.type==='review'||task.type==='chat')resetTask('Busca local disponível. Não foi possível iniciar a IA.');
+      else resetTask('Não foi possível iniciar a IA: '+error.message,true);
+      return false;
+    }
     info();
     return true;
   }
@@ -665,6 +745,31 @@ const GGUF=(()=>{
     selectedState.task=task;
     $('ai-last').textContent='';
     return sendTask(task,request);
+  }
+  function startChat(chat){
+    if(startTask('chat',chat.request,{chatResolve:chat.resolve})){
+      showTask('Refinando pelo chat','Você pode continuar consultando os resultados enquanto a IA responde.');
+    }else chat.resolve(null);
+  }
+  function refineChat(message,intent){
+    if(!state.effectiveQuery||state.searchSettings.mode==='literal'||!intent.eligible||!selectedState.ready||
+        (intent.list&&!intent.canPick))
+      return Promise.resolve(null);
+    const constraints=[
+      state.exclude.length&&'excluir '+state.exclude.join(', '),
+      state.deprioritize?.length&&'menos foco em '+state.deprioritize.join(', '),
+      state.requiredTerms?.length&&'obrigatório '+state.requiredTerms.join(', ')
+    ].filter(Boolean).join('; ');
+    const request=LocalHymnAI.prepareChat({query:state.effectiveQuery,rootQuery:state.searchRootQuery,
+      message,previous:state.lastRefinement,hymns:state.lastResults,constraints,canPick:intent.list});
+    if(intent.list&&!request.candidates.size)return Promise.resolve(null);
+    return new Promise(resolve=>{
+      const chat={request,resolve,epoch:state.searchEpoch};
+      if(selectedState.task?.type==='review'){
+        queuedChat=chat;
+        cancelIfBusy();
+      }else startChat(chat);
+    });
   }
   function hintsFromJson(answer,task){
     try{
@@ -678,10 +783,74 @@ const GGUF=(()=>{
     }catch(error){ /* Resposta incompleta ou inválida. */ }
     return [];
   }
-  function maybeAuto(query){
-    if(!selectedState.ready||!$('gguf-auto').checked||!state.ready||!canUseTopics())return;
+  async function maybeAuto(query){
+    const hymns=state.lastResults.slice(0,LocalHymnAI.REVIEW_LIMIT);
+    if(!selectedState.ready||!$('gguf-auto').checked||!state.ready||state.busy||
+        state.repertoirePending||!canUseTopics()||hymns.length<LocalHymnAI.REVIEW_LIMIT||
+        hymns.some(hymn=>hymn.match_type==='titulo_exato')||/["“”]/.test(query))return;
     if(selectedState.task){queuedAuto={query,epoch:state.searchEpoch};return;}
-    interpret(query,MAX_AI_MS);
+    if(selectedState.busy||!native()?.generate)return;
+    const task={type:'review',epoch:state.searchEpoch,startedAt:performance.now()};
+    selectedState.task=task;
+    $('ai-last').textContent='';
+    showTask('Revisando os primeiros hinos','Os resultados da busca inicial já estão disponíveis.');
+    info();
+    let request;
+    try{
+      const entries=await Promise.all(hymns.map(async hymn=>{
+        const detail=await jsonRequest('/api/hymns/'+hymn.id);
+        return [hymn.id,detail.lyrics];
+      }));
+      if(selectedState.task!==task||task.epoch!==state.searchEpoch)return;
+      request=LocalHymnAI.prepareReview(query,new Map(entries),hymns,{
+        exclude:state.exclude,required:state.requiredTerms,context:state.aiContext
+      });
+    }catch(error){
+      if(selectedState.task===task)resetTask('Busca inicial preservada. Não foi possível ler os trechos para revisão.');
+      return;
+    }
+    if(!request){resetTask('Busca inicial preservada. Trechos insuficientes para revisão.');return;}
+    task.requests=request.requests;
+    task.judgments=[];
+    task.deadline=task.startedAt+request.timeoutMs;
+    advanceReview(task);
+  }
+  function advanceReview(task){
+    const timeoutMs=Math.floor(task.deadline-performance.now());
+    if(timeoutMs<1000){
+      resetTask('Busca inicial preservada. A revisão da IA atingiu o limite de tempo.');
+      return;
+    }
+    sendTask(task,{...task.requests[task.judgments.length],timeoutMs});
+  }
+  function finishReview(task, ok, answer){
+    if(!ok||performance.now()>task.deadline){
+      resetTask('Busca inicial preservada. A revisão da IA não terminou.');
+      return;
+    }
+    if(state.repertoirePending||!$('gguf-auto').checked){
+      resetTask('A lista mudou durante a revisão.');
+      return;
+    }
+    try{
+      const {candidate}=task.requests[task.judgments.length];
+      task.judgments.push(LocalHymnAI.readReview(answer,candidate));
+    }catch(error){resetTask('Busca inicial preservada. A resposta da revisão foi inválida.');return;}
+    if(task.judgments.length<task.requests.length){advanceReview(task);return;}
+    const results=LocalHymnAI.applyReview(state.lastResults,task.judgments);
+    if(!results){resetTask('A lista mudou durante a revisão.');return;}
+    if(results===state.lastResults){resetTask('A revisão não identificou encaixe direto.');return;}
+    const list=$('results-list');
+    const active=document.activeElement;
+    const focus=active&&list.contains(active)?active.dataset:null;
+    const focusId=Number(focus?.hymnId||focus?.repertoireId);
+    state.lastResults=results;
+    list.innerHTML=results.map(resultCard).join('');
+    if(focusId>0){
+      const attribute=focus.hymnId?'data-hymn-id':'data-repertoire-id';
+      list.querySelector('['+attribute+'="'+focusId+'"]')?.focus({preventScroll:true});
+    }
+    resetTask('A IA revisou os primeiros '+task.judgments.length+' hinos.');
   }
   function interpret(query,timeoutMs=MAX_AI_MS){
     if(!query?.trim()||state.busy||state.repertoirePending||!canUseTopics())return;
@@ -783,7 +952,7 @@ const GGUF=(()=>{
   }
   window.__ggufNativeEvent=(event,ok,value,requestId,metrics)=>{
     if(event==='phase'){info();return;}
-    if(event==='selection'){if(ok){aiCache.clear();toast('Modelo selecionado: '+value);$('gguf-test-result').textContent='Carregue o GGUF para testar a geração no aparelho.';}else if(value!=='Seleção cancelada.')toast(value);info();return;}
+    if(event==='selection'){if(ok){aiCache.clear();toast('Modelo selecionado: '+value);$('gguf-test-result').textContent='Carregando o modelo selecionado…';}else if(value!=='Seleção cancelada.')toast(value);info();return;}
     if(event==='load'){
       $('gguf-test-result').textContent=ok?'GGUF carregado. Toque em Testar modelo para verificar a geração.':'Carregamento falhou: '+value;
       toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();return;
@@ -803,6 +972,13 @@ const GGUF=(()=>{
         'Teste falhou: '+(ok?'a resposta esperada era OK.':value);
       $('gguf-test-result').textContent=message;
       resetTask(message,!passed);return;
+    }
+    if(task.type==='review'){finishReview(task,ok,answer);return;}
+    if(task.type==='chat'){
+      let result=null;
+      try{if(ok)result=LocalHymnAI.readChat(answer,task)||{noAction:true};}catch(error){ /* A busca local continua disponível. */ }
+      resetTask(result?'Resposta do chat pronta.':'Aplicando refinamento pela busca local.',false,result);
+      return;
     }
     if(!ok){resetTask('IA falhou: '+value,true);return;}
     if(task.type==='compare'){
@@ -830,8 +1006,12 @@ const GGUF=(()=>{
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
   const savedAuto=localStorage.getItem('hinos-gguf-auto-v15');$('gguf-auto').checked=savedAuto==='1';
-  $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-gguf-auto-v15',$('gguf-auto').checked?'1':'0'));
+  $('gguf-auto').addEventListener('change',()=>{
+    const auto=$('gguf-auto').checked;
+    localStorage.setItem('hinos-gguf-auto-v15',auto?'1':'0');
+    if(!auto&&selectedState.task?.type==='review')cancelIfBusy();
+  });
   if(native())setInterval(info,1250);
-  info();return {info,maybeAuto,cancelSearchTask};
+  info();return {info,maybeAuto,cancelSearchTask,refineChat};
 })();
 refreshStatus().catch(e=>toast('Não foi possível acessar a base local: '+e.message));
