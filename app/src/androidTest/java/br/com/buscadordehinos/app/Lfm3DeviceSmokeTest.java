@@ -1,6 +1,11 @@
 package br.com.buscadordehinos.app;
 
+import androidx.test.core.app.ActivityScenario;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.net.Uri;
+import java.util.concurrent.atomic.AtomicReference;
 import androidx.test.platform.app.InstrumentationRegistry;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -61,14 +66,7 @@ public class Lfm3DeviceSmokeTest {
                 +" prefill_ms="+metrics[1]+" first_token_ms="+metrics[2]
                 +" generated="+metrics[3]);
 
-            JSONObject fixture;
-            try (java.io.InputStream input=InstrumentationRegistry.getInstrumentation()
-                    .getContext().getAssets().open("lfm3-comparison.json")) {
-                ByteArrayOutputStream data=new ByteArrayOutputStream();
-                byte[] chunk=new byte[4096];
-                for (int size; (size=input.read(chunk))!=-1;) data.write(chunk,0,size);
-                fixture=new JSONObject(new String(data.toByteArray(),StandardCharsets.UTF_8));
-            }
+            JSONObject fixture=fixture("lfm3-comparison.json");
             int timeout="baseline".equals(InstrumentationRegistry.getArguments().getString("benchmarkMode"))
                 ?180_000:fixture.getInt("timeoutMs");
             long[] compareMetrics=new long[4];
@@ -88,10 +86,97 @@ public class Lfm3DeviceSmokeTest {
             assertEquals("A resposta deve referenciar o hino permitido",fixture.getInt("expected"),resultJson.getInt(0));
             assertTrue("Não houve geração real",compareMetrics[3]>0);
 
+            if (!"baseline".equals(InstrumentationRegistry.getArguments().getString("benchmarkMode"))) {
+                verifyReview(generate);
+            }
             android.util.Log.i("LFM3_SMOKE_SUCCESS","official QAD Q4_0, tokens="
                 +metrics[3]+", prefill_ms="+metrics[1]+", first_token_ms="+metrics[2]);
         } finally {
             unload.invoke(null);
         }
+        if (!"baseline".equals(InstrumentationRegistry.getArguments().getString("benchmarkMode"))) {
+            verifyAutomaticLoading(gguf);
+        }
+    }
+
+    private static void verifyAutomaticLoading(File gguf) throws Exception {
+        Context context=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        SharedPreferences prefs=context.getSharedPreferences("hinos_local_llm",Context.MODE_PRIVATE);
+        Uri uri=Uri.parse("content://br.com.buscadordehinos.qa.unavailable/qa-lfm3.gguf");
+        long size=gguf.length();
+        Method cacheKey=MainActivity.class.getDeclaredMethod("cacheKey",Uri.class,long.class);
+        cacheKey.setAccessible(true);
+        File cache=new File(context.getFilesDir(),"gguf-cache");
+        assertTrue(cache.isDirectory()||cache.mkdirs());
+        File cached=new File(cache,"gguf-"+cacheKey.invoke(null,uri,size)+".gguf");
+        assertTrue("Não foi possível preparar a cópia privada de teste",gguf.renameTo(cached));
+        assertTrue(prefs.edit().putString("model_uri",uri.toString()).putString("model_display_name","qa-lfm3.gguf")
+            .putLong("model_bytes",size).commit());
+        try(ActivityScenario<MainActivity> activity=ActivityScenario.launch(MainActivity.class)){
+            awaitAutomaticLoad(activity);
+            activity.recreate();
+            awaitAutomaticLoad(activity);
+            assertEquals(size,cached.length());
+            android.util.Log.i("LFM3_BENCH","AUTOLOAD_RESULT ready_after_create=true ready_after_recreate=true private_cache=true");
+        }finally{
+            prefs.edit().clear().commit();
+            assertTrue("Não foi possível devolver o modelo temporário ao runner",cached.renameTo(gguf));
+        }
+    }
+
+    private static void awaitAutomaticLoad(ActivityScenario<MainActivity> activity) throws Exception {
+        long until=SystemClock.elapsedRealtime()+60000;
+        while(SystemClock.elapsedRealtime()<until){
+            AtomicReference<String> status=new AtomicReference<>();
+            activity.onActivity(screen->status.set(screen.new ModelBridge().status()));
+            JSONObject result=new JSONObject(status.get());
+            assertNotEquals("Erro ao restaurar modelo: "+result.optString("lastError"),"error",result.optString("phase"));
+            if(result.optBoolean("loaded") && !result.optBoolean("busy"))return;
+            SystemClock.sleep(250);
+        }
+        fail("O GGUF salvo não carregou automaticamente");
+    }
+
+    private static JSONObject fixture(String name) throws Exception {
+        try (java.io.InputStream input=InstrumentationRegistry.getInstrumentation()
+                .getContext().getAssets().open(name)) {
+            ByteArrayOutputStream data=new ByteArrayOutputStream();
+            byte[] chunk=new byte[4096];
+            for (int size; (size=input.read(chunk))!=-1;) data.write(chunk,0,size);
+            return new JSONObject(new String(data.toByteArray(),StandardCharsets.UTF_8));
+        }
+    }
+
+    private static void verifyReview(Method generate) throws Exception {
+        JSONObject request=fixture("lfm3-review.json");
+        int budget=request.getInt("timeoutMs");
+
+        long start=SystemClock.elapsedRealtime();
+        int totalTokens=0;
+        long totalSetup=0, totalPrefill=0, firstToken=0;
+        JSONArray requests=request.getJSONArray("requests");
+        assertEquals("Quatro hinos precisam ser analisados",4,requests.length());
+        String[] expected={"não","sim","não","não"};
+        for (int i=0;i<requests.length();i++) {
+            JSONObject item=requests.getJSONObject(i);
+            long[] metrics=new long[4];
+            int remaining=budget-(int)(SystemClock.elapsedRealtime()-start);
+            assertTrue("A revisão ultrapassou o tempo disponível",remaining>=1000);
+            byte[] output=(byte[])generate.invoke(null,new Object[]{
+                item.getString("prompt").getBytes(StandardCharsets.UTF_8),
+                item.getString("grammar").getBytes(StandardCharsets.UTF_8),item.getInt("maxTokens"),remaining,metrics
+            });
+            assertNotNull("Sem resultado da revisão",output);
+            assertTrue("A revisão precisa gerar tokens",metrics[3]>0);
+            assertEquals("Classificação do hino sintético "+(i+1),expected[i],new String(output,StandardCharsets.UTF_8).trim());
+            if (i==0) firstToken=metrics[2];
+            totalSetup+=metrics[0];
+            totalPrefill+=metrics[1];
+            totalTokens+=metrics[3];
+        }
+        long wall=SystemClock.elapsedRealtime()-start;
+        android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=review-four total_ms="+wall
+            +" setup_ms="+totalSetup+" prefill_ms="+totalPrefill
+            +" first_token_ms="+firstToken+" generated="+totalTokens);
     }
 }

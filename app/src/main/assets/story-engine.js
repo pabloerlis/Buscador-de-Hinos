@@ -91,7 +91,7 @@ const StoryEngine = (() => {
         const customWords=Array.isArray(custom[s.id])?custom[s.id].slice(0,20):[];
         for(const alias of customWords){if(typeof alias==='string'&&alias.length>3&&alias.length<=90)aliases.push({text:alias,normalized:normalize(alias),re:matcher(alias)});}
         const matched=aliases.filter(a=>a.re.test(q)).sort((a,b)=>b.normalized.length-a.normalized.length);
-        if(matched.length)matches.push({id:s.id,label:s.label,reference:s.reference,alias:matched[0].text,description:s.description,topics:s.topics||[]});
+        if(matched.length)matches.push({id:s.id,label:s.label,reference:s.reference,alias:matched[0].text,description:s.description,reviewFocus:s.review_focus,topics:s.topics||[]});
       }
       // Retirar da busca literal apenas o trecho reconhecido como narrativa.
       // Ex.: "Filho Pródigo com gratidão" continua buscando "gratidão" também.

@@ -125,5 +125,63 @@ const LocalHymnAI = (() => {
     };
   }
 
-  return { diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  const REVIEW_LIMIT = 4;
+  const REVIEW_TIMEOUT_MS = 30000;
+  const reviewLabels = { D: 'Encaixe direto', I: 'Encaixe direto não identificado' };
+
+  function reviewPassages(snippet, lyrics) {
+    const stanzas = String(lyrics||'').split(/\r?\n[ \t]*\r?\n+/)
+      .map(stanza=>stanza.split(/\r?\n/).map(line=>clip(line, 100)).filter(Boolean))
+      .filter(lines=>lines.length);
+    if (!stanzas.length) return [];
+    const key = text => text.normalize('NFC').toLocaleLowerCase('pt-BR');
+    const lineHint = clip(String(snippet||'').split(/\s+\/\s+/)[0], 45);
+    const hint = key(lineHint);
+    const match = hint.length>=6 ? stanzas.findIndex(lines=>lines.some(line=>key(line).includes(hint))) : -1;
+    const lines = stanzas[Math.max(0, match)];
+    const anchor = match<0 ? 0 : lines.findIndex(line=>key(line).includes(hint));
+    const excerpt = clip(lines.slice(Math.max(0, anchor-1), anchor+2).join(' / '), 150);
+    const alternatives = [stanzas.at(-1), stanzas[0]].filter(stanza=>stanza!==lines)
+      .map(stanza=>clip(stanza.join(' / '), 75));
+    const second = alternatives.find(text=>!key(excerpt).includes(key(text)));
+    return second ? [excerpt, second] : [excerpt];
+  }
+
+  function prepareReview(query, lyricsById, hymns, {exclude=[], required=[], context}={}) {
+    const candidates = hymns.slice(0, REVIEW_LIMIT).map(hymn=>({
+      id: hymn.id, excerpts: reviewPassages(hymn.snippet, lyricsById.get(hymn.id))
+    }));
+    if (candidates.length!==REVIEW_LIMIT || candidates.some(item=>!item.excerpts.length) ||
+        new Set(candidates.map(item=>item.id)).size!==REVIEW_LIMIT) return null;
+    const subject = promptText(context?.narrative || query, 145).replace(/[.!?]+$/, '');
+    const requests = candidates.map(candidate=>{
+      const excerpt = candidate.excerpts.join(' / ');
+      const prompt = [
+        'Este trecho fala especificamente de '+subject+'? Responda sim ou não.',
+        exclude.length && 'Exclua: '+promptText(exclude.join(', '), 65),
+        required.length && 'Obrigatório: '+promptText(required.join(', '), 65),
+        'Trecho: '+promptText(excerpt, 228)
+      ].filter(Boolean).join('\n');
+      return { prompt, candidate, grammar:'root ::= "sim" | "não"', maxTokens:5 };
+    });
+    return { requests, timeoutMs:REVIEW_TIMEOUT_MS };
+  }
+
+  function readReview(response, candidate) {
+    if (response!=='sim' && response!=='não') throw Error('Resposta de revisão inválida.');
+    const grade = response==='sim'?'D':'I';
+    return {id:candidate.id, grade, label:reviewLabels[grade],
+      excerpt:grade==='D'?candidate.excerpts.join(' / '):''};
+  }
+
+  function applyReview(hymns, judgments) {
+    if (!judgments.every(({id},i)=>hymns[i]?.id===id)) return null;
+    if (!judgments.some(({grade})=>grade==='D')) return hymns;
+    const priority = {D:1,I:0};
+    const reviewed = judgments.map((review,i)=>({...hymns[i],aiReview:review}));
+    reviewed.sort((a,b)=>priority[b.aiReview.grade]-priority[a.aiReview.grade]);
+    return [...reviewed,...hymns.slice(reviewed.length)];
+  }
+
+  return { REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
 })();
