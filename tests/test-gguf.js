@@ -221,7 +221,7 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
     generate:(...args)=>calls.push(args),cancel:id=>cancelled.push(id)}}:{};
   const vector=Array(384).fill(0.1);
   const settings={mode:'balanced',vectorMode:nativeModel?'balanced':'off',collections:{principal:true,avulsos:false}};
-  const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatOptions:[],chatQuestions:new Set()};
+  const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatOptions:[],chatQuestions:new Set(),chatBrief:{}};
   const {gguf,search,refine,visible}=vm.runInNewContext(aiSource+searchSource+turnSource+ggufSource+'\n({gguf:GGUF,search:performSearch,refine:submitRefinement,visible:visibleHymns})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>{messages.push(text);return $('conversation');},showResults(){},selectWorkspace(){},
     document:{createElement(){return {append(){},addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
     OfflineAPI:{chatEditCommand:text=>/\b(?:acrescente|retire)\b/i.test(text),chatSearchIntent:text=>({eligible:true,canPick:true,list:/entre esses|desses/i.test(text)}),normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
@@ -485,6 +485,24 @@ async function checkBridge(){
   assert.match(addByTheme.messages.at(-1),/Responda sim ou não/);
   assert.equal(await addByTheme.refine('Sim'),true);
   assert.ok(addByTheme.state.chatAdded.has(chosen.id));
+
+  const shortReplies=setup();
+  shortReplies.state.chatHistory.push({kind:'assistant',text:'Para qual momento?',intent:'preference:ocasiao'});
+  shortReplies.state.chatQuestions.add('ocasiao');
+  assert.equal(await shortReplies.refine('Velório'),true);
+  assert.match(shortReplies.messages.at(-1),/Velório.*Que mensagem/);
+  assert.equal(await shortReplies.refine('Consolo e encorajamento'),true);
+  assert.match(shortReplies.messages.at(-1),/Velório.*Consolo e encorajamento/);
+  assert.equal(shortReplies.requests.length,0);
+  assert.equal(shortReplies.calls.length,0);
+  const context=ai.chatSearchRequest('Pode buscar agora?',[],false,shortReplies.state.chatBrief);
+  assert.match(context.query,/Consolo e encorajamento.*Velório/);
+  const generic='A escolha dos hinos para o culto depende do momento e da mensagem central';
+  assert.equal(ai.repeatsChatReply(generic+' que de consolo e encorajamento.',[
+    {kind:'assistant',text:generic+' que deseja transmitir.'}
+  ]),true);
+  assert.equal(ai.isBriefAnswer('João 14:1'),false);
+  assert.equal(ai.isBriefAnswer('Não sei'),false);
 
   const funeral=setup();
   const occasion=funeral.refine('Culto de velório. Hinos de consolo e encorajamento.');

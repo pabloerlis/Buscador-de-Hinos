@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatProposal:null,chatQuestions:new Set(),
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,chatPending:null,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatProposal:null,chatQuestions:new Set(),chatBrief:{},
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -289,7 +289,7 @@ function selectWorkspace(name){
   if(name==='chat'){
     if(!state.chatHistory.length){
       state.chatQuestions.add('ocasiao');
-      chatSay('assistant','Para qual momento você está escolhendo os hinos? Você também pode colar uma anotação espiritual aqui.');
+      chatSay('assistant','Para qual momento você está escolhendo os hinos? Você também pode colar uma anotação espiritual aqui.','preference:ocasiao');
     }
     scrollChat();
   }
@@ -333,6 +333,7 @@ function resetChatTurn(){
 function clearChatContext(){
   state.chatHistory=[];
   state.chatQuestions.clear();
+  state.chatBrief={};
   $('conversation').replaceChildren();
   const hadEdits=state.chatAdded.size||state.chatRemoved.size;
   clearChatEdits();
@@ -488,6 +489,22 @@ async function refineChatSearch(request,turn){
   }
   return true;
 }
+function saveChatBrief(message,lastQuestion){
+  const field=lastQuestion==='preference:ocasiao'?'occasion':lastQuestion==='preference:tema'?'theme':null;
+  if(!field||!LocalHymnAI.isBriefAnswer(message))return false;
+  if(field==='occasion'&&/^(?:prefiro|quero|hinos?|tema)\b/iu.test(message.trim()))return false;
+  const value=message.trim().replace(/[.!]+$/u,'');
+  state.chatBrief[field]=value;
+  if(field==='occasion'&&!state.chatBrief.theme&&!state.chatQuestions.has('tema')){
+    state.chatQuestions.add('tema');
+    chatSay('assistant','Ocasião: '+value+'. Que mensagem você quer transmitir com os hinos?','preference:tema');
+  }else{
+    const {theme,occasion}=state.chatBrief;
+    const context=[occasion&&'ocasião: '+occasion,theme&&'tema: '+theme].filter(Boolean).join('; ');
+    chatSay('assistant','Anotei '+context+'. Posso buscar hinos quando você pedir.');
+  }
+  return true;
+}
 async function submitRefinement(message,{viaButton=false}={}){
   if((!message&&!viaButton)||state.busy||state.chatPending)return false;
   if(message.length>LocalHymnAI.CHAT_MESSAGE_LIMIT){
@@ -498,7 +515,7 @@ async function submitRefinement(message,{viaButton=false}={}){
   const lastQuestion=history.at(-1)?.intent;
   const answeringPreference=typeof lastQuestion==='string'&&lastQuestion.startsWith('preference:')&&message.length<=100;
   const pick=!viaButton&&OfflineAPI.chatSearchIntent(message).list;
-  const request=pick?null:LocalHymnAI.chatSearchRequest(message,history,viaButton);
+  const request=pick?null:LocalHymnAI.chatSearchRequest(message,history,viaButton,state.chatBrief);
   const editCommand=!request&&OfflineAPI.chatEditCommand(message);
   const editTurn=Boolean(editCommand||state.chatProposal||state.chatChoices);
   const turn={epoch:state.searchEpoch,searching:Boolean(request)};
@@ -512,6 +529,7 @@ async function submitRefinement(message,{viaButton=false}={}){
       state.chatProposal=null;
       return await refineChatSearch(request,turn);
     }
+    if(!editTurn&&!pick&&saveChatBrief(message,lastQuestion))return true;
     const proposal=state.chatProposal;
     state.chatProposal=null;
     if(proposal&&/^(?:sim|pode (?:adicionar|incluir|acrescentar)|confirmo|aceito)[.!]?$/i.test(message))
@@ -579,7 +597,7 @@ async function submitRefinement(message,{viaButton=false}={}){
       (message.length<120&&previousNote?await chatScripture(previousNote):null));
     if(!current())return false;
     const response=await GGUF.refineChat({message,history,shown,found,editIntent:lookup.verb,explaining,pick,scripture,
-      asked:[...state.chatQuestions],answeringPreference});
+      asked:[...state.chatQuestions],answeringPreference,brief:state.chatBrief});
     if(!current())return false;
     if(response?.cancelled){chatSay('assistant','Conversa interrompida.');return false;}
     if(response?.verb==='destacar'&&pick)return applyChatEdit('destacar',response.hymn);
@@ -588,7 +606,7 @@ async function submitRefinement(message,{viaButton=false}={}){
       chatSay('assistant','Posso acrescentar '+chatHymnName(response.hymn)+'? Responda sim ou não.');
       return true;
     }
-    if(response?.reply){
+    if(response?.reply&&(response.question||!LocalHymnAI.repeatsChatReply(response.reply,history))){
       if(response.question)state.chatQuestions.add(response.question);
       showChatScripture(chatSay('assistant',response.reply,response.question?'preference:'+response.question:undefined),scripture);
       return true;
