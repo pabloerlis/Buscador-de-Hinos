@@ -58,7 +58,7 @@ public class E5DeviceSmokeTest {
                 evaluate(web,
                     "(()=>{" +
                     "const el=id=>document.getElementById(id);" +
-                    "const nav=['search','chat','library','settings'].map(name=>el('app-tab-'+name));" +
+                    "const nav=['search','chat','library','bible','settings'].map(name=>el('app-tab-'+name));" +
                     "const visible=active=>nav.every(tab=>{const on=tab===nav[active];" +
                     "return tab.getAttribute('aria-selected')===String(on)&&el(tab.getAttribute('aria-controls')).hidden!==on;});" +
                     "if(!visible(0))return false;" +
@@ -70,6 +70,7 @@ public class E5DeviceSmokeTest {
                     "const synced=quick.checked===main.checked&&main.checked!==previous;" +
                     "main.click();" +
                     "nav[3].click(); if(!visible(3))return false;" +
+                    "nav[4].click(); if(!visible(4))return false;" +
                     "el('settings-tab-about').click();" +
                     "const about=!el('settings-panel-about').hidden&&el('about-app').open;" +
                     "el('ai-indicator').click();" +
@@ -210,12 +211,16 @@ public class E5DeviceSmokeTest {
                 "await refreshStatus(); state.searchSettings.vectorMode='off';" +
                 "const el=id=>document.getElementById(id); el('app-tab-chat').click();" +
                 "const greeting=el('conversation').textContent.includes('Para qual momento');" +
+                "const books=await OfflineAPI.request('/api/scripture/books');" +
+                "const chapter=await OfflineAPI.request('/api/scripture/chapter',{book:'John',chapter:3});" +
+                "const scripture=await OfflineAPI.request('/api/scripture/context',{message:'Anotação de João 3:16 sobre amor'});" +
+                "const bibleOK=books.books.length===66&&chapter.verses.length===36&&scripture.reference==='João 3:16';" +
                 "const epoch=state.searchEpoch;" +
                 "await submitRefinement('Prefiro hinos de gratidão');" +
                 "const conversationOnly=state.searchEpoch===epoch&&!state.effectiveQuery;" +
                 "const searched=await submitRefinement('Busque o hino 101');" +
                 "const intentOK=searched&&state.searchEpoch>epoch&&visibleHymns().some(h=>h.number==='101');" +
-                "el('conversation').querySelector('button').click();" +
+                "Array.from(el('conversation').querySelectorAll('button')).find(button=>button.textContent==='Ver resultados').click();" +
                 "const resultsTab=!el('workspace-search').hidden&&el('refine-panel').hidden;" +
                 "el('app-tab-chat').click();" +
                 "const retained=el('conversation').textContent.includes('Prefiro hinos de gratidão');" +
@@ -226,7 +231,7 @@ public class E5DeviceSmokeTest {
                 "const explained=await submitRefinement('Não retire nenhum hino. Só me explique a lista.');" +
                 "const sameList=explained&&visibleHymns().some(h=>h.number==='101')&&visibleHymns().some(h=>h.number==='102');" +
                 "const removed=await submitRefinement('Retire o hino 102');" +
-                "window.__chatQa=greeting&&conversationOnly&&intentOK&&resultsTab&&retained&&inclusion&&preserved&&sameList&&removed&&!visibleHymns().some(h=>h.number==='102');" +
+                "window.__chatQa=greeting&&bibleOK&&conversationOnly&&intentOK&&resultsTab&&retained&&inclusion&&preserved&&sameList&&removed&&!visibleHymns().some(h=>h.number==='102');" +
                 "})().catch(error=>{window.__chatQa=String(error);});true;"));
             limit=System.currentTimeMillis()+45_000;
             String chat="null";

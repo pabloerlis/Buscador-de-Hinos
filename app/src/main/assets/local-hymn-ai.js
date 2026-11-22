@@ -183,6 +183,7 @@ const LocalHymnAI = (() => {
     return [...reviewed,...hymns.slice(reviewed.length)];
   }
 
+  const CHAT_MESSAGE_LIMIT=1000;
   const CHAT_TEXT=String.raw`A-Za-zÀ-ÖØ-öø-ÿ0-9 .,:;!?()/'’–\-`;
   const invalidChatText=new RegExp('[^'+CHAT_TEXT+']');
   const preferenceQuestions={
@@ -195,7 +196,7 @@ const LocalHymnAI = (() => {
 
   function chatSearchRequest(message,history=[],viaButton=false) {
     const text=message.trim();
-    const command=text.match(/(?:^|[.!?]\s+)(?:(?:por favor|agora|pode|voc[eê] pode|quero(?: que(?: voc[eê])?)?)[,\s]+){0,2}(?:bus(?:car|ca|que)|pesquis(?:ar|a|e)|procur(?:ar|a|e)|encontr(?:ar|e|a)|(?:me\s+)?(?:mostre|sugira)(?=\s+(?:hinos|louvores|op[cç][õo]es)\b))(?:\s+|[:,.!?]+(?:\s+|$)|$)/iu);
+    const command=text.match(/(?:^|[.!?]\s+)(?:(?:por favor|agora|pode|voc[eê] pode|quero(?: que(?: voc[eê])?)?)[,\s]+){0,2}(?:bus(?:car|ca|que)|pesquis(?:ar|a|e)|procur(?:ar|a|e)|encontr(?:ar|e|a)|(?:me\s+)?(?:mostre|sugira|proponha|recomende|indique)(?=\s+(?:hinos|louvores|op[cç][õo]es)\b))(?:\s+|[:,.!?]+(?:\s+|$)|$)/iu);
     if(!command&&!viaButton)return null;
     const query=(command?text.slice(command.index+command[0].length):text)
       .replace(/^(?:por|sobre)\s+/iu,'').replace(/^(?:o|a)\s+(?=(?:hino|louvor)\s+\d)/iu,'').replace(/\s*[,;]?\s+por favor[.!?]*$/iu,'').replace(/[.!?]+$/u,'').trim();
@@ -207,16 +208,17 @@ const LocalHymnAI = (() => {
     if(beforeCommand)preferences.push(beforeCommand);
     const recent=preferences.map(item=>item.replace(/^(?:prefiro|quero|gostaria de|[eé] para)\s+/iu,''))
       .filter(item=>item.length>=5&&!/^(?:ol[aá]|obrigad[oa]|tudo bem|sim|n[aã]o)[.!?]*$/iu.test(item)).slice(-3);
-    return {query:recent.join('. ').slice(0,500),refine:false};
+    const context=recent.reverse().join(' · ');
+    return {query:context.slice(0,500),refine:false,context:context.slice(0,CHAT_MESSAGE_LIMIT)};
   }
 
-  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,explaining=false,pick=false,forced=null}) {
+  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,explaining=false,pick=false,forced=null,asked=[],scripture=null}) {
     const candidates=new Map();
     const addRow=(hymn,inList)=>{
       if(!Number.isSafeInteger(hymn.id)||[...candidates.values()].some(item=>item.id===hymn.id))return;
       candidates.set(candidates.size+1,{...hymn,inList});
     };
-    shown.slice(0,6).forEach(hymn=>addRow(hymn,true));
+    shown.slice(0,message.length>500?3:6).forEach(hymn=>addRow(hymn,true));
     found.slice(0,3).forEach(hymn=>addRow(hymn,false));
     const positions=predicate=>[...candidates].filter(([,h])=>predicate(h)).map(([position])=>position);
     const editKeys={
@@ -227,11 +229,12 @@ const LocalHymnAI = (() => {
     const forcedPosition=forced&&[...candidates].find(([,hymn])=>hymn.id===forced.id)?.[0];
     if(forcedPosition&&forced.verb in editKeys)editKeys[forced.verb]=[forcedPosition];
 
-    const rules=[
-      'falar ::= '+JSON.stringify('["falar",')+' text "]"',
-      'perguntar ::= '+JSON.stringify('["perguntar",')+' preference "]"',
-      'preference ::= '+Object.keys(preferenceQuestions).map(key=>JSON.stringify(JSON.stringify(key))).join(' | ')
-    ];
+    const questions=Object.keys(preferenceQuestions).filter(key=>!asked.includes(key));
+    const rules=['falar ::= '+JSON.stringify('["falar",')+' text "]"'];
+    if(questions.length){
+      rules.push('perguntar ::= '+JSON.stringify('["perguntar",')+' preference "]"');
+      rules.push('preference ::= '+questions.map(key=>JSON.stringify(JSON.stringify(key))).join(' | '));
+    }
     for(const [verb,keys] of Object.entries(editKeys)){
       if(!keys.length)continue;
       rules.push(verb+' ::= '+JSON.stringify('["'+verb+'",')+' '+verb+'-position "]"');
@@ -239,8 +242,9 @@ const LocalHymnAI = (() => {
     }
     const uncertain=/\b(?:em dúvida|não sei|não tenho certeza|me ajude a decidir)\b/i.test(message);
     const edit=editIntent==='acrescentar'&&editKeys.acrescentar.length?'acrescentar':null;
-    const actions=forcedPosition?[forced.verb]:edit?[edit,'perguntar']:uncertain?['perguntar']:
-      explaining?['falar']:pick&&editKeys.destacar.length?['destacar','falar','perguntar']:['falar','perguntar'];
+    const actions=forcedPosition?[forced.verb]:edit?[edit,'falar']:uncertain&&questions.length?['perguntar']:
+      explaining?['falar']:pick&&editKeys.destacar.length?['destacar','falar']:['falar'];
+    if(!forcedPosition&&!explaining&&questions.length&&!actions.includes('perguntar'))actions.push('perguntar');
     const prompt=[
       'Você conversa em português para ajudar a escolher hinos. Responda só com uma ação JSON.',
       forcedPosition
@@ -249,22 +253,32 @@ const LocalHymnAI = (() => {
           ?'Escolha um hino do catálogo para propor. Se não houver boa opção, pergunte qual hino o usuário procura.'
           :uncertain
             ?'Escolha qual preferência perguntar: clima, ritmo, tema, ocasiao ou hino.'
-            :'Use falar para responder à última mensagem, confirmar preferências ou propor uma ideia. Faça uma pergunta curta se precisar. A busca é acionada pelo usuário.',
+            :'Responda ao conteúdo novo. Em uma anotação espiritual, interprete a mensagem central e sugira temas de hinos. Use perguntar só para uma informação que falta.',
+      asked.length&&'Já perguntado: '+asked.join(', ')+'. Aproveite as respostas do histórico.',
+      scripture&&'Bíblia Livre '+promptText(scripture.reference,60)+': '+promptText(scripture.text,270),
+      scripture?.narrative&&'Relato: '+promptText(scripture.narrative,60),
+      scripture&&'Relacione o trecho à anotação sem inventar citações.',
       'Cite títulos e números apenas se estiverem nas opções abaixo.',
       pick&&'Para indicar um hino da lista atual, use destacar com a posição da opção mais adequada à preferência.',
       explaining&&'Explique as sugestões usando apenas os títulos e trechos apresentados. Não execute ações.',
       query&&'Última busca: '+promptText(query,76),
       constraints&&'Filtros: '+promptText(constraints,90),
-      ...history.slice(-7).map(item=>(item.kind==='user'?'Usuário: ':'Você: ')+promptText(item.text,105)),
-      'Usuário agora: '+promptText(message,320),
+      ...history.slice(-4).map(item=>(item.kind==='user'?'Usuário: ':'Você: ')+promptText(item.text,80)),
+      'Usuário agora: '+promptText(message,CHAT_MESSAGE_LIMIT),
       ...(candidates.size?[...candidates].map(([position,h])=>position+' '+(h.inList?'na lista':'catálogo')+
-        ' · '+promptText(h.number,8)+' '+promptText(h.title,37)+' '+promptText(h.snippet,40)):[])
-    ].filter(Boolean).join('\n');
+        ' · '+promptText(h.number,8)+' '+promptText(h.title,34)+' '+promptText(h.snippet,message.length>500?20:36)):[])
+    ].filter(Boolean);
+    // Keep the current note and Scripture when a long note fills the bridge budget.
+    while(prompt.join('\n').length>2280){
+      const oldest=prompt.findIndex(line=>/^(?:Usuário|Você):/.test(line));
+      if(oldest<0)break;
+      prompt.splice(oldest,1);
+    }
     const grammar=[
       'root ::= '+actions.join(' | '),...rules,
-      'text ::= ' + JSON.stringify('"') + ' ['+CHAT_TEXT+']{4,300} ' +JSON.stringify('"')
+      'text ::= ' + JSON.stringify('"') + ' ['+(asked.length?CHAT_TEXT.replace('?',''):CHAT_TEXT)+']{4,300} ' +JSON.stringify('"')
     ].join('\n');
-    return {prompt,grammar,maxTokens:105,timeoutMs:45000,candidates,actions,editKeys};
+    return {prompt:prompt.join('\n'),grammar,maxTokens:105,timeoutMs:45000,candidates,actions,editKeys,questions,noFreeQuestion:asked.length>0};
   }
 
   function cleanChatText(value,max) {
@@ -273,17 +287,18 @@ const LocalHymnAI = (() => {
     return value.trim().replace(/\s+/g,' ');
   }
 
-  function readChat(answer,{actions,editKeys,candidates}) {
+  function readChat(answer,{actions,editKeys,candidates,questions,noFreeQuestion}) {
     const value=JSON.parse(answer);
     if(!Array.isArray(value)||!actions.includes(value[0]))throw Error('Ação do chat inválida.');
     const [verb,arg]=value;
     if(value.length!==2)throw Error('Resposta inválida.');
     if(verb==='perguntar'){
-      if(!Object.hasOwn(preferenceQuestions,arg))throw Error('Preferência inválida.');
+      if(!questions.includes(arg))throw Error('Preferência inválida.');
       return {reply:preferenceQuestions[arg],question:arg};
     }
     if(verb==='falar'){
       const text=cleanChatText(arg,300);
+      if(noFreeQuestion&&text.includes('?'))throw Error('Use uma pergunta de preferência inédita.');
       if(/^(?:\/|(?:buscar|busca|perguntar|retirar|acrescentar|destacar|filtros|usu[aá]rio(?: agora)?)\s*:)/i.test(text))throw Error('Resposta sem conteúdo.');
       return {reply:text};
     }
@@ -292,5 +307,5 @@ const LocalHymnAI = (() => {
     return {verb,hymn};
   }
 
-  return { chatSearchRequest, prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  return { CHAT_MESSAGE_LIMIT, chatSearchRequest, prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
 })();
