@@ -719,18 +719,35 @@ const GGUF=(()=>{
       return;
     }
     if(!request){resetTask('Busca inicial preservada. Trechos insuficientes para revisão.');return;}
-    sendTask(task,request);
+    task.requests=request.requests;
+    task.judgments=[];
+    task.deadline=task.startedAt+request.timeoutMs;
+    advanceReview(task);
+  }
+  function advanceReview(task){
+    const timeoutMs=Math.floor(task.deadline-performance.now());
+    if(timeoutMs<1000){
+      resetTask('Busca inicial preservada. A revisão da IA atingiu o limite de tempo.');
+      return;
+    }
+    sendTask(task,{...task.requests[task.judgments.length],timeoutMs});
   }
   function finishReview(task, ok, answer){
-    if(!ok){resetTask('Busca inicial preservada. A revisão da IA não terminou.');return;}
-    let results;
-    try{
-      results=LocalHymnAI.applyReview(state.lastResults,LocalHymnAI.readReview(answer,task.candidates));
-    }catch(error){resetTask('Busca inicial preservada. A resposta da revisão foi inválida.');return;}
-    if(!results||state.repertoirePending||!$('gguf-auto').checked){
+    if(!ok||performance.now()>task.deadline){
+      resetTask('Busca inicial preservada. A revisão da IA não terminou.');
+      return;
+    }
+    if(state.repertoirePending||!$('gguf-auto').checked){
       resetTask('A lista mudou durante a revisão.');
       return;
     }
+    try{
+      const {candidate}=task.requests[task.judgments.length];
+      task.judgments.push(LocalHymnAI.readReview(answer,candidate));
+    }catch(error){resetTask('Busca inicial preservada. A resposta da revisão foi inválida.');return;}
+    if(task.judgments.length<task.requests.length){advanceReview(task);return;}
+    const results=LocalHymnAI.applyReview(state.lastResults,task.judgments);
+    if(!results){resetTask('A lista mudou durante a revisão.');return;}
     const list=$('results-list');
     const focus=document.activeElement?.dataset;
     const focusId=Number(focus?.hymnId||focus?.repertoireId);
@@ -740,7 +757,7 @@ const GGUF=(()=>{
       const attribute=focus.hymnId?'data-hymn-id':'data-repertoire-id';
       list.querySelector('['+attribute+'="'+focusId+'"]')?.focus({preventScroll:true});
     }
-    resetTask('A IA revisou os primeiros '+task.candidates.length+' hinos.');
+    resetTask('A IA revisou os primeiros '+task.judgments.length+' hinos.');
   }
   function interpret(query,timeoutMs=MAX_AI_MS){
     if(!query?.trim()||state.busy||state.repertoirePending||!canUseTopics())return;
@@ -894,7 +911,6 @@ const GGUF=(()=>{
     const auto=$('gguf-auto').checked;
     localStorage.setItem('hinos-gguf-auto-v15',auto?'1':'0');
     if(!auto&&selectedState.task?.type==='review')cancelIfBusy();
-    if(auto&&state.effectiveQuery)void maybeAuto(state.effectiveQuery);
   });
   if(native())setInterval(info,1250);
   info();return {info,maybeAuto,cancelSearchTask};

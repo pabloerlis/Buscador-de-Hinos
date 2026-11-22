@@ -145,23 +145,24 @@ const reviewLyrics=new Map([
   [4,'Em ti confio na noite.\n\nCantarei tua misericórdia.']
 ]);
 const reviewHymns=hymns.map(hymn=>({...hymn,snippet:hymn.id===2?'Hoje volto ao teu lar.':hymn.snippet}));
-const review=ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns,{context});
-assert.match(review.prompt,/Eu me afastei.*Hoje volto.*Tu me recebes/);
-assert.match(review.prompt,/Lucas 15:20/);
-assert.match(review.grammar,/h3 ::= .*"D2"/);
-assert.doesNotMatch(review.grammar,/^h1 ::= .*"D2"/m);
-assert.equal(review.candidates.length,4);
-assert.equal(review.timeoutMs,20000);
-const grade='T1,D1,I0,T2';
-const judgments=ai.readReview(grade,review.candidates);
-assert.deepEqual(Array.from(ai.applyReview(reviewHymns,judgments),x=>x.id),[2,1,4,3,5,6]);
+const review=ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns,{
+  context:{narrative:'voltar ao pai depois de se afastar'}
+});
+assert.match(review.requests[1].prompt,/voltar ao pai depois de se afastar/);
+assert.match(review.requests[1].prompt,/Eu me afastei.*Hoje volto.*Tu me recebes/);
+assert.match(review.requests[3].prompt,/Em ti confio.*Cantarei tua misericórdia/);
+assert.equal(review.requests.length,4);
+assert.equal(review.timeoutMs,30000);
+const grades=['não','sim','não','não'];
+const judgments=review.requests.map(({candidate},i)=>ai.readReview(grades[i],candidate));
+assert.deepEqual(Array.from(ai.applyReview(reviewHymns,judgments),x=>x.id),[2,1,3,4,5,6]);
 assert.match(judgments[1].excerpt,/Hoje volto ao teu lar/);
-assert.equal(judgments[3].excerpt,'Cantarei tua misericórdia.');
-for(const invalid of ['T1,D2,I0,T2','T1,D1,T0,T2','T1,D1,I0','T1,D1,I0,T2,extra']){
-  assert.throws(()=>ai.readReview(invalid,review.candidates));
+assert.equal(judgments[3].excerpt,'');
+for(const invalid of ['talvez','sim\nnão','','sim 2']){
+  assert.throws(()=>ai.readReview(invalid,review.requests[0].candidate));
 }
 assert.equal(ai.applyReview(reviewHymns.slice(1),judgments),null);
-assert.deepEqual(Array.from(ai.applyReview(reviewHymns,ai.readReview('I0,T1,T1,T2',review.candidates)),x=>x.id),[1,2,3,4,5,6]);
+assert.deepEqual(Array.from(ai.applyReview(reviewHymns,review.requests.map(({candidate})=>ai.readReview('não',candidate))),x=>x.id),[1,2,3,4,5,6]);
 assert.equal(ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns.slice(0,3)),null);
 
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
@@ -303,11 +304,16 @@ async function checkBridge(){
   assert.equal(automatic.calls.length,1);
   assert.match(automatic.calls[0][0],/Filho Pródigo/);
   assert.deepEqual(automatic.state.lastResults.map(x=>x.id),[1,2,3,4,5,6]);
-  automatic.complete(automatic.calls[0][1],grade);
-  assert.deepEqual(Array.from(automatic.state.lastResults,x=>x.id),[2,1,4,3,5,6]);
+  for(const [index,grade] of grades.entries()){
+    if(index===1)automatic.setTime(3000);
+    automatic.complete(automatic.calls[index][1],grade);
+    if(index<grades.length-1)assert.equal(automatic.state.lastResults,reviewHymns);
+  }
+  assert.equal(automatic.calls[2][4],27000);
+  assert.deepEqual(Array.from(automatic.state.lastResults,x=>x.id),[2,1,3,4,5,6]);
   assert.match(automatic.state.lastResults[0].aiReview.excerpt,/Hoje volto/);
 
-  for(const [value,ok] of [['Tempo limite',false],['D2,D1,I0,T2',true]]){
+  for(const [value,ok] of [['Tempo limite',false],['resposta inválida',true]]){
     const aborted=setup({auto:true,initialResults:reviewHymns});
     await aborted.gguf.maybeAuto('Filho Pródigo');
     aborted.complete(aborted.calls[0][1],value,ok);
@@ -319,7 +325,7 @@ async function checkBridge(){
   queued.state.searchEpoch++;
   queued.gguf.cancelSearchTask();
   await queued.gguf.maybeAuto('Paz na dificuldade');
-  queued.complete(first,grade);
+  queued.complete(first,'sim');
   await tick();
   assert.equal(queued.calls.length,2);
   assert.equal(queued.state.lastResults,hymns);

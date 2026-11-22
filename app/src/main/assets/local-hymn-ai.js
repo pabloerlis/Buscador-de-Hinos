@@ -126,8 +126,8 @@ const LocalHymnAI = (() => {
   }
 
   const REVIEW_LIMIT = 4;
-  const REVIEW_TIMEOUT_MS = 20000;
-  const reviewLabels = { D: 'Encaixe direto', T: 'Relação temática', I: 'Evidência insuficiente' };
+  const REVIEW_TIMEOUT_MS = 30000;
+  const reviewLabels = { D: 'Encaixe direto', I: 'Encaixe direto não identificado' };
 
   function reviewPassages(snippet, lyrics) {
     const stanzas = String(lyrics||'').split(/\r?\n[ \t]*\r?\n+/)
@@ -153,40 +153,30 @@ const LocalHymnAI = (() => {
     }));
     if (candidates.length!==REVIEW_LIMIT || candidates.some(item=>!item.excerpts.length) ||
         new Set(candidates.map(item=>item.id)).size!==REVIEW_LIMIT) return null;
-    const prompt = [
-      'Julgue cada hino para o pedido. Em histórias, confira ação, pessoas e destino.',
-      'D: encaixe direto. T: só tema parecido. I: sem evidência. Cite 1 ou 2, ou I0.',
-      'Uma resposta por hino, na ordem: D1,T2,I0,D2',
-      'Pedido: '+promptText(query, 140),
-      exclude.length && 'Excluir: '+promptText(exclude.join(', '), 65),
-      required.length && 'Obrigatório: '+promptText(required.join(', '), 65),
-      context?.reference && 'Referência: '+promptText(context.reference, 38),
-      context?.passage && 'Contexto: '+promptText(context.passage, 86),
-      ...candidates.map(({excerpts},i)=>(i+1)+'. '+excerpts
-        .map((text,j)=>(j+1)+') '+promptText(text, 150)).join(' | '))
-    ].filter(Boolean).join('\n');
-    const rules = candidates.map(({excerpts},i)=>'h'+i+' ::= "D1" | "T1" | "I0"'+
-      (excerpts.length>1?' | "D2" | "T2"':''));
-    const root = 'root ::= '+candidates.map((_,i)=>'h'+i).join(' "," ');
-    return { prompt, candidates, grammar:[root,...rules].join('\n'), maxTokens:20, timeoutMs:REVIEW_TIMEOUT_MS };
+    const subject = promptText(context?.narrative || query, 145).replace(/[.!?]+$/, '');
+    const requests = candidates.map(candidate=>{
+      const excerpt = candidate.excerpts.join(' / ');
+      const prompt = [
+        'Este trecho fala especificamente de '+subject+'? Responda sim ou não.',
+        exclude.length && 'Exclua: '+promptText(exclude.join(', '), 65),
+        required.length && 'Obrigatório: '+promptText(required.join(', '), 65),
+        'Trecho: '+promptText(excerpt, 228)
+      ].filter(Boolean).join('\n');
+      return { prompt, candidate, grammar:'root ::= "sim" | "não"', maxTokens:5 };
+    });
+    return { requests, timeoutMs:REVIEW_TIMEOUT_MS };
   }
 
-  function readReview(response, candidates) {
-    const marks = response.split(',');
-    if (marks.length!==candidates.length) throw Error('Revisão de hinos incompleta.');
-    return marks.map((mark, i)=>{
-      const {id, excerpts} = candidates[i];
-      if (mark==='I0') return {id, grade:'I', label:reviewLabels.I, excerpt:''};
-      const [,grade,position] = /^([DT])([12])$/.exec(mark)||[];
-      const excerpt = excerpts[Number(position)-1];
-      if (!excerpt) throw Error('Trecho da revisão inválido.');
-      return {id, grade, label:reviewLabels[grade], excerpt};
-    });
+  function readReview(response, candidate) {
+    if (response!=='sim' && response!=='não') throw Error('Resposta de revisão inválida.');
+    const grade = response==='sim'?'D':'I';
+    return {id:candidate.id, grade, label:reviewLabels[grade],
+      excerpt:grade==='D'?candidate.excerpts.join(' / '):''};
   }
 
   function applyReview(hymns, judgments) {
     if (!judgments.every(({id},i)=>hymns[i]?.id===id)) return null;
-    const priority = {D:2,T:1,I:0};
+    const priority = {D:1,I:0};
     const reviewed = judgments.map((review,i)=>({...hymns[i],aiReview:review}));
     if (judgments.some(item=>item.grade==='D')) {
       reviewed.sort((a,b)=>priority[b.aiReview.grade]-priority[a.aiReview.grade]);

@@ -103,20 +103,33 @@ public class Lfm3DeviceSmokeTest {
     private static void verifyReview(Method generate) throws Exception {
         JSONObject request=fixture("lfm3-review.json");
         int budget=request.getInt("timeoutMs");
-        long[] metrics=new long[4];
+
         long start=SystemClock.elapsedRealtime();
-        byte[] output=(byte[])generate.invoke(null,new Object[]{
-            request.getString("prompt").getBytes(StandardCharsets.UTF_8),
-            request.getString("grammar").getBytes(StandardCharsets.UTF_8),request.getInt("maxTokens"),budget,metrics
-        });
+        int totalTokens=0;
+        long totalSetup=0, totalPrefill=0, firstToken=0;
+        JSONArray requests=request.getJSONArray("requests");
+        assertEquals("Quatro hinos precisam ser analisados",4,requests.length());
+        String[] expected={"não","sim","não","não"};
+        for (int i=0;i<requests.length();i++) {
+            JSONObject item=requests.getJSONObject(i);
+            long[] metrics=new long[4];
+            int remaining=budget-(int)(SystemClock.elapsedRealtime()-start);
+            assertTrue("A revisão ultrapassou o tempo disponível",remaining>=1000);
+            byte[] output=(byte[])generate.invoke(null,new Object[]{
+                item.getString("prompt").getBytes(StandardCharsets.UTF_8),
+                item.getString("grammar").getBytes(StandardCharsets.UTF_8),item.getInt("maxTokens"),remaining,metrics
+            });
+            assertNotNull("Sem resultado da revisão",output);
+            assertTrue("A revisão precisa gerar tokens",metrics[3]>0);
+            assertEquals("Classificação do hino sintético "+(i+1),expected[i],new String(output,StandardCharsets.UTF_8).trim());
+            if (i==0) firstToken=metrics[2];
+            totalSetup+=metrics[0];
+            totalPrefill+=metrics[1];
+            totalTokens+=metrics[3];
+        }
         long wall=SystemClock.elapsedRealtime()-start;
-        assertNotNull("Sem resultado da revisão",output);
         android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=review-four total_ms="+wall
-            +" setup_ms="+metrics[0]+" prefill_ms="+metrics[1]
-            +" first_token_ms="+metrics[2]+" generated="+metrics[3]);
-        String grades=new String(output,StandardCharsets.UTF_8).trim();
-        assertTrue("A revisão precisa distinguir retorno ao pai de entrada no céu: "+grades,
-            grades.matches("(?:T1|I0),D1,(?:T1|I0),(?:T1|I0)"));
-        assertTrue("A revisão precisa gerar tokens",metrics[3]>0);
+            +" setup_ms="+totalSetup+" prefill_ms="+totalPrefill
+            +" first_token_ms="+firstToken+" generated="+totalTokens);
     }
 }

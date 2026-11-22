@@ -27,9 +27,13 @@ const pairs = [
   'O vento cessou no mar.\nO barco chegou à praia.',
   'Deus me consola na dor.\nSeu amor me dá forças.'
 ];
-const reviewHymns = pairs.map((lyrics,i)=>({id:i+1,snippet:lyrics.split('\n')[0]}));
-const review = ai.prepareReview('Filho pródigo',new Map(pairs.map((lyrics,i)=>[i+1,lyrics])),reviewHymns);
+
+const reviewHymns = pairs.map((lyrics,i)=>({id:i+1,snippet:lyrics.split('\n')[i===1?1:0]}));
+const review = ai.prepareReview('Filho pródigo',new Map(pairs.map((lyrics,i)=>[i+1,lyrics])),reviewHymns,{
+  context:{narrative:'voltar para o pai depois de se afastar e ser recebido de volta'}
+});
 if (!review) throw Error('A revisão automática precisa de quatro hinos.');
 fs.writeFileSync('app/src/androidTest/assets/lfm3-review.json',JSON.stringify({
-  prompt:review.prompt, grammar:review.grammar, maxTokens:review.maxTokens, timeoutMs:review.timeoutMs
+  requests:review.requests.map(({prompt,grammar,maxTokens})=>({prompt,grammar,maxTokens})),
+  timeoutMs:review.timeoutMs
 })+'\n');
