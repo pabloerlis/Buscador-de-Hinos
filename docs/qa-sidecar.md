@@ -11,3 +11,10 @@ Este build `-PqaSidecar=true` usa applicationId `br.com.buscadordehinos.app.qa`,
 ## Bloqueio de entrega
 
 Exigir package id `.app.qa`, certificado Android válido, versionCode 34, hash SHA256, E5, motor GGUF, todos agentes, Android offline, QA real e relatório independente. Teste físico ARM64 será realizado pelo usuário e ainda não está comprovado no CI.
+
+## Piloto ARM64 KleidiAI 2.6.16/build35
+- APK de teste independente: `br.com.buscadordehinos.app.qa.arm64`, rótulo **Buscador de Hinos ARM64 QA**; não substitui o app original nem a versão QA 2.6.15.
+- Build opt-in: `-PqaSidecar=true -PqaArm64Pilot=true -PenableKleidiAI=true`.
+- KleidiAI ativa **somente** em arm64-v8a. x86_64 mantém caminho anterior; o CI audita CMakeCache, arquivos realmente compilados e flags, sem exigir DOTPROD/I8MM globalmente.
+- A aprovação do emulador x86_64 **não comprova aceleração ARM64**: medir tempo de primeira resposta, prefill, tokens/s, RAM e aquecimento no smartphone antes de declarar ganho.
+- O GGUF não faz parte do APK; assinatura Debug muda entre runs. Não desinstalar instalações com dados.

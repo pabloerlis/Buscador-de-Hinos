@@ -4,6 +4,9 @@ def optimizeGgufNative = providers.gradleProperty('optimizeGgufNative').map { it
 def enableLocalEmbeddings = providers.gradleProperty('enableLocalEmbeddings').map { it.toBoolean() }.orElse(false).get()
 // O APK QA usa pacote independente; não substitui nem acessa dados de instalações anteriores.
 def qaSidecar = providers.gradleProperty('qaSidecar').map { it.toBoolean() }.orElse(false).get()
+def qaArm64Pilot = providers.gradleProperty('qaArm64Pilot').map { it.toBoolean() }.orElse(false).get()
+def enableKleidiAI = providers.gradleProperty('enableKleidiAI').map { it.toBoolean() }.orElse(false).get()
+if (qaArm64Pilot && !qaSidecar) throw new GradleException('Piloto ARM64 exige qaSidecar: nunca substituir o app principal.')
 // Valores incorporados ao APK: independentes de conexão e da biblioteca importada.
 def sourceRevision = (System.getenv('BUILD_SOURCE_SHA') ?: System.getenv('GITHUB_SHA') ?: 'local').replaceAll('[^a-zA-Z0-9]', '')
 def buildDateUtc = java.time.Instant.now().toString()
@@ -13,7 +16,7 @@ android {
     ndkVersion '27.2.12479018'
     defaultConfig {
         applicationId 'br.com.buscadordehinos.app'
-        manifestPlaceholders = [hinosAppLabel: qaSidecar ? 'Buscador de Hinos QA' : 'Buscador de Hinos']
+        manifestPlaceholders = [hinosAppLabel: qaArm64Pilot ? 'Buscador de Hinos ARM64 QA' : qaSidecar ? 'Buscador de Hinos QA' : 'Buscador de Hinos']
         minSdk 24
         targetSdk 34
         ndk {
@@ -25,12 +28,12 @@ android {
         if (enableLocalModels) {
             externalNativeBuild {
                 cmake {
-                    arguments '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON', "-DHINOS_OPTIMIZE_NATIVE=${optimizeGgufNative ? 'ON' : 'OFF'}"
+                    arguments '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON', "-DHINOS_OPTIMIZE_NATIVE=${optimizeGgufNative ? 'ON' : 'OFF'}", "-DHINOS_ENABLE_KLEIDIAI=${enableKleidiAI ? 'ON' : 'OFF'}"
                 }
             }
         }
-        versionCode 34
-        versionName '2.6.15'
+        versionCode 35
+        versionName '2.6.16'
         buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
         buildConfigField 'boolean', 'ENABLE_LOCAL_EMBEDDINGS', enableLocalEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
@@ -39,7 +42,7 @@ android {
     buildTypes {
         debug {
             // A versão de QA é instalável lado a lado. Sem a propriedade, o app mantém o ID original.
-            if (qaSidecar) applicationIdSuffix '.qa'
+            if (qaSidecar) applicationIdSuffix (qaArm64Pilot ? '.qa.arm64' : '.qa')
         }
     }
     buildFeatures { buildConfig true }

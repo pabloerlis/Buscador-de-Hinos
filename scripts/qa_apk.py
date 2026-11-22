@@ -33,7 +33,7 @@ expected_sha = os.environ.get("BUILD_SOURCE_SHA", "").strip()
 expect_e5 = os.environ.get('EXPECT_E5_EMBEDDINGS','false').lower()=='true'
 expect_gguf = os.environ.get('EXPECT_GGUF_ENGINE','false').lower()=='true'
 expected_application_id = os.environ.get('EXPECTED_APPLICATION_ID','br.com.buscadordehinos.app')
-expected_app_label = 'Buscador de Hinos QA' if expected_application_id.endswith('.qa') else 'Buscador de Hinos'
+expected_app_label = ('Buscador de Hinos ARM64 QA' if expected_application_id.endswith('.qa.arm64') else 'Buscador de Hinos QA' if expected_application_id.endswith('.qa') else 'Buscador de Hinos')
 check(len(expected_sha)==40 and re.fullmatch(r"[0-9a-f]{40}",expected_sha),
       "SHA do commit de origem ausente ou inválido")
 
