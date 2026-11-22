@@ -20,9 +20,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)" = true
-          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" |
-            jq -e --arg sha "$SOURCE_SHA" '.head_sha == $sha and .conclusion == "success"'
+          gh api "repos/$GITHUB_REPOSITORY" --jq '{private,visibility}' | jq -e '.private == true'
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '{id,head_sha,status,conclusion}' |
+            tee /tmp/run-approved.json | jq -e --argjson run "$RUN_ID" '.id == $run and .conclusion == "success"'
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14743385077" --jq '{id,name,expired,workflow_run}' |
+            tee /tmp/artifact-approved.json |
+            jq -e --arg sha "$SOURCE_SHA" --argjson run "$RUN_ID" '.name == "Buscador-de-Hinos-v2.6.19-QA-aprovado" and .expired == false and .workflow_run.id == $run and .workflow_run.head_sha == $sha'
       - name: Extrair pacote aprovado sem recompilar
         uses: actions/download-artifact@v4
         with:
@@ -75,6 +78,6 @@ jobs:
         run: |
           set -euo pipefail
           jq -n --argjson run "$GITHUB_RUN_ID" '{delivery_failed_run:$run}' >/tmp/delivery-error.json
-          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/delivery-error-2.6.19.json" \
+          gh api --method PUT "repos/$GITHUB_REPOSITORY/contents/qa/delivery-error-2.6.19-retry.json" \
             -f branch="$GITHUB_REF_NAME" -f message='Registra execução da entrega para diagnóstico' \
             -f content="$(base64 -w0 /tmp/delivery-error.json)"
