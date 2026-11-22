@@ -373,7 +373,7 @@ async function checkBridge(){
   const chosen=hymns[4];
   const cia={...hymns[5],number:chosen.number,collection:'CIA',collection_ids:['cia']};
   const chat=setup({initialResults:reviewHymns.slice(0,4),chatLookup:message=>
-    /Acrescente o hino/.test(message)?{exact:true,verb:'acrescentar',hymns:[chosen,cia]}:{hymns:[chosen]}});
+    /Acrescente o hino/.test(message)?{exact:true,verb:'acrescentar',hymns:[chosen,cia]}:{hymns:[chosen,hymns[0]]}});
   const firstTurn=chat.refine('Ainda estou em dúvida sobre o estilo');
   await tick();
   chat.complete(chat.calls[0][1],'["perguntar","clima"]');
@@ -399,6 +399,7 @@ async function checkBridge(){
   assert.match(chat.$('results-list').innerHTML,/^\[hino:6\]/);
   const revise=chat.refine('Também gostaria de reconciliação');
   await tick();
+  assert.doesNotMatch(chat.calls[3][0],/catálogo · 1 Hino de teste 1/);
   chat.complete(chat.calls[3][1],'["buscar","Voltar para Deus e reconciliação"]');
   assert.equal(await revise,true);
   assert.equal(chat.requests[0].model_query,'Voltar para Deus e reconciliação');

@@ -370,7 +370,9 @@ async function submitRefinement(message){
       state.chatChoices=null;
       const onList=new Set(visible.map(h=>h.id));
       const options=new Map();
-      for(const h of [...lookup.hymns,...state.chatOptions])if(!onList.has(h.id)&&!options.has(h.id))options.set(h.id,h);
+      for(const h of [...lookup.hymns,...state.chatOptions]){
+        if(!onList.has(h.id)&&!state.chatRemoved.has(h.id)&&!options.has(h.id))options.set(h.id,h);
+      }
       found=[...options.values()].slice(0,3);
       state.chatOptions=found;
     }
