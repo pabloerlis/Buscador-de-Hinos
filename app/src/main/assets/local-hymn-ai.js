@@ -212,7 +212,27 @@ const LocalHymnAI = (() => {
     return {query:context.slice(0,500),refine:false,context:context.slice(0,CHAT_MESSAGE_LIMIT)};
   }
 
-  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,explaining=false,pick=false,forced=null,asked=[],scripture=null}) {
+  const LETTERS='A-Za-zÀ-ÖØ-öø-ÿ';
+  function prepareRecommendation(message,hymns,scripture){
+    const candidates=new Map(hymns.filter(hymn=>hymn.snippet&&hymn.snippet!=='Nenhum trecho disponível')
+      .slice(0,4).map((hymn,index)=>[index+1,hymn]));
+    if(candidates.size<2)return null;
+    const prompt=[
+      'Escolha o hino mais adequado ao pedido usando os trechos. Responda com ["indicar", posição, "motivo em português"] ou ["nenhum"].',
+      'No motivo, explique a ligação com o trecho. Use o tema e as preferências do pedido. Não invente versos nem características musicais.',
+      'Pedido: '+promptText(message,430),
+      scripture&&'Bíblia Livre '+promptText(scripture.reference,45)+': '+promptText(scripture.text,130),
+      ...[...candidates].map(([position,hymn])=>position+' · '+promptText(hymn.title,65)+' · '+promptText(hymn.snippet,125))
+    ].filter(Boolean).join('\n');
+    const grammar=[
+      'root ::= "[\\"indicar\\"," position "," reason "]" | "[\\"nenhum\\"]"',
+      'position ::= '+[...candidates.keys()].map(x=>JSON.stringify(String(x))).join(' | '),
+      'reason ::= ' + JSON.stringify('"')+' ['+LETTERS+'] ['+CHAT_TEXT.replace('?','')+']{5,170} '+JSON.stringify('"')
+    ].join('\n');
+    return {prompt,grammar,maxTokens:75,timeoutMs:35000,candidates,actions:['indicar','nenhum']};
+  }
+
+  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,explaining=false,pick=false,forced=null,asked=[],scripture=null,answeringPreference=false}) {
     const candidates=new Map();
     const addRow=(hymn,inList)=>{
       if(!Number.isSafeInteger(hymn.id)||[...candidates.values()].some(item=>item.id===hymn.id))return;
@@ -229,7 +249,7 @@ const LocalHymnAI = (() => {
     const forcedPosition=forced&&[...candidates].find(([,hymn])=>hymn.id===forced.id)?.[0];
     if(forcedPosition&&forced.verb in editKeys)editKeys[forced.verb]=[forcedPosition];
 
-    const questions=Object.keys(preferenceQuestions).filter(key=>!asked.includes(key));
+    const questions=answeringPreference?[]:Object.keys(preferenceQuestions).filter(key=>!asked.includes(key));
     const rules=['falar ::= '+JSON.stringify('["falar",')+' text "]"'];
     if(questions.length){
       rules.push('perguntar ::= '+JSON.stringify('["perguntar",')+' preference "]"');
@@ -246,7 +266,11 @@ const LocalHymnAI = (() => {
       explaining?['falar']:pick&&editKeys.destacar.length?['destacar','falar']:['falar'];
     if(!forcedPosition&&!explaining&&questions.length&&!actions.includes('perguntar'))actions.push('perguntar');
     const prompt=[
-      'Você conversa em português para ajudar a escolher hinos. Responda só com uma ação JSON.',
+      'Ajude em português a escolher hinos para o culto.',
+      'Saída JSON. Ações permitidas: '+actions.join(', ')+'.',
+      actions.includes('falar')&&'Para responder, escreva ["falar","Uma frase útil em português."].',
+      actions.includes('perguntar')&&'Para uma dúvida necessária, escreva ["perguntar","'+questions[0]+'"]. Opções: '+questions.join(', ')+'.',
+      answeringPreference&&'A última mensagem responde à sua pergunta. Confirme a preferência com uma frase curta; não faça outra pergunta.',
       forcedPosition
         ?'Pedido explícito confirmado pelo catálogo. Use a ação '+forced.verb+' na posição '+forcedPosition+' para confirmar.'
         :edit
@@ -276,7 +300,7 @@ const LocalHymnAI = (() => {
     }
     const grammar=[
       'root ::= '+actions.join(' | '),...rules,
-      'text ::= ' + JSON.stringify('"') + ' ['+(asked.length?CHAT_TEXT.replace('?',''):CHAT_TEXT)+']{4,300} ' +JSON.stringify('"')
+      'text ::= ' + JSON.stringify('"') + ' ['+LETTERS+'] ['+(asked.length?CHAT_TEXT.replace('?',''):CHAT_TEXT)+']{3,260} ' +JSON.stringify('"')
     ].join('\n');
     return {prompt:prompt.join('\n'),grammar,maxTokens:105,timeoutMs:45000,candidates,actions,editKeys,questions,noFreeQuestion:asked.length>0};
   }
@@ -287,17 +311,28 @@ const LocalHymnAI = (() => {
     return value.trim().replace(/\s+/g,' ');
   }
 
+  function cleanChatReply(value,max){
+    const text=cleanChatText(value,max);
+    const words=text.match(/\p{L}+/gu)||[];
+    if(!/^\p{L}/u.test(text)||words.join('').length<4||
+        /(?:^|\s)([\p{L}]{2,})(?:[ ,.!]+\1){2,}(?=$|[^\p{L}])/iu.test(text))
+      throw Error('O modelo não produziu uma frase útil.');
+    return text;
+  }
   function readChat(answer,{actions,editKeys,candidates,questions,noFreeQuestion}) {
     const value=JSON.parse(answer);
     if(!Array.isArray(value)||!actions.includes(value[0]))throw Error('Ação do chat inválida.');
-    const [verb,arg]=value;
+    const [verb,arg,reason]=value;
+    if(verb==='nenhum'&&value.length===1)return {noRecommendation:true};
+    if(verb==='indicar'&&value.length===3&&candidates.has(arg))
+      return {recommendation:candidates.get(arg),reason:cleanChatReply(reason,171)};
     if(value.length!==2)throw Error('Resposta inválida.');
     if(verb==='perguntar'){
       if(!questions.includes(arg))throw Error('Preferência inválida.');
       return {reply:preferenceQuestions[arg],question:arg};
     }
     if(verb==='falar'){
-      const text=cleanChatText(arg,300);
+      const text=cleanChatReply(arg,261);
       if(noFreeQuestion&&text.includes('?'))throw Error('Use uma pergunta de preferência inédita.');
       if(/^(?:\/|(?:buscar|busca|perguntar|retirar|acrescentar|destacar|filtros|usu[aá]rio(?: agora)?)\s*:)/i.test(text))throw Error('Resposta sem conteúdo.');
       return {reply:text};
@@ -307,5 +342,5 @@ const LocalHymnAI = (() => {
     return {verb,hymn};
   }
 
-  return { CHAT_MESSAGE_LIMIT, chatSearchRequest, prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  return { CHAT_MESSAGE_LIMIT, chatSearchRequest, prepareRecommendation, prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
 })();

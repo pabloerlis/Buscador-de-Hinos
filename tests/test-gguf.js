@@ -416,14 +416,20 @@ async function checkBridge(){
   assert.equal(await interpretation,true);
   assert.equal(notes.requests.length,0);
   assert.match(notes.messages.at(-1),/Perdão e restauração/);
-  assert.equal(await notes.refine('Pode buscar agora?'),true);
+  const curate=notes.refine('Pode buscar agora?');
+  await tick();
   assert.match(notes.requests.at(-1).query,/acolhe com misericórdia/);
+  assert.match(notes.calls[1][0],/Escolha o hino/);
+  assert.match(notes.messages.at(-1),/Encontrei/);
+  notes.complete(notes.calls[1][1],'["indicar",2,"O trecho aproxima o tema de restauração do pedido."]');
+  assert.equal(await curate,true);
+  assert.match(notes.messages.at(-1),/Sugestão da IA/);
 
   const choose=chat.refine('Mais alegres, por favor');
   await tick();
   assert.match(chat.calls[1][0],/prefere hinos mais alegres ou mais solenes/);
-  assert.doesNotMatch(chat.calls[1][2].split('\n').find(line=>line.startsWith('preference ::=')),/clima/);
-  assert.match(chat.calls[1][2],/^root ::= falar \| perguntar\n/);
+  assert.doesNotMatch(chat.calls[1][2],/preference ::=/);
+  assert.match(chat.calls[1][2],/^root ::= falar\n/);
   chat.complete(chat.calls[1][1],'["falar","Entendi. Para a abertura, vamos pensar em algo alegre e fácil de cantar em conjunto."]');
   assert.equal(await choose,true);
   assert.equal(chat.requests.length,0);
@@ -479,6 +485,25 @@ async function checkBridge(){
   assert.match(addByTheme.messages.at(-1),/Responda sim ou não/);
   assert.equal(await addByTheme.refine('Sim'),true);
   assert.ok(addByTheme.state.chatAdded.has(chosen.id));
+
+  const funeral=setup();
+  const occasion=funeral.refine('Culto de velório. Hinos de consolo e encorajamento.');
+  await tick();
+  funeral.complete(funeral.calls[0][1],'["perguntar","clima"]');
+  assert.equal(await occasion,true);
+  const tone=funeral.refine('Solenes');
+  await tick();
+  assert.match(funeral.calls[1][0],/Confirme a preferência/);
+  funeral.complete(funeral.calls[1][1],'["falar",", 1, 2, 3, 4, 5,"]');
+  assert.equal(await tone,true);
+  assert.match(funeral.messages.at(-1),/considerar essa preferência/);
+  assert.equal(funeral.requests.length,0);
+  const recommend=funeral.refine('Pode buscar agora?');
+  await tick();
+  assert.match(funeral.calls[2][0],/Solenes.*velório/);
+  funeral.complete(funeral.calls[2][1],'["indicar",99,"Motivo fora do catálogo."]');
+  assert.equal(await recommend,true);
+  assert.match(funeral.messages.at(-1),/Encontrei/);
 
   const expiredChat=setup();
   const expiredTurn=expiredChat.refine('Quero esperança');
