@@ -215,6 +215,11 @@ public class E5DeviceSmokeTest {
                 "const chapter=await OfflineAPI.request('/api/scripture/chapter',{book:'John',chapter:3});" +
                 "const scripture=await OfflineAPI.request('/api/scripture/context',{message:'Anotação de João 3:16 sobre amor'});" +
                 "const bibleOK=books.books.length===66&&chapter.verses.length===36&&scripture.reference==='João 3:16';" +
+                "const briefEpoch=state.searchEpoch;" +
+                "const occasion=await submitRefinement('Velório');" +
+                "const theme=await submitRefinement('Consolo e encorajamento');" +
+                "const brief=LocalHymnAI.chatSearchRequest('Pode buscar agora?',[],false,state.chatBrief);" +
+                "const briefOK=occasion&&theme&&state.searchEpoch===briefEpoch&&brief.query.includes('Velório')&&brief.query.includes('Consolo e encorajamento')&&el('conversation').lastElementChild.textContent.includes('Consolo e encorajamento');" +
                 "const epoch=state.searchEpoch;" +
                 "await submitRefinement('Prefiro hinos de gratidão');" +
                 "const conversationOnly=state.searchEpoch===epoch&&!state.effectiveQuery;" +
@@ -231,7 +236,7 @@ public class E5DeviceSmokeTest {
                 "const explained=await submitRefinement('Não retire nenhum hino. Só me explique a lista.');" +
                 "const sameList=explained&&visibleHymns().some(h=>h.number==='101')&&visibleHymns().some(h=>h.number==='102');" +
                 "const removed=await submitRefinement('Retire o hino 102');" +
-                "window.__chatQa=greeting&&bibleOK&&conversationOnly&&intentOK&&resultsTab&&retained&&inclusion&&preserved&&sameList&&removed&&!visibleHymns().some(h=>h.number==='102');" +
+                "window.__chatQa=greeting&&bibleOK&&briefOK&&conversationOnly&&intentOK&&resultsTab&&retained&&inclusion&&preserved&&sameList&&removed&&!visibleHymns().some(h=>h.number==='102');" +
                 "})().catch(error=>{window.__chatQa=String(error);});true;"));
             limit=System.currentTimeMillis()+45_000;
             String chat="null";

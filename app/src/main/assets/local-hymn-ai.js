@@ -194,7 +194,27 @@ const LocalHymnAI = (() => {
     hino:'Qual hino você quer manter ou mudar? Pode me dizer o número ou o título.'
   };
 
-  function chatSearchRequest(message,history=[],viaButton=false) {
+  function isBriefAnswer(message){
+    const text=message.trim().replace(/[.!]+$/u,'');
+    return text.length>0&&text.length<=80&&text.split(/\s+/u).length<=9&&
+      /^[\p{L}\p{M}][\p{L}\p{M} ,’'-]*$/u.test(text)&&
+      !/^(?:nao sei|nao quero|nao precisa|ainda nao|me ajude|explique|obrigad[oa]|sim$|nao$|ola$|oi$)\b/u.test(
+        text.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase());
+  }
+
+  function repeatsChatReply(reply,history){
+    const tokenize=value=>value.normalize('NFD').replace(/\p{M}/gu,'').toLowerCase().match(/[\p{L}\p{N}]+/gu)||[];
+    const words=tokenize(reply);
+    if(words.length<6)return false;
+    const text=words.join(' ');
+    return history.filter(item=>item.kind==='assistant').slice(-4).some(item=>{
+      const prior=tokenize(item.text);
+      return prior.length>=6&&(prior.join(' ')===text||
+        words.length>=9&&prior.length>=9&&prior.slice(0,9).join(' ')===words.slice(0,9).join(' '));
+    });
+  }
+
+  function chatSearchRequest(message,history=[],viaButton=false,brief={}) {
     const text=message.trim();
     const command=text.match(/(?:^|[.!?]\s+)(?:(?:por favor|agora|pode|voc[eê] pode|quero(?: que(?: voc[eê])?)?)[,\s]+){0,2}(?:bus(?:car|ca|que)|pesquis(?:ar|a|e)|procur(?:ar|a|e)|encontr(?:ar|e|a)|(?:me\s+)?(?:mostre|sugira|proponha|recomende|indique)(?=\s+(?:hinos|louvores|op[cç][õo]es)\b))(?:\s+|[:,.!?]+(?:\s+|$)|$)/iu);
     if(!command&&!viaButton)return null;
@@ -208,7 +228,7 @@ const LocalHymnAI = (() => {
     if(beforeCommand)preferences.push(beforeCommand);
     const recent=preferences.map(item=>item.replace(/^(?:prefiro|quero|gostaria de|[eé] para)\s+/iu,''))
       .filter(item=>item.length>=5&&!/^(?:ol[aá]|obrigad[oa]|tudo bem|sim|n[aã]o)[.!?]*$/iu.test(item)).slice(-3);
-    const context=recent.reverse().join(' · ');
+    const context=[...new Set([brief.theme,brief.occasion,...recent.reverse()].filter(Boolean))].join(' · ');
     return {query:context.slice(0,500),refine:false,context:context.slice(0,CHAT_MESSAGE_LIMIT)};
   }
 
@@ -232,7 +252,7 @@ const LocalHymnAI = (() => {
     return {prompt,grammar,maxTokens:75,timeoutMs:35000,candidates,actions:['indicar','nenhum']};
   }
 
-  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,explaining=false,pick=false,forced=null,asked=[],scripture=null,answeringPreference=false}) {
+  function prepareChat({query,message,history=[],shown=[],found=[],constraints,editIntent,explaining=false,pick=false,forced=null,asked=[],scripture=null,answeringPreference=false,brief={}}) {
     const candidates=new Map();
     const addRow=(hymn,inList)=>{
       if(!Number.isSafeInteger(hymn.id)||[...candidates.values()].some(item=>item.id===hymn.id))return;
@@ -278,6 +298,8 @@ const LocalHymnAI = (() => {
           :uncertain
             ?'Escolha qual preferência perguntar: clima, ritmo, tema, ocasiao ou hino.'
             :'Responda ao conteúdo novo. Em uma anotação espiritual, interprete a mensagem central e sugira temas de hinos. Use perguntar só para uma informação que falta.',
+      brief.occasion&&'Ocasião confirmada: '+promptText(brief.occasion,80),
+      brief.theme&&'Tema confirmado: '+promptText(brief.theme,80),
       asked.length&&'Já perguntado: '+asked.join(', ')+'. Aproveite as respostas do histórico.',
       scripture&&'Bíblia Livre '+promptText(scripture.reference,60)+': '+promptText(scripture.text,270),
       scripture?.narrative&&'Relato: '+promptText(scripture.narrative,60),
@@ -342,5 +364,5 @@ const LocalHymnAI = (() => {
     return {verb,hymn};
   }
 
-  return { CHAT_MESSAGE_LIMIT, chatSearchRequest, prepareRecommendation, prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  return { CHAT_MESSAGE_LIMIT, isBriefAnswer, repeatsChatReply, chatSearchRequest, prepareRecommendation, prepareChat, readChat, REVIEW_LIMIT, prepareReview, readReview, applyReview, diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
 })();
