@@ -47,7 +47,7 @@ for mode in optimized baseline; do
       && grep -q 'INSTRUMENTATION_STATUS_CODE: -2' "$log" \
       && ! grep -q 'BENCHMARK_RESULT case=compare-five ' "$log" \
       && [ "$instrument_rc" -eq 0 ]; then
-    echo 'EXPECTED_BASELINE_TIMEOUT case=compare-five budget_ms=180000' | tee -a "$log"
+    echo 'EXPECTED_BASELINE_TIMEOUT case=compare-five budget_ms=180000' | tee -a "$log" qa-report/lfm3-device-evidence.log
   else
     if [ "$instrument_rc" -ne 0 ] \
         || grep -Eq 'FAILURES!!!|INSTRUMENTATION_STATUS_CODE: -2|Error in officialLfm3' "$log" \
