@@ -603,14 +603,14 @@ const GGUF=(()=>{
       if(task?.type==='diagnostic')$('gguf-test-result').textContent=`${message} ${seconds} s`;
     }
     if(phase==='ready'&&!selectedState.task){setActivity(false);}
-    if(phase==='selected'&&!selectedState.task){setActivity(false);showTask('Modelo selecionado, não carregado','Abra configurações e toque em “Carregar modelo”. Selecionar não significa executar.');}
+    if(phase==='selected'&&!selectedState.task){setActivity(false);showTask('Modelo selecionado, não carregado','Aguarde o carregamento automático ou tente novamente nas configurações.');}
     if(phase==='error'){setActivity(false);showTask('Modelo não foi carregado','Confira os detalhes do erro nas configurações. A busca offline continua disponível.');}
     if(phase==='none'||phase==='unavailable'){setActivity(false);showTask('Busca local disponível','Você pode carregar um GGUF para interpretação contextual complementar.');}
   }
   function info(){
     const status=nativeStatus();selectedState.ready=Boolean(status.loaded);selectedState.busy=Boolean(status.busy||selectedState.task);
     const available=Boolean(status.available); const phase=status.phase||(status.loaded?'ready':status.selected?'selected':'none');
-    $('gguf-select').disabled=!available||selectedState.busy;$('gguf-load').disabled=!available||!status.selected||selectedState.busy;
+    $('gguf-select').disabled=!available||selectedState.busy;$('gguf-load').disabled=!available||!status.selected||selectedState.busy||selectedState.ready;
     $('gguf-improve').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||!canUseTopics();
     $('gguf-compare').disabled=!state.lastResults.length;
     $('gguf-compare-model').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
@@ -861,7 +861,7 @@ const GGUF=(()=>{
   }
   window.__ggufNativeEvent=(event,ok,value,requestId,metrics)=>{
     if(event==='phase'){info();return;}
-    if(event==='selection'){if(ok){aiCache.clear();toast('Modelo selecionado: '+value);$('gguf-test-result').textContent='Carregue o GGUF para testar a geração no aparelho.';}else if(value!=='Seleção cancelada.')toast(value);info();return;}
+    if(event==='selection'){if(ok){aiCache.clear();toast('Modelo selecionado: '+value);$('gguf-test-result').textContent='Carregando o modelo selecionado…';}else if(value!=='Seleção cancelada.')toast(value);info();return;}
     if(event==='load'){
       $('gguf-test-result').textContent=ok?'GGUF carregado. Toque em Testar modelo para verificar a geração.':'Carregamento falhou: '+value;
       toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();return;

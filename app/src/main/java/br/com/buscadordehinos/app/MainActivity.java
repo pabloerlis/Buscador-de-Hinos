@@ -44,7 +44,7 @@ public final class MainActivity extends Activity {
     private static final String MODEL_URI_KEY = "model_uri";
     private static final String MODEL_DISPLAY_NAME_KEY = "model_display_name";
     private static final String MODEL_BYTES_KEY = "model_bytes";
-    private final ExecutorService llmExecutor=Executors.newSingleThreadExecutor();
+    private static final ExecutorService llmExecutor=Executors.newSingleThreadExecutor();
     private final ExecutorService vectorExecutor=Executors.newSingleThreadExecutor();
     private volatile String vectorState="Aguardando primeira pesquisa";
     private E5Engine embeddingEngine;
@@ -74,6 +74,7 @@ public final class MainActivity extends Activity {
     private static native void nativeResetCancellation();
     private static native void nativeCancel();
     private static native void nativeUnload();
+    private final ModelBridge modelBridge=new ModelBridge();
     private WebView web;
     private ValueCallback<Uri[]> pendingFile;
 
@@ -124,7 +125,10 @@ public final class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new ImportBridge(), "NativeHinos");
         if(BuildConfig.ENABLE_LOCAL_MODELS){
-            web.addJavascriptInterface(new ModelBridge(), "NativeGGUF");
+            web.addJavascriptInterface(modelBridge, "NativeGGUF");
+            if (NATIVE_AVAILABLE && getSharedPreferences(PREFS,MODE_PRIVATE).contains(MODEL_URI_KEY)) {
+                modelBridge.loadModel();
+            }
         }
         if(BuildConfig.ENABLE_LOCAL_EMBEDDINGS||BuildConfig.ENABLE_LOCAL_MODELS){
             web.addJavascriptInterface(new VectorBridge(), "NativeVector");
@@ -187,34 +191,9 @@ public final class MainActivity extends Activity {
                 ggufEvent("selection", false, "Seleção cancelada.");return;
             }
             Uri uri=data.getData();
-            try {
-                String name=modelName(uri);
-                if(!name.toLowerCase(Locale.ROOT).endsWith(".gguf"))throw new IOException("Selecione um arquivo com extensão .gguf.");
-                try(InputStream input=getContentResolver().openInputStream(uri)) {
-                    if(input==null||input.read()!='G'||input.read()!='G'||input.read()!='U'||input.read()!='F')
-                        throw new IOException("Arquivo inválido: cabeçalho GGUF não encontrado.");
-                }
-                try {getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);}
-                catch(SecurityException ignored) { /* Algumas fontes não oferecem permissão persistente. */ }
-                // Somente a seleção é persistida. O modelo deve ser carregado explicitamente.
-                getSharedPreferences(PREFS,MODE_PRIVATE).edit()
-                    .putString(MODEL_URI_KEY,uri.toString())
-                    .putString(MODEL_DISPLAY_NAME_KEY,name)
-                    .putLong(MODEL_BYTES_KEY,modelSize(uri)).apply();
-                modelError="";
-                lastDurationMs=0;
-                modelPhase="selected";
-                if(modelLoaded){
-                    llmBusy=true;
-                    llmExecutor.execute(()->{
-                        try{
-                            if(NATIVE_AVAILABLE)nativeUnload();
-                            modelLoaded=false;
-                        }catch(Exception ignored){}
-                        finally{llmBusy=false;ggufEvent("selection",true,name);}
-                    });
-                }else ggufEvent("selection",true,name);
-            }catch(Exception ex){modelError=errorMessage(ex);ggufEvent("selection",false,modelError);}
+            try { getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION); }
+            catch(SecurityException ignored) { /* A cópia privada continua acessível depois de concluída. */ }
+            modelBridge.loadSelection(uri);
         }
     }
     @Override public void onBackPressed(){
@@ -227,7 +206,6 @@ public final class MainActivity extends Activity {
         if(NATIVE_AVAILABLE&&!activeGenerationId.isEmpty())nativeCancel();
         if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeGGUF");web.destroy();web=null;}
         llmExecutor.execute(()->{if(NATIVE_AVAILABLE)nativeUnload();});
-        llmExecutor.shutdown();
         super.onDestroy();
     }
     private String modelName(Uri uri) {
@@ -384,48 +362,69 @@ public final class MainActivity extends Activity {
                 catch(Exception ex){ggufEvent("selection",false,errorMessage(ex));}
             });
         }
-        @JavascriptInterface public synchronized void loadModel(){
-            if(!NATIVE_AVAILABLE){modelPhase="unavailable";ggufEvent("load",false,"Motor nativo indisponível neste dispositivo ARM64.");return;}
-            if(llmBusy){ggufEvent("load",false,"A IA já está ocupada.");return;}
+        @JavascriptInterface public void loadModel(){
+            startModelLoad(null);
+        }
+        private void loadSelection(Uri uri){
+            startModelLoad(uri);
+        }
+        private synchronized void startModelLoad(Uri selection){
+            if(!NATIVE_AVAILABLE){modelPhase="unavailable";ggufEvent("load",false,"Motor nativo indisponível neste dispositivo.");return;}
+            if(llmBusy){ggufEvent(selection==null?"load":"selection",false,"A IA já está ocupada.");return;}
+            if(selection==null && modelLoaded)return;
             llmBusy=true;modelPhase="copying";copyProgress=0;modelError="";lastDurationMs=0;
             final long start=android.os.SystemClock.elapsedRealtime();
             ggufEvent("phase",true,"Preparando acesso ao GGUF…");
             llmExecutor.execute(()->{
                 boolean ok=false;
+                boolean selectionAccepted=selection==null;
                 String message;
                 try{
                     android.content.SharedPreferences preferences=getSharedPreferences(PREFS,MODE_PRIVATE);
                     String uriString=preferences.getString(MODEL_URI_KEY,null);
-                    if(uriString==null)throw new IOException("Selecione um GGUF primeiro.");
-                    Uri uri=Uri.parse(uriString);
-                    long size=modelSize(uri);
-                    if(size<0)size=preferences.getLong(MODEL_BYTES_KEY,-1);
+                    if(selection==null && uriString==null)throw new IOException("Selecione um GGUF primeiro.");
+                    Uri uri=selection==null?Uri.parse(uriString):selection;
+                    long size=selection==null?preferences.getLong(MODEL_BYTES_KEY,-1):modelSize(uri);
+                    String name=selection==null?preferences.getString(MODEL_DISPLAY_NAME_KEY,"Modelo GGUF"):modelName(uri);
+                    if(selection!=null){
+                        if(!name.toLowerCase(Locale.ROOT).endsWith(".gguf"))throw new IOException("Selecione um arquivo com extensão .gguf.");
+                        try(InputStream input=getContentResolver().openInputStream(uri)) {
+                            if(input==null||input.read()!='G'||input.read()!='G'||input.read()!='U'||input.read()!='F')
+                                throw new IOException("Arquivo inválido: cabeçalho GGUF não encontrado.");
+                        }
+                    }
                     android.app.ActivityManager.MemoryInfo memory=new android.app.ActivityManager.MemoryInfo();
                     ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(memory);
-                    // A RAM livre não é toda utilizável pelo processo Android, mesmo que pareça suficiente.
-                    // Não rejeitar modelos com base apenas no tamanho do GGUF: mmap é paginado pelo sistema.
+                    // A memória livre não é toda utilizável pelo processo, e mmap é paginado.
                     if(size>0&&size>memory.totalMem*1.2)
                         throw new IOException("Arquivo muito maior que a RAM física. Tente uma quantização menor.");
+                    if(selection!=null){
+                        if(!preferences.edit().putString(MODEL_URI_KEY,uri.toString())
+                            .putString(MODEL_DISPLAY_NAME_KEY,name).putLong(MODEL_BYTES_KEY,size).commit())
+                            throw new IOException("Não foi possível lembrar o modelo selecionado.");
+                        selectionAccepted=true;
+                        ggufEvent("selection",true,name);
+                    }
                     if(modelLoaded){nativeUnload();modelLoaded=false;}
+                    // O tamanho persistido também faz parte da chave da cópia privada.
+                    // Consulte o provedor somente se a cópia ainda precisar ser recuperada.
                     File modelFile=prepareModelFile(uri,size);
                     modelPhase="loading";
                     ggufEvent("phase",true,"Modelo copiado. Carregando pesos…");
                     ((android.app.ActivityManager)getSystemService(ACTIVITY_SERVICE)).getMemoryInfo(memory);
-                    // Reserve memória para o Android e o contexto antes de reempacotar pesos.
                     long headroom=memory.availMem-memory.threshold-768L*1024*1024;
                     boolean allowPackedWeights=!memory.lowMemory && modelFile.length()<=headroom;
                     message=nativeLoad(modelFile.getAbsolutePath(),allowPackedWeights);
-                    android.content.SharedPreferences.Editor metadata=preferences.edit().putLong(MODEL_BYTES_KEY,size);
-                    if(!preferences.contains(MODEL_DISPLAY_NAME_KEY))metadata.putString(MODEL_DISPLAY_NAME_KEY,modelName(uri));
-                    metadata.apply();
                     modelLoaded=true;modelPhase="ready";modelError="";
                     lastDurationMs=android.os.SystemClock.elapsedRealtime()-start;
                     ok=true;
                 }catch(Throwable ex){
-                    modelLoaded=false;modelPhase="error";modelError=errorMessage(ex);
+                    if(selectionAccepted)modelLoaded=false;
+                    modelPhase=modelLoaded?"ready":selectionAccepted?"error":"none";
+                    modelError=errorMessage(ex);
                     message=modelError;
                 }finally{llmBusy=false;}
-                ggufEvent("load",ok,message);
+                ggufEvent(selectionAccepted?"load":"selection",ok,message);
             });
         }
         @JavascriptInterface public synchronized void cancel(String requestId){
