@@ -54,27 +54,28 @@ public class E5DeviceSmokeTest {
                 Thread.sleep(1000);
             }
             assertTrue("Interface or E5 native bridge did not load",ready);
-            assertEquals("Settings navigation or collection synchronization failed","true",
+            assertEquals("Navigation tabs or collection synchronization failed","true",
                 evaluate(web,
                     "(()=>{" +
                     "const el=id=>document.getElementById(id);" +
-                    "const open=el('open-settings'); open.focus(); open.click();" +
-                    "const library=el('settings-panel-library');" +
+                    "const nav=['search','chat','library','settings'].map(name=>el('app-tab-'+name));" +
+                    "const visible=active=>nav.every(tab=>{const on=tab===nav[active];" +
+                    "return tab.getAttribute('aria-selected')===String(on)&&el(tab.getAttribute('aria-controls')).hidden!==on;});" +
+                    "if(!visible(0))return false;" +
+                    "nav[1].click(); if(!visible(1))return false;" +
+                    "nav[2].click(); if(!visible(2))return false;" +
                     "const main=el('collection-principal');" +
                     "const quick=document.querySelector('[data-collection=principal]');" +
                     "const previous=main.checked; main.click();" +
                     "const synced=quick.checked===main.checked&&main.checked!==previous;" +
                     "main.click();" +
-                    "const search=el('settings-tab-search'); search.click();" +
-                    "const preferences=library.hidden&&!el('settings-panel-search').hidden;" +
+                    "nav[3].click(); if(!visible(3))return false;" +
                     "el('settings-tab-about').click();" +
                     "const about=!el('settings-panel-about').hidden&&el('about-app').open;" +
-                    "document.querySelector('#settings-layer .icon-button[data-close]').click();" +
-                    "const restored=document.activeElement===open;" +
                     "el('ai-indicator').click();" +
                     "const ai=!el('settings-panel-ai').hidden;" +
-                    "document.querySelector('#settings-layer .icon-button[data-close]').click();" +
-                    "return synced&&preferences&&about&&restored&&ai;})()"));
+                    "nav[0].click();" +
+                    "return synced&&about&&ai&&visible(0);})()"));
             String metadata=evaluate(web,
                 "(()=>{try{const a=JSON.parse(window.NativeHinos.buildInfo());" +
                 "return a.versionName==='" + BuildConfig.VERSION_NAME +
@@ -207,8 +208,17 @@ public class E5DeviceSmokeTest {
                 "{title:'101 - Consolo do viajante',content:'Na viagem encontro consolo em Deus.'}," +
                 "{title:'102 - Louvor da manhã',content:'Na manhã dou graças a Deus.'}]}]});" +
                 "await refreshStatus(); state.searchSettings.vectorMode='off';" +
-                "await submitSearch('hino 101'); document.getElementById('refine-toggle').click();" +
-                "const greeting=document.getElementById('conversation').textContent.includes('momento do culto');" +
+                "const el=id=>document.getElementById(id); el('app-tab-chat').click();" +
+                "const greeting=el('conversation').textContent.includes('Para qual momento');" +
+                "const epoch=state.searchEpoch;" +
+                "await submitRefinement('Prefiro hinos de gratidão');" +
+                "const conversationOnly=state.searchEpoch===epoch&&!state.effectiveQuery;" +
+                "const searched=await submitRefinement('Busque o hino 101');" +
+                "const intentOK=searched&&state.searchEpoch>epoch&&visibleHymns().some(h=>h.number==='101');" +
+                "el('conversation').querySelector('button').click();" +
+                "const resultsTab=!el('workspace-search').hidden&&el('refine-panel').hidden;" +
+                "el('app-tab-chat').click();" +
+                "const retained=el('conversation').textContent.includes('Prefiro hinos de gratidão');" +
                 "const added=await submitRefinement('Por favor, adicione o hino 102');" +
                 "const inclusion=added&&visibleHymns().some(h=>h.number==='102');" +
                 "const absent=await submitRefinement('Retire o hino sobre tempestade distante');" +
@@ -216,7 +226,7 @@ public class E5DeviceSmokeTest {
                 "const explained=await submitRefinement('Não retire nenhum hino. Só me explique a lista.');" +
                 "const sameList=explained&&visibleHymns().some(h=>h.number==='101')&&visibleHymns().some(h=>h.number==='102');" +
                 "const removed=await submitRefinement('Retire o hino 102');" +
-                "window.__chatQa=greeting&&inclusion&&preserved&&sameList&&removed&&!visibleHymns().some(h=>h.number==='102');" +
+                "window.__chatQa=greeting&&conversationOnly&&intentOK&&resultsTab&&retained&&inclusion&&preserved&&sameList&&removed&&!visibleHymns().some(h=>h.number==='102');" +
                 "})().catch(error=>{window.__chatQa=String(error);});true;"));
             limit=System.currentTimeMillis()+45_000;
             String chat="null";

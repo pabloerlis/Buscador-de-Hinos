@@ -177,14 +177,25 @@ assert.equal(ai.prepareReview('Filho Pródigo',reviewLyrics,reviewHymns.slice(0,
 const chatRequest=ai.prepareChat({query:'Consolo',message:'Prefiro hinos mais animados.',shown:reviewHymns.slice(0,2),
   found:reviewHymns.slice(2,4),history:[{kind:'assistant',text:'Você prefere hinos alegres ou solenes?'}]});
 assert.match(chatRequest.prompt,/Você prefere hinos alegres ou solenes/);
-assert.match(chatRequest.grammar,/root ::= falar \| perguntar \| buscar/);
+assert.match(chatRequest.grammar,/^root ::= falar \| perguntar\n/);
 assert.equal(ai.readChat('["perguntar","clima"]',chatRequest).reply,'Você prefere hinos mais alegres ou mais solenes?');
 assert.throws(()=>ai.readChat('["retirar",2]',chatRequest));
 assert.throws(()=>ai.readChat('["acrescentar",3]',chatRequest));
 const addition=ai.prepareChat({query:'Consolo',message:'Acrescente esperança',editIntent:'acrescentar',found:reviewHymns.slice(2,4)});
 assert.equal(ai.readChat('["acrescentar",1]',addition).hymn.id,3);
 assert.throws(()=>ai.readChat('["falar","buscar: paz"]',chatRequest));
-assert.equal(ai.readChat('["buscar","Consolo e esperança"]',chatRequest).query,'Consolo e esperança');
+assert.throws(()=>ai.readChat('["buscar","Consolo e esperança"]',chatRequest));
+const history=[{kind:'user',intent:'conversation',text:'Prefiro hinos mais alegres.'},
+  {kind:'assistant',text:'Podemos pensar na abertura do culto.'},
+  {kind:'user',intent:'edit',text:'Retire o hino 027.'}];
+assert.equal(ai.chatSearchRequest('Prefiro hinos mais alegres',history),null);
+assert.equal(ai.chatSearchRequest('Não precisa buscar agora',history),null);
+assert.equal(ai.chatSearchRequest('Por favor, busque o hino 027.',history).query,'hino 027');
+assert.equal(ai.chatSearchRequest('Pode buscar agora?',history).query,'hinos mais alegres.');
+assert.equal(ai.chatSearchRequest('É para a ceia. Pode buscar no catálogo?',[]).query,'a ceia');
+assert.equal(ai.chatSearchRequest('Pode buscar mais tarde?',history),null);
+assert.equal(ai.chatSearchRequest('',history,true).query,'hinos mais alegres.');
+assert.equal(ai.chatSearchRequest('Busque somente hinos de alegria',history).refine,true);
 for(const response of ['["retirar",3]','["acrescentar",9]',
   '["acrescentar",1]','["falar","https://exemplo.com"]','[]','["buscar"]'])
   assert.throws(()=>ai.readChat(response,chatRequest));
@@ -193,10 +204,10 @@ assert.match(forcedChat.grammar,/^root ::= retirar\n/);
 assert.throws(()=>ai.readChat('["retirar",1]',forcedChat));
 
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
-const turnSource=js.slice(js.indexOf('function clearChatContext('),js.indexOf("$('refine-form').addEventListener"));
+const turnSource=js.slice(js.indexOf('function scrollChat('),js.indexOf("$('refine-form').addEventListener"));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
 function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,embeddingTask=null,chatLookup=null,searchResults=hymns}={}){
-  const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];
+  const calls=[],cancelled=[],elements=new Map(),requests=[],lookups=[],embeddings=[],opened=[],messages=[];
   let now=0;
   const $=id=>{
     if(!elements.has(id)){
@@ -211,18 +222,21 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
   const vector=Array(384).fill(0.1);
   const settings={mode:'balanced',vectorMode:nativeModel?'balanced':'off',collections:{principal:true,avulsos:false}};
   const state={ready,searchEpoch:1,effectiveQuery:'Voltar para Deus',exclude:['tristeza'],lastResults:initialResults,searchSettings:settings,aiContext:context,vectorQuery:vector,chatHistory:[],chatAdded:new Map(),chatRemoved:new Set(),chatChoices:null,chatOptions:[]};
-  const {gguf,search,refine,visible}=vm.runInNewContext(aiSource+searchSource+turnSource+ggufSource+'\n({gguf:GGUF,search:performSearch,refine:submitRefinement,visible:visibleHymns})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>{messages.push(text);return $('conversation');},showResults(){},
+  const {gguf,search,refine,visible}=vm.runInNewContext(aiSource+searchSource+turnSource+ggufSource+'\n({gguf:GGUF,search:performSearch,refine:submitRefinement,visible:visibleHymns})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>{messages.push(text);return $('conversation');},showResults(){},selectWorkspace(){},
     document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
-    OfflineAPI:{chatSearchIntent:text=>({eligible:true,canPick:true,list:/entre esses|desses/i.test(text)}),normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
+    OfflineAPI:{chatEditCommand:text=>/\b(?:acrescente|retire)\b/i.test(text),chatSearchIntent:text=>({eligible:true,canPick:true,list:/entre esses|desses/i.test(text)}),normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
     jsonRequest:async(url,payload)=>{
       if(url.startsWith('/api/hymns/'))return {lyrics:reviewLyrics.get(Number(url.split('/').at(-1)))};
-      if(url==='/api/chat-candidates')return chatLookup?chatLookup(payload.message):{hymns:hymns.slice(3)};
+      if(url==='/api/chat-candidates'){
+        lookups.push(payload.message);
+        return chatLookup?chatLookup(payload.message):{hymns:hymns.slice(3)};
+      }
       requests.push(payload);
       if(additionalSearch&&payload.settings.pageSize===10)return additionalSearch();
       return {results:searchResults,effective_query:payload.model_query||payload.query,model_refinement:payload.model_query||'',excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
     },
     busySearch:value=>{state.busy=value;},resultCard:hymn=>'[hino:'+hymn.id+']',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>{embeddings.push(args);return embeddingTask?.();}}});
-  return {calls,cancelled,$,state,requests,embeddings,opened,messages,vector,gguf,search,refine,visible,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
+  return {calls,cancelled,$,state,requests,lookups,embeddings,opened,messages,vector,gguf,search,refine,visible,setTime:ms=>{now=ms;},complete:(id,value,ok=true,metrics=null)=>window.__ggufNativeEvent('generate',ok,value,id,metrics)};
 }
 
 async function checkBridge(){
@@ -389,42 +403,35 @@ async function checkBridge(){
   const choose=chat.refine('Mais alegres, por favor');
   await tick();
   assert.match(chat.calls[1][0],/prefere hinos mais alegres ou mais solenes/);
-  assert.match(chat.calls[1][2],/^root ::= buscar \| perguntar\n/);
-  chat.complete(chat.calls[1][1],'["retirar",1]');
+  assert.match(chat.calls[1][2],/^root ::= falar \| perguntar\n/);
+  chat.complete(chat.calls[1][1],'["falar","Entendi. Para a abertura, vamos pensar em algo alegre e fácil de cantar em conjunto."]');
   assert.equal(await choose,true);
-  assert.equal(chat.requests.at(-1).query,'Mais alegres, por favor');
-  assert.ok(chat.visible().some(h=>h.id===1));
+  assert.equal(chat.requests.length,0);
+  assert.equal(chat.lookups.length,0);
 
   assert.equal(await chat.refine('Retire sobre sangue do cordeiro'),false);
   assert.match(chat.messages.at(-1),/Qual hino você quer retirar/);
-  assert.equal(chat.calls.length,2);
-
-  const remove=chat.refine('Retire sobre Hino de teste 1');
-  await tick();
-  assert.match(chat.calls[2][2],/^root ::= retirar\n/);
-  chat.complete(chat.calls[2][1],'["retirar",2]');
-  assert.equal(await remove,true);
+  assert.equal(await chat.refine('Retire sobre Hino de teste 1'),true);
   assert.doesNotMatch(chat.$('results-list').innerHTML, /hino:1/);
 
-  const lookup=await chat.refine('Acrescente o hino 5');
-  assert.equal(lookup,false);
+  assert.equal(await chat.refine('Acrescente o hino 5'),false);
   assert.match(chat.messages.at(-1),/Qual deles você quer/);
-  const add=chat.refine('O da CIA');
-  await tick();
-  assert.match(chat.calls[3][2],/^root ::= acrescentar/);
-  chat.complete(chat.calls[3][1],'["acrescentar",4]');
-  assert.equal(await add,true);
+  assert.equal(await chat.refine('O da CIA'),true);
   assert.ok(chat.visible().some(h=>h.id===6));
-  assert.match(chat.$('results-list').innerHTML,/\[hino:6\]/);
-  const revise=chat.refine('Também gostaria de reconciliação');
-  await tick();
-  assert.doesNotMatch(chat.calls[4][0],/catálogo · 1 Hino de teste 1/);
-  chat.complete(chat.calls[4][1],'["buscar","Voltar para Deus e reconciliação"]');
-  assert.equal(await revise,true);
-  assert.equal(chat.requests.at(-1).model_query,'Voltar para Deus e reconciliação');
+  assert.equal(chat.calls.length,2);
+  assert.equal(await chat.refine('Busque somente hinos de alegria'),true);
+  assert.equal(chat.requests.at(-1).query,'somente hinos de alegria');
   assert.equal(chat.requests[0].exclude[0],'tristeza');
   assert.ok(!chat.visible().some(h=>h.id===1));
   assert.ok(chat.visible().some(h=>h.id===6));
+  assert.match(chat.messages.at(-1),/Encontrei/);
+
+  const noModelChat=setup({nativeModel:false});
+  assert.equal(await noModelChat.refine('Prefiro hinos de consolo'),false);
+  assert.equal(noModelChat.requests.length,0);
+  assert.match(noModelChat.messages.at(-1),/Carregue um modelo/);
+  assert.equal(await noModelChat.refine('',{viaButton:true}),true);
+  assert.equal(noModelChat.requests.at(-1).query,'hinos de consolo');
 
   const noEdits=setup({chatLookup:()=>({refine:true,hymns:[]})});
   assert.equal(await noEdits.refine('Não retire nenhum hino.'),true);
@@ -436,8 +443,12 @@ async function checkBridge(){
   assert.equal(await explanation,true);
   assert.equal(noEdits.state.chatRemoved.size,0);
   assert.equal(noEdits.requests.length,0);
-  assert.equal(await chat.refine('Somente hinos de alegria'),true);
-  assert.equal(chat.requests.at(-1).query,'Somente hinos de alegria');
+  const plainFilter=noEdits.refine('Somente hinos de alegria');
+  await tick();
+  noEdits.complete(noEdits.calls[1][1],'["buscar","alegria"]');
+  assert.equal(await plainFilter,false);
+  assert.equal(noEdits.requests.length,0);
+  assert.equal(noEdits.lookups.length,0);
 
   const addByTheme=setup({initialResults:hymns.slice(0,2),chatLookup:()=>({verb:'acrescentar',hymns:[chosen]})});
   const proposal=addByTheme.refine('Acrescente consolo');
@@ -453,8 +464,9 @@ async function checkBridge(){
   const expiredTurn=expiredChat.refine('Quero esperança');
   await tick();
   expiredChat.complete(expiredChat.calls[0][1],'Tempo limite',false);
-  assert.equal(await expiredTurn,true);
-  assert.equal(expiredChat.requests.at(-1).query,'Quero esperança');
+  assert.equal(await expiredTurn,false);
+  assert.equal(expiredChat.requests.length,0);
+  assert.match(expiredChat.messages.at(-1),/não respondeu/);
 
   const staleChat=setup();
   const staleTurn=staleChat.refine('Agora mais sobre vigiar');
