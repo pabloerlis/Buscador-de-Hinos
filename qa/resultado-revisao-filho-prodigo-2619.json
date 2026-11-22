@@ -1,0 +1,100 @@
+{
+  "hardware": "Linux x86_64, GitHub hosted",
+  "before": [
+    {
+      "rank": 1,
+      "number": "286",
+      "collection": [
+        "principal"
+      ],
+      "type": "referencia_biblica",
+      "score": 98.48,
+      "fits": false,
+      "inference_ms": 6574
+    },
+    {
+      "rank": 2,
+      "number": "264",
+      "collection": [
+        "principal"
+      ],
+      "type": "referencia_biblica",
+      "score": 96.24,
+      "fits": false,
+      "inference_ms": 7402
+    },
+    {
+      "rank": 3,
+      "number": "191",
+      "collection": [
+        "principal"
+      ],
+      "type": "referencia_biblica",
+      "score": 84.75,
+      "fits": false,
+      "inference_ms": 6685
+    },
+    {
+      "rank": 4,
+      "number": "099",
+      "collection": [
+        "principal"
+      ],
+      "type": "referencia_biblica",
+      "score": 77.8,
+      "fits": false,
+      "inference_ms": 6625
+    }
+  ],
+  "after": [
+    {
+      "rank": 1,
+      "number": "286",
+      "collection": [
+        "principal"
+      ],
+      "type": "referencia_biblica",
+      "score": 98.48,
+      "fits": false,
+      "inference_ms": 6574,
+      "new_rank": 1
+    },
+    {
+      "rank": 2,
+      "number": "264",
+      "collection": [
+        "principal"
+      ],
+      "type": "referencia_biblica",
+      "score": 96.24,
+      "fits": false,
+      "inference_ms": 7402,
+      "new_rank": 2
+    },
+    {
+      "rank": 3,
+      "number": "191",
+      "collection": [
+        "principal"
+      ],
+      "type": "referencia_biblica",
+      "score": 84.75,
+      "fits": false,
+      "inference_ms": 6685,
+      "new_rank": 3
+    },
+    {
+      "rank": 4,
+      "number": "099",
+      "collection": [
+        "principal"
+      ],
+      "type": "referencia_biblica",
+      "score": 77.8,
+      "fits": false,
+      "inference_ms": 6625,
+      "new_rank": 4
+    }
+  ],
+  "total_inference_ms": 27286
+}
