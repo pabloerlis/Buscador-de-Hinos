@@ -1,0 +1,266 @@
+[
+  {
+    "variant": "/tmp/hinos-review/results/rotulo.json",
+    "before": [
+      {
+        "number": "286",
+        "fits": true,
+        "inference_ms": 6784
+      },
+      {
+        "number": "264",
+        "fits": false,
+        "inference_ms": 7779
+      },
+      {
+        "number": "191",
+        "fits": true,
+        "inference_ms": 6784
+      },
+      {
+        "number": "099",
+        "fits": false,
+        "inference_ms": 6968
+      }
+    ],
+    "after": [
+      {
+        "number": "286",
+        "new_rank": 1
+      },
+      {
+        "number": "191",
+        "new_rank": 2
+      },
+      {
+        "number": "264",
+        "new_rank": 3
+      },
+      {
+        "number": "099",
+        "new_rank": 4
+      }
+    ],
+    "total_inference_ms": 28315
+  },
+  {
+    "variant": "/tmp/hinos-review/results/rotulo.json",
+    "before": [
+      {
+        "number": "286",
+        "fits": true,
+        "inference_ms": 4511
+      },
+      {
+        "number": "264",
+        "fits": true,
+        "inference_ms": 5561
+      },
+      {
+        "number": "191",
+        "fits": true,
+        "inference_ms": 4665
+      },
+      {
+        "number": "099",
+        "fits": false,
+        "inference_ms": 4904
+      }
+    ],
+    "after": [
+      {
+        "number": "286",
+        "new_rank": 1
+      },
+      {
+        "number": "264",
+        "new_rank": 2
+      },
+      {
+        "number": "191",
+        "new_rank": 3
+      },
+      {
+        "number": "099",
+        "new_rank": 4
+      }
+    ],
+    "total_inference_ms": 19641
+  },
+  {
+    "variant": "/tmp/hinos-review/results/rotulo.json",
+    "before": [
+      {
+        "number": "286",
+        "fits": false,
+        "inference_ms": 4813
+      },
+      {
+        "number": "264",
+        "fits": false,
+        "inference_ms": 5814
+      },
+      {
+        "number": "191",
+        "fits": false,
+        "inference_ms": 4974
+      },
+      {
+        "number": "099",
+        "fits": false,
+        "inference_ms": 5076
+      }
+    ],
+    "after": [
+      {
+        "number": "286",
+        "new_rank": 1
+      },
+      {
+        "number": "264",
+        "new_rank": 2
+      },
+      {
+        "number": "191",
+        "new_rank": 3
+      },
+      {
+        "number": "099",
+        "new_rank": 4
+      }
+    ],
+    "total_inference_ms": 20677
+  },
+  {
+    "variant": "/tmp/hinos-review/results/rotulo.json",
+    "before": [
+      {
+        "number": "286",
+        "fits": true,
+        "inference_ms": 7028
+      },
+      {
+        "number": "264",
+        "fits": true,
+        "inference_ms": 7928
+      },
+      {
+        "number": "191",
+        "fits": true,
+        "inference_ms": 6977
+      },
+      {
+        "number": "099",
+        "fits": true,
+        "inference_ms": 7118
+      }
+    ],
+    "after": [
+      {
+        "number": "286",
+        "new_rank": 1
+      },
+      {
+        "number": "264",
+        "new_rank": 2
+      },
+      {
+        "number": "191",
+        "new_rank": 3
+      },
+      {
+        "number": "099",
+        "new_rank": 4
+      }
+    ],
+    "total_inference_ms": 29051
+  },
+  {
+    "variant": "/tmp/hinos-review/results/rotulo.json",
+    "before": [
+      {
+        "number": "286",
+        "fits": false,
+        "inference_ms": 6444
+      },
+      {
+        "number": "264",
+        "fits": false,
+        "inference_ms": 7464
+      },
+      {
+        "number": "191",
+        "fits": false,
+        "inference_ms": 6465
+      },
+      {
+        "number": "099",
+        "fits": false,
+        "inference_ms": 6531
+      }
+    ],
+    "after": [
+      {
+        "number": "286",
+        "new_rank": 1
+      },
+      {
+        "number": "264",
+        "new_rank": 2
+      },
+      {
+        "number": "191",
+        "new_rank": 3
+      },
+      {
+        "number": "099",
+        "new_rank": 4
+      }
+    ],
+    "total_inference_ms": 26904
+  },
+  {
+    "variant": "/tmp/hinos-review/results/rotulo.json",
+    "before": [
+      {
+        "number": "286",
+        "fits": false,
+        "inference_ms": 6188
+      },
+      {
+        "number": "264",
+        "fits": false,
+        "inference_ms": 7078
+      },
+      {
+        "number": "191",
+        "fits": false,
+        "inference_ms": 6121
+      },
+      {
+        "number": "099",
+        "fits": false,
+        "inference_ms": 6245
+      }
+    ],
+    "after": [
+      {
+        "number": "286",
+        "new_rank": 1
+      },
+      {
+        "number": "264",
+        "new_rank": 2
+      },
+      {
+        "number": "191",
+        "new_rank": 3
+      },
+      {
+        "number": "099",
+        "new_rank": 4
+      }
+    ],
+    "total_inference_ms": 25632
+  }
+]
