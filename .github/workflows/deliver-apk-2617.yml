@@ -1,0 +1,80 @@
+name: Entregar APK 2.6.17 verificado
+on:
+  push:
+    branches: ['delivery/apk-2.6.17-4dff739']
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: apk-delivery-2.6.17
+  cancel-in-progress: false
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SOURCE_SHA: '4dff739086966773a42a218a739ee249c0ec384f'
+      APK_SHA: '3dae469165dd9e7f4c30bf78f319e7f1e6d7b423cce382708fe0f026b7b108bf'
+      APK_NAME: 'Buscador-de-Hinos-2.6.17.apk'
+      RELEASE_TAG: 'v2.6.17-qa'
+    steps:
+      - name: Confirmar que a origem foi aprovada no repositório privado
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(gh api "repos/$GH_REPO" --jq .private)" = true
+          gh api "repos/$GH_REPO/actions/runs/44967482176" |
+            jq -e --arg sha "$SOURCE_SHA" '.head_sha == $sha and .conclusion == "success"'
+          gh api "repos/$GH_REPO/actions/artifacts/14732927255" |
+            jq -e --arg sha "$SOURCE_SHA" '.workflow_run.head_sha == $sha and .expired == false and .name == "Buscador-de-Hinos-v2.6.17-QA-aprovado"'
+      - name: Extrair o pacote aprovado
+        uses: actions/download-artifact@v4
+        with:
+          name: Buscador-de-Hinos-v2.6.17-QA-aprovado
+          run-id: 44967482176
+          github-token: ${{ github.token }}
+          path: verified
+      - name: Conferir o APK contra o laudo e disponibilizar o arquivo
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t candidates < <(find verified -type f -name app-debug.apk)
+          test "${#candidates[@]}" -eq 1
+          cp -- "${candidates[0]}" "$APK_NAME"
+          test "$(wc -c < "$APK_NAME")" -eq 193974986
+          printf '%s  %s\n' "$APK_SHA" "$APK_NAME" | sha256sum --check --strict
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            cat > release-notes.md <<'EOF'
+          APK de QA 2.6.17 (versionCode 36), extraído sem recompilar da execução aprovada #346 no commit 4dff739.
+          SHA-256: `3dae469165dd9e7f4c30bf78f319e7f1e6d7b423cce382708fe0f026b7b108bf`.
+          A instalação como atualização depende da assinatura da versão já instalada. Veja a issue #35.
+          EOF
+            gh release create "$RELEASE_TAG" "$APK_NAME" --prerelease --latest=false \
+              --target "$SOURCE_SHA" --title "Buscador de Hinos 2.6.17 (QA)" --notes-file release-notes.md
+          fi
+          gh release view "$RELEASE_TAG" --json isPrerelease,targetCommitish |
+            jq -e --arg sha "$SOURCE_SHA" '.isPrerelease and .targetCommitish == $sha'
+          mkdir -p downloaded
+          gh release download "$RELEASE_TAG" --pattern "$APK_NAME" --dir downloaded
+          printf '%s  %s\n' "$APK_SHA" "downloaded/$APK_NAME" | sha256sum --check --strict
+      - name: Conferir compatibilidade de assinatura com o APK anterior
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release download v2.6.15-qa --pattern Buscador-de-Hinos-2.6.15.apk --dir previous
+          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print -quit)"
+          test -x "$apksigner"
+          current="$("$apksigner" verify --print-certs "downloaded/$APK_NAME" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          previous="$("$apksigner" verify --print-certs "previous/Buscador-de-Hinos-2.6.15.apk" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p')"
+          test -n "$current"
+          test -n "$previous"
+          if [ "$current" = "$previous" ]; then
+            echo "COMPATIBILIDADE_ASSINATURA=igual"
+          else
+            echo "COMPATIBILIDADE_ASSINATURA=diferente"
+          fi
