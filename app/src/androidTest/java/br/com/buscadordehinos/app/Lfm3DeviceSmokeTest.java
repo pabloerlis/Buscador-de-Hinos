@@ -105,8 +105,12 @@ public class Lfm3DeviceSmokeTest {
                 +"4 tempestade e socorro no mar; 5 ressurreição e esperança eterna. "
                 +"Retorne SOMENTE as notas 0,1,2 ou 3 para TODOS os cinco IDs no JSON. "
                 +"Cada nota deve avaliar seu próprio candidato, não a posição.";
-            String scoreGrammar="root ::= \"{\\\"1\\\":\" score \",\\\"2\\\":\" score "
-                +\",\\\"3\\\":\" score \",\\\"4\\\":\" score \",\\\"5\\\":\" score \"}\"\\n"
+            String scoreGrammar="root ::= "+JSONObject.quote("{\"1\":") +" score "
+                +JSONObject.quote(",\"2\":") +" score "
+                +JSONObject.quote(",\"3\":") +" score "
+                +JSONObject.quote(",\"4\":") +" score "
+                +JSONObject.quote(",\"5\":") +" score "
+                +JSONObject.quote("}") +"\\n"
                 +"score ::= \"0\" | \"1\" | \"2\" | \"3\"\\n";
             long[] scoreMetrics=new long[4];
             long scoreStart=SystemClock.elapsedRealtime();
