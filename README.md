@@ -1,3 +1,15 @@
+# Buscador de Hinos Android — candidato v2.6.14 (ETAPA 1, CI obrigatório)
+
+## v2.6.14 — auditoria e otimização nativa ARM64 (candidato, não aprovado)
+
+- Base na branch da PR #31 (v2.6.13), preservando as melhorias de contexto/diagnóstico, E5, RRF, EventFrame, Bíblia, importação, repertório, GGUF e funcionamento offline.
+- Atualização da versão fixa do llama.cpp para **b12088** (mesma referência da PR #27 para LFM3).
+- `GGML/llama/JNI`: compilação nativa `-O3` mesmo com APK Android Debug, com símbolos de linhas e frame pointers; compilação Debug normal preservada para as demais partes.
+- Alternância reproduzível `-PoptimizeGgufNative=false` para comparação de baseline no mesmo CI. O agente lê `compile_commands.json` e bloqueia otimizações ausentes.
+- Não significa que a inferência no telefone foi resolvida; a aprovação exige teste representativo com modelo real, revisão independente, auditabilidade e APK aprovado.
+- Proibição de trocar a assinatura sem plano de preservação de dados. Não instalar diretamente sobre versão com certificado distinto.
+
+---
 # Buscador de Hinos Android v2.6.11 — restauração sem perda funcional
 
 ## v2.6.13 — redução do trabalho GGUF e diagnóstico de timeout

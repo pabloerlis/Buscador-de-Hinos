@@ -90,7 +90,7 @@ require(re.search(r"^  independent_review:", workflow, re.M),
         "Agente 8 de teste e análise independente não está no workflow")
 require(re.search(r"^  publish_apk:", workflow, re.M),
         "Job de entrega condicionada não está no workflow")
-require("needs: [audit_apk, device_smoke, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
+require("needs: [audit_apk, device_smoke, lfm3_model_qa, relevance, embeddings, semantic_search_qa, semantic_crossversion_qa]" in workflow,
         "Agente 8 deve esperar relatórios de relevância, E5, Android e auditoria")
 require("needs: [audit_apk, independent_review]" in workflow,
         "O APK final deve depender da aprovação do agente 8")
@@ -101,6 +101,10 @@ require("android-device-evidence-qa" in workflow and "independent-review-qa" in 
 require(workflow.index("  independent_review:") < workflow.index("  publish_apk:"),
         "A análise independente deve preceder a publicação")
 
+require("scripts/qa_native_compile_flags.py" in workflow and
+        "scripts/qa_native_performance_gate.py" in workflow and
+        "  lfm3_model_qa:" in workflow,
+        "Etapa 1 sem auditoria nativa e benchmark LFM3 real")
 require("scripts/qa_android_emulator.sh" in workflow,
         "Workflow sem executor de teste Android nativo")
 runner_script = (ROOT / "scripts/qa_android_emulator.sh").read_text(encoding="utf-8")
