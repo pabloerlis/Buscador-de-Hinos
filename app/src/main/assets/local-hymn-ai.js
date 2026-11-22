@@ -195,14 +195,17 @@ const LocalHymnAI = (() => {
 
   function chatSearchRequest(message,history=[],viaButton=false) {
     const text=message.trim();
-    const command=text.match(/^(?:(?:por favor|agora|pode|voc[eê] pode|quero(?: que(?: voc[eê])?)?)[,\s]+)?(?:bus(?:car|ca|que)|pesquis(?:ar|a|e)|procur(?:ar|a|e)|encontr(?:ar|e|a)|(?:me\s+)?(?:mostre|sugira)(?=\s+(?:hinos|louvores|op[cç][õo]es)\b))(?:\s+|[:,.!?]+(?:\s+|$)|$)/iu);
+    const command=text.match(/(?:^|[.!?]\s+)(?:(?:por favor|agora|pode|voc[eê] pode|quero(?: que(?: voc[eê])?)?)[,\s]+){0,2}(?:bus(?:car|ca|que)|pesquis(?:ar|a|e)|procur(?:ar|a|e)|encontr(?:ar|e|a)|(?:me\s+)?(?:mostre|sugira)(?=\s+(?:hinos|louvores|op[cç][õo]es)\b))(?:\s+|[:,.!?]+(?:\s+|$)|$)/iu);
     if(!command&&!viaButton)return null;
-    const query=(command?text.slice(command[0].length):text)
+    const query=(command?text.slice(command.index+command[0].length):text)
       .replace(/^(?:por|sobre)\s+/iu,'').replace(/^(?:o|a)\s+(?=(?:hino|louvor)\s+\d)/iu,'').replace(/\s*[,;]?\s+por favor[.!?]*$/iu,'').replace(/[.!?]+$/u,'').trim();
-    if(query&&!/^(?:(?:alguns?|mais|outros?)\s+)?(?:hinos|louvores|op[cç][õo]es)(?:\s+(?:assim|agora))?$|^(?:agora|mais|isso|por favor)$/iu.test(query))
+    if(!viaButton&&/^(?:mais tarde|depois|amanh[ãa]|quando eu (?:pedir|disser))\b/iu.test(query))return null;
+    if(query&&!/^(?:(?:alguns?|mais|outros?)\s+)?(?:hinos|louvores|op[cç][õo]es)(?:\s+(?:assim|agora))?$|^(?:agora|mais|isso|por favor|na colet[âa]nea|no cat[áa]logo)$/iu.test(query))
       return {query,refine:/^(?:s[oó]|somente|apenas|sem|mais|menos|agora|tamb[eé]m)\s+/iu.test(query)};
-    const recent=history.filter(item=>item.kind==='user'&&item.intent==='conversation')
-      .map(item=>item.text.replace(/^(?:prefiro|quero|gostaria de|[eé] para)\s+/iu,''))
+    const beforeCommand=command?text.slice(0,command.index).trim():'';
+    const preferences=history.filter(item=>item.kind==='user'&&item.intent==='conversation').map(item=>item.text);
+    if(beforeCommand)preferences.push(beforeCommand);
+    const recent=preferences.map(item=>item.replace(/^(?:prefiro|quero|gostaria de|[eé] para)\s+/iu,''))
       .filter(item=>item.length>=5&&!/^(?:ol[aá]|obrigad[oa]|tudo bem|sim|n[aã]o)[.!?]*$/iu.test(item)).slice(-3);
     return {query:recent.join('. ').slice(0,500),refine:false};
   }
@@ -247,6 +250,7 @@ const LocalHymnAI = (() => {
           :uncertain
             ?'Escolha qual preferência perguntar: clima, ritmo, tema, ocasiao ou hino.'
             :'Use falar para responder à última mensagem, confirmar preferências ou propor uma ideia. Faça uma pergunta curta se precisar. A busca é acionada pelo usuário.',
+      'Cite títulos e números apenas se estiverem nas opções abaixo.',
       pick&&'Para indicar um hino da lista atual, use destacar com a posição da opção mais adequada à preferência.',
       explaining&&'Explique as sugestões usando apenas os títulos e trechos apresentados. Não execute ações.',
       query&&'Última busca: '+promptText(query,76),

@@ -292,6 +292,7 @@ function selectWorkspace(name){
   }
 }
 bindTabs(workspaceTabs,tab=>selectWorkspace(tab.id.replace('app-tab-','')));
+q('.brand').addEventListener('click',event=>{event.preventDefault();selectWorkspace('search');});
 $('search-open-library').addEventListener('click',()=>selectWorkspace('library'));
 $('chat-new').addEventListener('click',()=>{
   resetChatTurn();

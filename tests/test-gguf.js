@@ -192,6 +192,8 @@ assert.equal(ai.chatSearchRequest('Prefiro hinos mais alegres',history),null);
 assert.equal(ai.chatSearchRequest('Não precisa buscar agora',history),null);
 assert.equal(ai.chatSearchRequest('Por favor, busque o hino 027.',history).query,'hino 027');
 assert.equal(ai.chatSearchRequest('Pode buscar agora?',history).query,'hinos mais alegres.');
+assert.equal(ai.chatSearchRequest('É para a ceia. Pode buscar no catálogo?',[]).query,'a ceia');
+assert.equal(ai.chatSearchRequest('Pode buscar mais tarde?',history),null);
 assert.equal(ai.chatSearchRequest('',history,true).query,'hinos mais alegres.');
 assert.equal(ai.chatSearchRequest('Busque somente hinos de alegria',history).refine,true);
 for(const response of ['["retirar",3]','["acrescentar",9]',
