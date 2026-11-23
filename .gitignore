@@ -12,3 +12,7 @@ app/src/main/assets/e5-model.onnx
 app/src/main/assets/e5-index.json
 app/src/main/assets/e5-vocab.bin
 app/src/main/assets/e5-source.txt
+
+# Revisões humanas, perfis locais e catálogo temporário: nunca distribuir
+.tmp/
+private-review/
