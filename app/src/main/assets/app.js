@@ -55,6 +55,7 @@ function resultCard(hymn,{unlearned=false}={}){
   const score=Number.isFinite(hymn.tuner_score)?hymn.tuner_score:Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
   return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Índice heurístico de ordenação, não probabilidade, certeza nem avaliação NLI"><strong>${score}%</strong> ${scoreLabel}</span></div>
   <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
+  ${hymn.nli_label?`<div class="nli-result-label" title="Classificação real do Telepatia PT/ES, não probabilidade">Telepatia: ${hymn.nli_label==='entailment'?'implicação':hymn.nli_label==='contradiction'?'contradição':'neutro'}</div>`:''}
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
@@ -120,7 +121,11 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     $('load-more').classList.toggle('hidden',!data.has_more);
     if(page===1)RepertoireUI.renderSearch(data);
     $('load-more').textContent='Carregar mais '+data.page_size+' hinos';
-    if(page===1&&typeof SearchTuner!=='undefined'){SearchTuner.accept(data);if(!refine&&!preserveContext)SearchTuner.record(query);}
+    if(page===1&&typeof SearchTuner!=='undefined'){
+      SearchTuner.accept(data);
+      if(!refine&&!preserveContext)SearchTuner.record(query);
+      if(window.TelepatiaUI)window.TelepatiaUI.onResults(data,state.effectiveQuery,state.searchEpoch);
+    }
     succeeded=true;
   }catch(error){
     if(page===1&&!preserveContext){
@@ -259,7 +264,7 @@ $('refine-form').addEventListener('submit',async ev=>{
 });
 $('load-more').addEventListener('click',()=>{if(!SearchTuner.more())performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false});});
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;SearchTuner.clearPool();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;SearchTuner.clearPool();window.TelepatiaUI?.reset();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
 
 const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
@@ -561,6 +566,7 @@ const EmbeddingSearch=(()=>{
       $('load-more').textContent='Carregar mais '+result.page_size+' hinos';
       $('results-subtitle').textContent=`${result.total} resultados · busca híbrida com E5 Small`;
       SearchTuner.accept(result);
+      if(window.TelepatiaUI)window.TelepatiaUI.onResults(result,state.effectiveQuery,epoch);
       status('E5 Small: ranking vetorial atualizado em '+(answer.ms/1000).toFixed(1)+'s. Sem internet.');
     }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · modelo E5: '+error.message);}
   }
