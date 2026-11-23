@@ -94,7 +94,7 @@ jobs:
           set -euo pipefail
           python .tmp/upstream/export_onnx.py \
             .tmp/checkpoint/telepatia-pt-es-nli \
-            --out .tmp/exports --verify
+            --out .tmp/exports --opset 23 --verify
       - name: Verificar paridade de respostas NLI portuguesas e hashes
         run: |
           set -euo pipefail
