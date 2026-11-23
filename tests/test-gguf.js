@@ -276,7 +276,7 @@ async function checkBridge(){
 
   const expired=setup({additionalSearch:async()=>({results:[hymns[5]]})});
   expired.$('gguf-compare-model').click();
-  expired.setTime(20500);
+  expired.setTime(expired.calls[0][4]+500);
   expired.complete(expired.calls[0][1],toolCall);
   await tick();
   assert.equal(expired.calls.length,1);
