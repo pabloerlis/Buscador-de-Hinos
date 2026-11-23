@@ -567,7 +567,7 @@ const EmbeddingSearch=(()=>{
 const GGUF=(()=>{
   const native=()=>window.NativeGGUF||null;
   const selectedState={ready:false,busy:false,task:null};
-  let nextRequest=0,queuedAuto=null;
+  let nextRequest=0,queuedAuto=null,expandedPending=false;
   const aiCache=new Map();
   const MAX_AI_MS=12000;
   const canUseTopics=()=>!state.exactNumber&&state.searchSettings.mode!=='literal';
@@ -604,6 +604,7 @@ const GGUF=(()=>{
     $('gguf-improve').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||!canUseTopics();
     $('gguf-compare').disabled=!state.lastResults.length;
     $('gguf-compare-model').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
+    $('gguf-compare-expanded').disabled=!selectedState.ready||selectedState.busy||expandedPending||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
     $('gguf-compare-model').textContent=state.lastResults.length<2?'Buscar hinos com IA':'Comparar com IA';
     $('gguf-test').disabled=!selectedState.ready||selectedState.busy;
     $('gguf-cancel').disabled=!selectedState.task; if($('ai-cancel'))$('ai-cancel').classList.toggle('hidden',!selectedState.task);
@@ -715,6 +716,42 @@ const GGUF=(()=>{
       showTask('Buscando hinos com IA',`Trechos disponíveis para o modelo: ${request.candidates.size}.`);
     }
   }
+  async function compareExpanded(){
+    if(expandedPending||state.busy||selectedState.busy||state.repertoirePending||
+      !state.ready||!state.effectiveQuery||state.exactNumber)return;
+    const epoch=state.searchEpoch,query=state.effectiveQuery;
+    const search={query,exclusions:state.exclude.slice(),
+      deprioritized:state.deprioritize?.slice(),context:state.aiContext,settings:state.searchSettings};
+    expandedPending=true;
+    $('gguf-compare-expanded').disabled=true;
+    showTask('Explorando mais resultados','Recuperando até 30 candidatos para amostrar cinco trechos curtos.');
+    try{
+      const pages=[];
+      for(let page=1;page<=3;page++){
+        const response=await jsonRequest('/api/search',{
+          query,page,parsed_query:true,...searchRestrictions(),
+          semantic_hints:state.semanticHints,vector_query:state.vectorQuery,
+          settings:{...search.settings,pageSize:10}
+        });
+        if(epoch!==state.searchEpoch||selectedState.task)return;
+        pages.push(response.results);
+        if(!response.has_more)break;
+      }
+      const candidates=LocalHymnAI.selectExpandedCandidates(pages);
+      const request=LocalHymnAI.prepareComparison(query,search.exclusions,candidates,search.context);
+      if(!request.candidates.size){toast('Não há hinos para comparar.');return;}
+      if(startTask('compare',request,{
+        search,deadline:performance.now()+request.timeoutMs,
+        expanded:true,expandedPages:pages.length
+      })){
+        $('gguf-comparison-text').textContent='Comparação ampliada: cinco trechos selecionados de até 30 resultados; a IA não examinou todas as letras.';
+        $('gguf-comparison-actions').replaceChildren();
+        $('gguf-comparison').classList.remove('hidden');
+        showTask('Comparação ampliada','Comparando '+request.candidates.size+' hinos selecionados de '+pages.reduce((n,p)=>n+p.length,0)+' resultados. Verifique a letra completa.');
+      }
+    }catch(error){if(epoch===state.searchEpoch)toast('Pesquisa ampliada falhou: '+error.message);}
+    finally{expandedPending=false;info();}
+  }
   async function completeLookup(task,term){
     if(task.deadline-performance.now()<1000){resetTask('A comparação atingiu o limite de tempo antes da busca complementar.',true);return;}
     task.id=null;
@@ -740,13 +777,14 @@ const GGUF=(()=>{
     if(remaining<1000){resetTask('A comparação atingiu o limite de tempo após a busca complementar.',true);return;}
     sendTask(task,{...request,timeoutMs:remaining});
   }
-  function displayComparison(picks,lookup){
+  function displayComparison(picks,lookup,task=null){
     const format = hymn => [
       (hymn.number?'Hino '+hymn.number+' — ':'')+hymn.title,
       'Trecho da coletânea: “'+hymn.excerpt+'”'
     ].join('\n');
     const parts = [];
-    if(state.lastResults.length)parts.push(indexComparison());
+    if(task?.expanded)parts.push('Amostra ampliada de resultados fora da primeira página. A recomendação usa apenas trechos.');
+    else if(state.lastResults.length)parts.push(indexComparison());
     if(lookup)parts.push('Busca complementar por “'+lookup.term+'” · '+lookup.added+' novo(s) candidato(s)');
     parts.push(picks.length?'Sugestões da IA\n\n'+picks.map(format).join('\n\n'):
       'A IA não destacou nenhum trecho.');
@@ -809,7 +847,7 @@ const GGUF=(()=>{
       try{
         const result=LocalHymnAI.readComparison(answer,task);
         if(result.lookup){completeLookup(task,result.lookup);return;}
-        displayComparison(result.picks,task.lookup);
+        displayComparison(result.picks,task.lookup,task);
       }
       catch(error){resetTask('A IA respondeu em um formato inválido. Tente comparar novamente.',true);return;}
       resetTask('Comparação concluída.');return;
@@ -827,6 +865,7 @@ const GGUF=(()=>{
   $('gguf-improve').addEventListener('click',()=>interpret(state.effectiveQuery||state.originalQuery));
   $('gguf-cancel').addEventListener('click',cancelIfBusy);if($('ai-cancel'))$('ai-cancel').addEventListener('click',cancelIfBusy);
   $('gguf-compare-model').addEventListener('click',compareWithModel);
+  $('gguf-compare-expanded').addEventListener('click',compareExpanded);
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
   const savedAuto=localStorage.getItem('hinos-gguf-auto-v15');$('gguf-auto').checked=savedAuto==='1';

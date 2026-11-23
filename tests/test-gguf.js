@@ -12,7 +12,7 @@ const cpp=read('app/src/main/cpp/hinos_jni.cpp');
 const cmake=read('app/src/main/cpp/CMakeLists.txt');
 const build=read('app/build.gradle');
 const workflow=read('.github/workflows/android-apk.yml');
-for(const id of ['gguf-cancel','ai-cancel','gguf-select','gguf-load','gguf-improve','gguf-compare','gguf-compare-model','gguf-test','gguf-test-result','gguf-comparison','gguf-status','gguf-banner','gguf-auto','ai-workspace','ai-indicator','modal-ai-ask','settings-ai','gguf-phase','gguf-model-meta'])assert.match(html,new RegExp('id="'+id+'"'),id);
+for(const id of ['gguf-compare-expanded','gguf-cancel','ai-cancel','gguf-select','gguf-load','gguf-improve','gguf-compare','gguf-compare-model','gguf-test','gguf-test-result','gguf-comparison','gguf-status','gguf-banner','gguf-auto','ai-workspace','ai-indicator','modal-ai-ask','settings-ai','gguf-phase','gguf-model-meta'])assert.match(html,new RegExp('id="'+id+'"'),id);
 for(const fn of ['selectModel','loadModel','generate','cancel','status'])assert.match(java,new RegExp('public (?:synchronized )?'+(fn==='status'?'String':'void')+' '+fn+'\\('),'Java bridge: '+fn);
 assert.match(js,/window\.NativeGGUF/);
 assert.match(js,/\.generate\(prompt/);
@@ -137,6 +137,16 @@ const merged=ai.mergeCandidates(hymns.slice(0,5),[hymns[0],hymns[5],hymns[5]]);
 assert.equal(merged.added,1);
 assert.equal(merged.hymns.at(-1).id,6);
 
+const pagesInput=[
+  hymns.slice(0,5),
+  [{id:21,title:'Hino fora da página',number:'021',snippet:'O amor de Deus alcança a todos.'}],
+  [{id:31,title:'Outro resultado fora da página',number:'031',snippet:'O Senhor ampara na dificuldade.'}]
+];
+const selected=ai.selectExpandedCandidates(pagesInput);
+assert.deepEqual(selected.map(h=>h.id),[1,2,3,21,31]);
+assert.equal(ai.prepareComparison('Consolo',[],selected,null).candidates.size,5);
+assert.deepEqual(ai.selectExpandedCandidates([hymns.slice(0,2)]).map(h=>h.id),[1,2]);
+assert.throws(()=>ai.selectExpandedCandidates([hymns,hymns,hymns,hymns]),/inválidas/);
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
 function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true}={}){
@@ -179,6 +189,16 @@ async function checkBridge(){
   diagnostic.complete(id,'OK',true,{setupMs:10,prefillMs:5,firstTokenMs:15,tokens:1});
   assert.match(diagnostic.$('gguf-test-result').textContent,/Teste passou.*Primeiro token: 15 ms/);
 
+  const expanded=setup({additionalSearch:async()=>({results:hymns.slice(0,5),has_more:false})});
+  expanded.$('gguf-compare-expanded').click();
+  await tick();
+  assert.equal(expanded.requests[0].page,1);
+  assert.equal(expanded.requests[0].settings.pageSize,10);
+  assert.equal(expanded.requests[0].vector_query,expanded.vector);
+  assert.equal(expanded.calls.length,1);
+  assert.match(expanded.$('gguf-comparison-text').textContent,/Comparação ampliada/);
+  expanded.complete(expanded.calls[0][1],'[2]');
+  assert.match(expanded.$('gguf-comparison-text').textContent,/Sugestões da IA/);
   const comparison=setup();
   comparison.$('gguf-compare-model').click();
   const comparisonId=comparison.calls[0][1];

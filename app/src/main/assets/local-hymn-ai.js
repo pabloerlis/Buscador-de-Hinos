@@ -99,6 +99,27 @@ const LocalHymnAI = (() => {
     return { added: extra.length, hymns: [...original.slice(0,MAX_CANDIDATES-extra.length),...extra] };
   }
 
+  // Five short excerpts from as many as 30 current search hits, no reranking.
+  function selectExpandedCandidates(pages) {
+    if (!Array.isArray(pages) || pages.length<1 || pages.length>3 ||
+      pages.some(page => !Array.isArray(page) || page.length>10))
+      throw Error('Páginas de candidatos inválidas.');
+    const selected=[],seen=new Set();
+    function add(h){
+      const id=Number(h?.id);
+      if(!Number.isSafeInteger(id)||id<1||seen.has(id)||
+        !String(h.snippet||'').trim()||selected.length>=MAX_CANDIDATES)return;
+      seen.add(id);selected.push(h);
+    }
+    pages[0].slice(0,3).forEach(add);
+    for(const page of pages.slice(1)){
+      const item=page.find(h=>Number.isSafeInteger(h?.id)&&!seen.has(h.id)&&String(h.snippet||'').trim());
+      if(item)add(item);
+    }
+    for(const page of pages)for(const h of page)add(h);
+    return selected;
+  }
+
   function prepareThemes(query, exclusions, labels, timeoutMs, preferred = []) {
     const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     const canonical = new Map(labels.map(label=>[normalize(label),label]));
@@ -125,5 +146,5 @@ const LocalHymnAI = (() => {
     };
   }
 
-  return { diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  return { diagnostic, prepareComparison, readComparison, mergeCandidates, selectExpandedCandidates, prepareThemes };
 })();
