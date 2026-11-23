@@ -747,3 +747,55 @@ jobs:
             reports/validation/relatorio-simples.md
           retention-days: 90
           if-no-files-found: error
+
+  release_qa_apk:
+    name: 'Entrega direta do APK QA após todos os agentes'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/codex/contextual-p0-p1-profile-schema'
+    needs: publish_apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Buscador-de-Hinos-v2.6.28-QA-aprovado
+          path: qa-approved
+      - name: Conferir SHA e parecer independente antes da versão pública
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib,re
+          from pathlib import Path
+          root=Path('qa-approved')
+          apk=root/'app-debug.apk'
+          audit=json.loads((root/'apk-audit.json').read_text())
+          review=json.loads((root/'independent-review.json').read_text())
+          assert apk.is_file(), 'APK não encontrado'
+          digest=hashlib.sha256(apk.read_bytes()).hexdigest()
+          assert digest==audit['sha256']==review['apk']['sha256'], 'SHA divergente'
+          assert audit['passed'] is True and review['decision']=='approved' and not review['errors']
+          assert audit['local_e5_embedded'] is True and audit['local_gguf_engine_embedded'] is True
+          gradle=Path('app/build.gradle').read_text()
+          assert re.search(r'versionCode\s+47\b',gradle)
+          assert re.search(r"versionName\s+'2\.6\.28'",gradle)
+          (root/'Buscador-de-Hinos-v2.6.28-QA.apk').write_bytes(apk.read_bytes())
+          (root/'SHA256SUMS.txt').write_text(digest+'  Buscador-de-Hinos-v2.6.28-QA.apk\n')
+          PY
+      - name: Publicar pre-release com APK e SHA256SUMS
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag='v2.6.28-qa-pr59'
+          test "$GITHUB_SHA" = "$(git rev-parse HEAD)"
+          gh release create "$tag" \
+            qa-approved/Buscador-de-Hinos-v2.6.28-QA.apk \
+            qa-approved/SHA256SUMS.txt \
+            --target "$GITHUB_SHA" \
+            --title 'Buscador de Hinos 2.6.28 — APK QA experimental' \
+            --prerelease \
+            --notes 'APK experimental PR #59 liberado somente após aprovação de testes Android offline, E5, GGUF e agente independente. Comparação ampliada oferece cinco trechos selecionados de até 30 candidatos. Não equivale à verificação da letra inteira e o GGUF é selecionado pelo usuário.'
