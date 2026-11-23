@@ -98,8 +98,9 @@ function fixture({silent=false}={}){
  assert.equal(stalled.timeouts.size,1,'Precisamos de watchdog quando o JNI não responde');
  for(const t of stalled.intervals.values())t.fn();
  assert.match(stalled.$('chat-messages').children.at(-1).textContent,/Processando entrada/);
- const watchdog=stalled.timeouts.values().next().value;
+ const [watchdogId,watchdog]=stalled.timeouts.entries().next().value;
  assert.ok(watchdog.ms>=30000&&watchdog.ms<40000);
+ stalled.timeouts.delete(watchdogId); // Browser removes the fired timeout before invoking callback.
  watchdog.fn();
  await inFlight;
  assert.equal(stalled.$('chat-send').disabled,false,'Erro libera envio');
