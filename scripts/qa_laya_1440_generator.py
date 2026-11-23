@@ -18,44 +18,44 @@ SOURCE=Path("tests/data/laya_curated_scenarios_v2.json")
 SEED=20261123
 
 INTRO=[
-    "Entre dúvidas, escolhas e lembranças, a comunidade acompanha com atenção um acontecimento contado à luz da fé.",
-    "Quando a assembleia se reúne para meditar, os detalhes do episódio ajudam a distinguir palavras e atitudes.",
-    "Ao recordar os caminhos da vida, o coração considera os acontecimentos e as consequências das decisões humanas.",
-    "Numa reflexão coletiva, a atenção passa das expressões conhecidas para os fatos que ocorreram.",
-    "Diante de um tempo de incerteza, as pessoas ouvem o relato e procuram compreender os gestos de cada participante.",
-    "Entre orações e perguntas, a narrativa apresenta escolhas cujos efeitos merecem ser observados.",
-    "Na lembrança de uma reunião, as pessoas prestam atenção aos fatos e ao destino de quem aparece no relato.",
-    "Sob o peso das dificuldades, o testemunho procura mostrar o que aconteceu de fato e quem participou.",
-    "Ao buscar entendimento, os ouvintes seguem o desenvolvimento da cena e observam o que resulta dela.",
-    "Em uma conversa sobre fé e responsabilidade, um episódio é lembrado por seus acontecimentos concretos.",
-    "Na quietude de uma reflexão, as palavras conduzem o pensamento a uma história com pessoas e decisões.",
-    "Diante da necessidade de discernimento, os ouvintes procuram reconhecer o sentido que emerge das ações relatadas.",
-    "Em uma ocasião de estudo e oração, os presentes procuram entender os acontecimentos sem antecipar conclusões.",
-    "A congregação escuta atentamente a lembrança de uma experiência e considera o lugar de cada participante.",
-    "A reflexão sobre caminhos e decisões prepara os ouvintes para acompanhar a situação narrada.",
-    "Quando se avaliam atitudes humanas, é preciso observar as ações, os agentes e seus resultados.",
-    "Um testemunho passa a ser considerado com cuidado, enquanto diferentes pessoas acompanham o relato.",
-    "Na memória de quem narra, os fatos se encadeiam e levam a uma conclusão que merece ser examinada."
+    "Em oração eu busco sabedoria,\npara ouvir com clareza e compaixão.",
+    "Na sombra de tantas escolhas,\npeço ao Senhor direção para os passos.",
+    "Quando a fé parece distante,\nlevanto meus olhos em busca de luz.",
+    "Entre o silêncio e a esperança,\nmeu coração repousa nas mãos de Deus.",
+    "Mesmo que os dias tragam perguntas,\nconfio na presença do Eterno.",
+    "Que a verdade guie minha mente,\ne a humildade habite cada decisão.",
+    "Nos caminhos de cada jornada,\na fé sustenta quem caminha.",
+    "O tempo revela muitas escolhas,\ne Deus conhece a intenção do coração.",
+    "Com reverência eu me aproximo,\nquerendo distinguir o justo do incerto.",
+    "Nas noites longas da vida,\na esperança renova o meu olhar.",
+    "Quando vejo as marcas do caminho,\nlembro do cuidado que vem do Alto.",
+    "Que meu coração aprenda a ouvir,\npara compreender a verdade com mansidão.",
+    "No amanhecer de cada dia,\nmeus pensamentos se voltam à fé.",
+    "Entre a coragem e a prudência,\nprocuro conduzir meus passos.",
+    "Deus, dá-me discernimento,\npara não confundir desejo e realidade.",
+    "Na memória das experiências vividas,\nreconheço quanto preciso aprender.",
+    "Um passo de cada vez,\natravesso o dia com confiança.",
+    "Ergo uma prece silenciosa,\ne sigo observando a vida com atenção."
 ]
 OUTRO=[
-    "A reflexão final chama a atenção para a importância dos acontecimentos, não apenas para palavras repetidas.",
-    "Os ouvintes guardam a lembrança dos gestos e de suas consequências ao longo do relato.",
-    "Depois, o grupo volta a considerar o que ocorreu com cada pessoa mencionada.",
-    "A comunidade procura extrair uma lição sem mudar os fatos já apresentados.",
-    "O pensamento retorna ao significado das ações e do resultado observado.",
-    "Ao recordar a cena, os presentes distinguem intenção, acontecimento e consequência.",
-    "A memória do episódio desperta perguntas sobre responsabilidade e confiança.",
-    "O relato é retomado como oportunidade de observar decisões e seus efeitos.",
-    "A atenção se mantém no percurso dos personagens, mesmo depois de terminar a narração.",
-    "O episódio permanece como tema de conversa e discernimento entre os ouvintes.",
-    "Cada participante da reflexão considera como o desenlace ilumina o sentido do relato.",
-    "O registro dos fatos serve de ponto de partida para pensar sobre a vida.",
-    "A história é lembrada sem transformar suposições em acontecimentos.",
-    "As pessoas refletem sobre o que a cena mostra e sobre o que ela deixa em aberto.",
-    "O encontro prossegue com uma reflexão sobre os gestos narrados.",
-    "Quem escutou procura compreender o percurso real, sem se deter apenas no vocabulário.",
-    "A cena ajuda a contrastar esperança, decisão e realidade.",
-    "A meditação final valoriza o que aconteceu na história e seu significado."
+    "Que a paz sustente minhas escolhas,\ne a justiça acompanhe o meu caminhar.",
+    "Sigo confiando no Senhor,\nmesmo diante do que não posso compreender.",
+    "Que a verdade permaneça viva,\ne floresça a esperança dentro de mim.",
+    "Com humildade eu prosseguirei,\nbuscando no Alto luz para os passos.",
+    "Meu coração guarda essa lembrança,\nenquanto a fé me ensina a esperar.",
+    "Que meus olhos encontrem clareza,\ne minhas ações expressem o bem.",
+    "No repouso de uma oração,\nlembro que a fé pede discernimento.",
+    "O Senhor conhece meus caminhos,\ne nele procuro repouso e sabedoria.",
+    "Que a esperança seja firme,\nquando a jornada exigir coragem.",
+    "Com serenidade eu sigo adiante,\npois o tempo revela novas possibilidades.",
+    "Mesmo ao enfrentar perguntas,\nconservo minha confiança na providência.",
+    "A fé ilumina o entendimento,\ne a prudência acompanha minhas decisões.",
+    "Que meus passos sejam atentos,\ne minha consciência permaneça desperta.",
+    "Deposito diante de Deus\nminhas dúvidas, minhas escolhas e meus desejos.",
+    "Há consolo na presença divina,\nquando o pensamento busca direção.",
+    "Reúno coragem para prosseguir,\nenquanto a luz da fé me acompanha.",
+    "Na quietude encontro forças,\npara observar a vida e agir com cuidado.",
+    "Oro por um coração sensível,\ncapaz de reconhecer a verdade sem pressa."
 ]
 
 def normalize(value):
@@ -78,18 +78,23 @@ def questions(topic):
         )}
     }
 
+def verse(core):
+    # Break at existing punctuation only: keep all narrated events unchanged.
+    return re.sub(r"(?<=[,;:])\s+", "\n", core)
+
 def render(core,topic,pair_index,style):
-    # Identical balanced frame is used for both labels of the SAME scenario.
-    # A style controls placement; lexical surroundings vary with every pair.
+    # Positive and negative retain IDENTICAL devotional surroundings for each
+    # authored scenario pair. Short narrative itself carries the contrast.
     k=(topic*37+pair_index*11+style*7)%len(INTRO)
     j=(topic*19+pair_index*13+style*5)%len(OUTRO)
     a,b=INTRO[k],OUTRO[j]
-    if style==0:return a+"\n\n"+core
-    if style==1:return INTRO[(k+11)%len(INTRO)]+"\n\n"+core+"\n\n"+b
-    if style==2:return a+"\n\n"+core+"\n\n"+b
-    if style==3:return core+" "+b+" "+INTRO[(k+4)%len(INTRO)]
-    if style==4:return INTRO[(k+8)%len(INTRO)]+" "+core+" "+b
-    if style==5:return b+" "+core+" "+a
+    event=verse(core)
+    if style==0:return a+"\n\n"+event+"\n\n"+b
+    if style==1:return event+"\n\n"+b+"\n"+INTRO[(k+11)%len(INTRO)]
+    if style==2:return a+"\n"+event+"\n"+b
+    if style==3:return event+"\n"+b+"\n"+INTRO[(k+4)%len(INTRO)]
+    if style==4:return INTRO[(k+8)%len(INTRO)]+"\n\n"+event+"\n\n"+OUTRO[(j+4)%len(OUTRO)]
+    if style==5:return b+"\n"+event+"\n"+a
     raise ValueError(style)
 
 def serialize(record):
