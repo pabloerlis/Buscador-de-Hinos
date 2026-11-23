@@ -155,7 +155,8 @@ def main():
             lowcore.append(family)
         for positive,negative in zip(sorted(labels[1],key=lambda r:r["style"]),sorted(labels[0],key=lambda r:r["style"])):
             # Same exact surrounding text: if style includes label-specific hints, fails.
-            if positive["text"].replace(positive["core"],"<EVENT>") != negative["text"].replace(negative["core"],"<EVENT>"):
+            if (re.sub(r"\s+"," ",positive["text"].strip()).replace(re.sub(r"\s+"," ",positive["core"].strip()),"<EVENT>") !=
+                re.sub(r"\s+"," ",negative["text"].strip()).replace(re.sub(r"\s+"," ",negative["core"].strip()),"<EVENT>")):
                 badframe.append(family)
         p=set(words(next(iter(core1))))
         n=set(words(next(iter(core0))))
