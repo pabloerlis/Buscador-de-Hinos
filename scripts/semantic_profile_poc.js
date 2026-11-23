@@ -119,7 +119,7 @@ function metrics(ranking,judgments,{exhaustive=false}={}){
   const p5=complete?top.filter(id=>judgments[id]>=2).length/5:null;
   const fp5=complete?top.filter(id=>judgments[id]===0).length:null;
   let n5=null;
-  if(complete){
+  if(complete&&exhaustive){
     const dcg=top.reduce((n,id,i)=>n+(2**judgments[id]-1)/Math.log2(i+2),0);
     const ideal=Object.values(judgments).sort((a,b)=>b-a).slice(0,5)
       .reduce((n,v,i)=>n+(2**v-1)/Math.log2(i+2),0);

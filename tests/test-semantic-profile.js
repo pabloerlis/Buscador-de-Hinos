@@ -62,6 +62,7 @@ p=clone(profile);p.schema_version=2;
 reject(h,p,'Versão incompatível');
 assert.equal(P.metrics([1,2,3,4,5],{1:3,2:0}).precision_at_5,null);
 assert.equal(P.metrics([1,2,3,4,5],{1:3,2:0,3:2,4:0,5:1}).recall_at_50,null);
+assert.equal(P.metrics([1,2,3,4,5],{1:3,2:0,3:2,4:0,5:1}).ndcg_at_5,null);
 const grades={1:3,2:0,3:2,4:0,5:1};
 const result=P.evaluatePaired([{query_id:'fabricated',baseline:[2,4,5,1,3],
   experiment:[1,3,5,2,4],judgments:grades,exhaustive:true}])[0];
