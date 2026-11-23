@@ -59,7 +59,7 @@ final class TelepatiaNliEngine implements AutoCloseable {
     String modelSha(){return installedSha;}
     File modelDir(){return new File(app.getFilesDir(),ROOT);}
     File tokenizerFile(String name) {
-        if(!Set.of("tokenizer.json","tokenizer_config.json").contains(name))return null;
+        if(!"tokenizer.json".equals(name)&&!"tokenizer_config.json".equals(name))return null;
         File file=new File(modelDir(),"tokenizer/"+name);
         return file.isFile()?file:null;
     }
@@ -97,13 +97,24 @@ final class TelepatiaNliEngine implements AutoCloseable {
         if(name.endsWith("/")||!MAX_FILES.containsKey(name))return null;
         return name;
     }
+    private static byte[] readSmall(File file,long max)throws Exception{
+        require(file.isFile()&&file.length()>0&&file.length()<=max,"Metadados NLI inválidos: "+file.getName());
+        try(InputStream input=new FileInputStream(file);java.io.ByteArrayOutputStream out=new java.io.ByteArrayOutputStream()){
+            byte[] buf=new byte[8192];int n;
+            while((n=input.read(buf))!=-1){
+                require(out.size()+n<=max,"Metadados NLI excedem tamanho máximo.");
+                out.write(buf,0,n);
+            }
+            return out.toByteArray();
+        }
+    }
     private static void verify(File dir)throws Exception{
         for(String name:MAX_FILES.keySet()){
             File file=new File(dir,name);
             require(file.isFile()&&file.length()>0,"Modelo externo incompleto: "+name);
         }
         JSONObject manifest=new JSONObject(new String(
-            java.nio.file.Files.readAllBytes(new File(dir,"manifest.json").toPath()),
+            readSmall(new File(dir,"manifest.json"),2_000_000L),
             java.nio.charset.StandardCharsets.UTF_8));
         require(MODEL.equals(manifest.optString("model"))&&REV.equals(manifest.optString("revision")),
             "O pacote não corresponde ao checkpoint Telepatia aprovado.");
@@ -116,7 +127,7 @@ final class TelepatiaNliEngine implements AutoCloseable {
         require(digest(new File(dir,"tokenizer/tokenizer.json")).equalsIgnoreCase(manifest.optString("tokenizer_sha256")),
             "SHA-256 do tokenizador inválido.");
         JSONObject cfg=new JSONObject(new String(
-            java.nio.file.Files.readAllBytes(new File(dir,"rl_agent_config.json").toPath()),
+            readSmall(new File(dir,"rl_agent_config.json"),1_000_000L),
             java.nio.charset.StandardCharsets.UTF_8));
         require(cfg.optInt("max_len",512)>=128,"Configuração Laya incompatível.");
     }
@@ -210,9 +221,10 @@ final class TelepatiaNliEngine implements AutoCloseable {
             OnnxTensor tPos=OnnxTensor.createTensor(env,positions);
             OnnxTensor tMarked=OnnxTensor.createTensor(env,markerMask);
             OnnxTensor tType=OnnxTensor.createTensor(env,new long[]{0})){
-            Map<String,OnnxTensor> inputs=Map.of(
-                "input_ids",tIds,"attention_mask",tMask,"marker_pos",tPos,
-                "marker_mask",tMarked,"qtype",tType);
+            Map<String,OnnxTensor> inputs=new HashMap<>();
+            inputs.put("input_ids",tIds);inputs.put("attention_mask",tMask);
+            inputs.put("marker_pos",tPos);inputs.put("marker_mask",tMarked);
+            inputs.put("qtype",tType);
             long started=System.nanoTime();
             try(OrtSession.Result result=session.run(inputs)){
                 OnnxValue value=result.get("logits").orElseThrow(
