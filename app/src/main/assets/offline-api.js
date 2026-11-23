@@ -99,6 +99,8 @@ const OfflineAPI = (() => {
     return (text.match(/(?:^| )(?:nao|nem|nunca|jamais|sem)(?= |$)/g)||[]).length;
   }
   function equivalentVersions(a,b){
+    // Apenas entre coleções distintas: não confundir hinos diferentes de uma mesma edição.
+    if(collectionIds(a).some(id=>collectionIds(b).includes(id)))return false;
     const x=normalizeLyrics(a.lyrics),y=normalizeLyrics(b.lyrics);
     if(x===y)return x.length>=28 && normalizeLyrics(a.title)===normalizeLyrics(b.title);
     if(x.length<95||y.length<95||normalizeLyrics(a.title)!==normalizeLyrics(b.title))return false;
@@ -107,7 +109,7 @@ const OfflineAPI = (() => {
     const first=lyricTokenShingles(x),second=lyricTokenShingles(y);
     let common=0;for(const term of first)if(second.has(term))common++;
     // Alto limiar: não agrupar só por título, tema ou sinônimos.
-    return first.size>=10&&second.size>=10&&common/(first.size+second.size-common)>=0.97;
+    return first.size>=10&&second.size>=10&&common/(first.size+second.size-common)>=0.95;
   }
   function buildFamilies(){
     familyById=new Map();familyMembers=new Map();
@@ -747,8 +749,9 @@ const OfflineAPI = (() => {
     // Agrupa edições textualmente equivalentes somente na apresentação, sem
     // mexer nos IDs internos, índice E5 ou nas referências de cada coletânea.
     const displayRanked=collapseVersions(ranked,numberMatch);
-    const available=displayRanked.filter(h=>!RepertoireStore.isNotLearned(hymns[h.id-1]));
-    const notLearned=displayRanked.filter(h=>RepertoireStore.isNotLearned(hymns[h.id-1]));
+    const familyNotLearned=h=>familyOf(h.id).some(member=>RepertoireStore.isNotLearned(member));
+    const available=displayRanked.filter(h=>!familyNotLearned(h));
+    const notLearned=displayRanked.filter(h=>familyNotLearned(h));
     const hiddenPage=Math.max(1,Math.min(100,Number(payload?.not_learned_page)||1));
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
@@ -844,6 +847,9 @@ const OfflineAPI = (() => {
       results.results=[...byId.values()].sort((a,b)=>b.compatibility_percent-a.compatibility_percent).slice(0,opts.recCount);
       results.total=byId.size;
     }
+    // Não repetir outra edição do mesmo hino na cadeia de recomendações.
+    results.results=collapseVersions(results.results,false);
+    results.not_learned_results=collapseVersions(results.not_learned_results||[],false);
     if(!opts.recBreakdown)for(const h of results.results){delete h.query_percent;delete h.similarity_percent;}
     return results;
   }
