@@ -1,0 +1,69 @@
+name: Laya Multilingual — teste real fora do APK
+on:
+  push:
+    branches:
+      - experiment/laya-multilingual-real-benchmark-20261123
+    paths:
+      - scripts/qa_laya_real.py
+      - .github/workflows/laya-real-benchmark.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  laya_real:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    name: "Laya Multilingual real vs Qwen3 / MiniLM"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar modelo classificador e dependencias
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.5.1" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "laya==0.4.20" "huggingface-hub>=0.34"
+          python -c "import laya,torch; print('Laya=',laya.__version__,'Torch=',torch.__version__)"
+      - name: Baixar evidencias anteriores fixadas
+        uses: actions/download-artifact@v4
+        with:
+          name: qwen3-reranker-real-benchmark
+          run-id: 45244039769
+          github-token: ${{ github.token }}
+          path: .tmp/qwen3
+      - uses: actions/download-artifact@v4
+        with:
+          name: minilm-nli-real-benchmark
+          run-id: 45245900882
+          github-token: ${{ github.token }}
+          path: .tmp/minilm
+      - name: Fonte de hinos somente temporaria
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output .tmp/catalog.json
+          test "$(wc -c < .tmp/catalog.json)" -gt 100000
+      - name: Executar classificador Laya real no CPU
+        env:
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          TOKENIZERS_PARALLELISM: "false"
+          OMP_NUM_THREADS: "4"
+          USE_TF: "0"
+        run: |
+          set -euo pipefail
+          python scripts/qa_laya_real.py .tmp/catalog.json \
+            --qwen .tmp/qwen3/qwen3-reranker-real.json \
+            --minilm .tmp/minilm/minilm-nli-real.json \
+            --output qa-report/laya-multilingual-real.json
+      - name: Publicar somente decisoes e metricas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laya-multilingual-real-benchmark
+          path: qa-report/laya-multilingual-real.json
+          retention-days: 90
+          if-no-files-found: warn
