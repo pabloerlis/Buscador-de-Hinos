@@ -51,17 +51,22 @@
     const eventScore=clamp(actions*7.5);
     return {topic:topical,narrative:narrativeScore,events:eventScore};
   }
-  function score(item,raw){
-    const cfg=config(raw);
-    const totals=cfg.topic+cfg.narrative+cfg.events;
-    if(totals===0)return Math.round(clamp(item.relevance_percent));
-    const s=signals(item);
-    return Math.round((s.topic*cfg.topic+s.narrative*cfg.narrative+s.events*cfg.events)/totals);
+  function score(item,raw,availability){
+    const cfg=config(raw),s=signals(item);
+    // Não penalizar consultas puramente temáticas por não possuírem sinais de
+    // narrativa/ações. Disponibilidade é avaliada no conjunto, não por hino.
+    const narrativeWeight=availability?.narrative===false?0:cfg.narrative;
+    const eventsWeight=availability?.events===false?0:cfg.events;
+    const total=cfg.topic+narrativeWeight+eventsWeight;
+    if(total===0)return Math.round(clamp(item.relevance_percent));
+    return Math.round((s.topic*cfg.topic+s.narrative*narrativeWeight+s.events*eventsWeight)/total);
   }
   function rank(pool,raw){
     const cfg=config(raw);
     if(!Array.isArray(pool))return [];
-    return pool.map((item,i)=>({...item,tuner_score:score(item,cfg),tuner_rank_baseline:i}))
+    const evidence=pool.map(signals);
+    const available={narrative:evidence.some(s=>s.narrative>0),events:evidence.some(s=>s.events>0)};
+    return pool.map((item,i)=>({...item,tuner_score:score(item,cfg,available),tuner_rank_baseline:i}))
       .filter(item=>item.tuner_score>=cfg.min)
       .sort((a,b)=>b.tuner_score-a.tuner_score||a.tuner_rank_baseline-b.tuner_rank_baseline);
   }
