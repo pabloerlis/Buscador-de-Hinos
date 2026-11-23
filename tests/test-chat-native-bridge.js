@@ -99,7 +99,8 @@ function fixture({silent=false}={}){
  for(const t of stalled.intervals.values())t.fn();
  assert.match(stalled.$('chat-messages').children.at(-1).textContent,/Processando entrada/);
  const [watchdogId,watchdog]=stalled.timeouts.entries().next().value;
- assert.ok(watchdog.ms>=30000&&watchdog.ms<40000);
+ assert.equal(watchdog.ms,stalled.calls[0].timeoutMs+6000,
+   'Timeout deve refletir o limite configurado no roteador mais tolerância do JNI');
  stalled.timeouts.delete(watchdogId); // Browser removes the fired timeout before invoking callback.
  watchdog.fn();
  await inFlight;
