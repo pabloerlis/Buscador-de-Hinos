@@ -569,6 +569,9 @@ const GGUF=(()=>{
   const selectedState={ready:false,busy:false,task:null};
   let nextRequest=0,queuedAuto=null;
   const aiCache=new Map();
+  const reviewedByContext=new Map();
+  let lyricSession=null,reviewPreparing=false;
+  const REVIEW_BATCH_TARGET=2,REVIEW_MAX_SCANNED=12;
   const MAX_AI_MS=12000;
   const canUseTopics=()=>!state.exactNumber&&state.searchSettings.mode!=='literal';
   const phases={none:'Sem modelo',selected:'Arquivo selecionado',copying:'Copiando GGUF',loading:'Carregando modelo',ready:'GGUF carregado',generating:'IA em execução',error:'Falha ao carregar',unavailable:'Motor indisponível'};
@@ -604,6 +607,8 @@ const GGUF=(()=>{
     $('gguf-improve').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||!canUseTopics();
     $('gguf-compare').disabled=!state.lastResults.length;
     $('gguf-compare-model').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
+    $('gguf-review-model').disabled=!selectedState.ready||selectedState.busy||reviewPreparing||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
+    $('gguf-more-two').disabled=!selectedState.ready||selectedState.busy||reviewPreparing||state.busy||state.repertoirePending;
     $('gguf-compare-model').textContent=state.lastResults.length<2?'Buscar hinos com IA':'Comparar com IA';
     $('gguf-test').disabled=!selectedState.ready||selectedState.busy;
     $('gguf-cancel').disabled=!selectedState.task; if($('ai-cancel'))$('ai-cancel').classList.toggle('hidden',!selectedState.task);
@@ -706,9 +711,127 @@ const GGUF=(()=>{
       showTask('Testando geração local','O teste envia uma consulta curta ao GGUF.');
     }
   }
+
+  // Cada contexto mantém o conjunto de hinos já exibidos. Refinamentos não
+  // repetem sugestões anteriores; mudança real de tema abre uma nova sessão.
+  function reviewRootKey(){
+    return JSON.stringify([OfflineAPI.normalize(state.searchRootQuery||state.originalQuery||state.effectiveQuery),
+      state.status?.hymn_count||0]);
+  }
+  function reviewedFor(root){
+    if(!reviewedByContext.has(root)){
+      if(reviewedByContext.size>=12)reviewedByContext.delete(reviewedByContext.keys().next().value);
+      reviewedByContext.set(root,new Set());
+    }
+    return reviewedByContext.get(root);
+  }
+  function reviewQueryKey(root){
+    return JSON.stringify([root,state.effectiveQuery,state.exclude,state.deprioritize,
+      state.requiredTerms,state.semanticHints,state.searchSettings]);
+  }
+  function renderLyricReviews(session){
+    if(!session || lyricSession!==session)return;
+    const rows=session.queue.approved;
+    const summary=rows.length?rows.map((hit,i)=>[
+      (i+1)+'. '+(hit.hymn.number?'Hino '+hit.hymn.number+' — ':'')+hit.hymn.title,
+      hit.grade===3?'Mensagem diretamente adequada ao contexto.':'Analogia central apropriada ao contexto.'
+    ].join('\n')).join('\n\n'):'Nenhuma letra foi aprovada pela IA até agora.';
+    $('gguf-comparison-text').textContent='Recomendações após análise integral da letra (IA local)\n\n'+summary+
+      '\n\nAnalisados: '+session.queue.attempted.size+' · Rejeitados por falta de adequação: '+
+      session.queue.rejected+' · Não verificados: '+session.queue.unverified+
+      '. A classificação é automática e pode falhar.';
+    const actions=$('gguf-comparison-actions');
+    actions.replaceChildren();
+    for(const item of rows){
+      const b=document.createElement('button');
+      b.className='secondary-btn';b.type='button';
+      b.textContent='Ver '+item.hymn.title;
+      b.addEventListener('click',()=>openHymn(item.hymn.id));
+      actions.appendChild(b);
+    }
+    $('gguf-comparison').classList.remove('hidden');
+    $('gguf-more-two').classList.toggle('hidden',session.queue.cursor>=session.queue.items.length);
+    info();
+  }
+  async function getReviewSession(){
+    const root=reviewRootKey(),key=reviewQueryKey(root),epoch=state.searchEpoch;
+    if(lyricSession?.key===key)return lyricSession;
+    const request={query:state.effectiveQuery,parsed_query:true,
+      ...searchRestrictions(),semantic_hints:state.semanticHints,
+      vector_query:state.vectorQuery,settings:{...state.searchSettings,minAffinity:0},
+      _forRecommendations:true};
+    const [result,repertoire]=await Promise.all([
+      jsonRequest('/api/search',request),
+      jsonRequest('/api/repertoire')
+    ]);
+    if(epoch!==state.searchEpoch)throw Error('A busca mudou durante a seleção dos candidatos.');
+    const blocked=new Set([...reviewedFor(root),
+      ...(repertoire.not_learned||[]).map(h=>Number(h.id))]);
+    const queue=LocalHymnAI.createReviewQueue(result._fullRanked||[],blocked);
+    lyricSession={root,key,epoch,queue,query:state.effectiveQuery,
+      exclusions:state.exclude.slice(),context:state.aiContext};
+    return lyricSession;
+  }
+  function finishReview(task,detail){
+    if(selectedState.task!==task)return;
+    const message=detail||('Análise do lote concluída: '+task.accepted+
+      ' novo(s) hino(s) aprovado(s) após '+task.scanned+' avaliação(ões).');
+    const session=task.session;
+    resetTask(message);
+    renderLyricReviews(session);
+  }
+  async function advanceReview(task){
+    if(selectedState.task!==task||task.cancelled)return;
+    const session=task.session;
+    while(selectedState.task===task&&!task.cancelled){
+      if(task.accepted>=REVIEW_BATCH_TARGET || task.scanned>=REVIEW_MAX_SCANNED){
+        finishReview(task);return;
+      }
+      const candidate=LocalHymnAI.nextReviewCandidate(session.queue);
+      if(!candidate){finishReview(task,'Todos os candidatos disponíveis já foram examinados ou excluídos.');return;}
+      task.scanned++;
+      let hymn;
+      try{
+        hymn=await jsonRequest('/api/hymns/'+candidate.id);
+      }catch(error){
+        session.queue.unverified++;continue;
+      }
+      if(selectedState.task!==task||task.cancelled||session.epoch!==state.searchEpoch)return;
+      if(!LocalHymnAI.registerReviewLyrics(session.queue,hymn.lyrics))continue;
+      const request=LocalHymnAI.prepareFullReview(session.query,session.exclusions,hymn,session.context);
+      if(!request){session.queue.unverified++;continue;}
+      task.hymn=hymn;
+      showTask('Analisando letra integral', 'Hino '+(hymn.number||hymn.id)+
+        ' · '+task.accepted+'/'+REVIEW_BATCH_TARGET+' novos aprovados');
+      if(!sendTask(task,request))return;
+      renderLyricReviews(session);
+      return; // Aguarda resposta nativa antes de consultar o próximo hino.
+    }
+  }
+  async function requestTwoReviewedHymns(){
+    if(reviewPreparing||state.busy||selectedState.busy||selectedState.task||
+      !selectedState.ready||!state.effectiveQuery||state.exactNumber)return;
+    reviewPreparing=true;info();
+    try{
+      const session=await getReviewSession();
+      if(!session.queue.items.length||session.queue.cursor>=session.queue.items.length){
+        renderLyricReviews(session);
+        toast('Não restam outros candidatos para analisar neste contexto.');return;
+      }
+      const task={type:'lyric-review',epoch:state.searchEpoch,startedAt:performance.now(),
+        session,accepted:0,scanned:0};
+      selectedState.task=task;
+      $('ai-last').textContent='';
+      renderLyricReviews(session);
+      await advanceReview(task);
+    }catch(error){toast('Falha ao preparar a revisão: '+error.message);}
+    finally{reviewPreparing=false;info();}
+  }
+
   function compareWithModel(){
     if(state.busy||selectedState.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber)return;
     const search={query:state.effectiveQuery,exclusions:state.exclude.slice(),deprioritized:state.deprioritize?.slice(),context:state.aiContext,settings:state.searchSettings};
+    $('gguf-more-two').classList.add('hidden');
     const request=LocalHymnAI.prepareComparison(search.query,search.exclusions,state.lastResults,search.context);
     if(startTask('compare',request,{search,deadline:performance.now()+request.timeoutMs})){
       if(state.lastResults.length)compare();
@@ -741,6 +864,7 @@ const GGUF=(()=>{
     sendTask(task,{...request,timeoutMs:remaining});
   }
   function displayComparison(picks,lookup){
+    $('gguf-more-two').classList.add('hidden');
     const format = hymn => [
       (hymn.number?'Hino '+hymn.number+' — ':'')+hymn.title,
       'Trecho da coletânea: “'+hymn.excerpt+'”'
@@ -770,6 +894,7 @@ const GGUF=(()=>{
     return ['Comparação do índice local',...rows].join('\n\n');
   }
   function compare(){
+    $('gguf-more-two').classList.add('hidden');
     if(!state.lastResults.length){toast('Primeiro faça uma pesquisa.');return;}
     $('gguf-comparison-text').textContent=indexComparison();
     $('gguf-comparison-actions').replaceChildren();
@@ -804,6 +929,25 @@ const GGUF=(()=>{
       $('gguf-test-result').textContent=message;
       resetTask(message,!passed);return;
     }
+    if(task.type==='lyric-review'){
+      if(!ok){
+        task.session.queue.unverified++;
+        finishReview(task,'Análise interrompida: '+value+'. É possível solicitar mais hinos.');
+        return;
+      }
+      try{
+        const decision=LocalHymnAI.readFullReview(answer);
+        if(decision.approved && !reviewedFor(task.session.root).has(task.hymn.id)){
+          reviewedFor(task.session.root).add(task.hymn.id);
+          task.session.queue.approved.push({hymn:task.hymn,grade:decision.grade});
+          task.accepted++;
+        }else if(!decision.approved)task.session.queue.rejected++;
+      }catch(error){task.session.queue.unverified++;}
+      task.id=null;
+      renderLyricReviews(task.session);
+      void advanceReview(task);
+      return;
+    }
     if(!ok){resetTask('IA falhou: '+value,true);return;}
     if(task.type==='compare'){
       try{
@@ -826,6 +970,8 @@ const GGUF=(()=>{
   $('gguf-test').addEventListener('click',testModel);
   $('gguf-improve').addEventListener('click',()=>interpret(state.effectiveQuery||state.originalQuery));
   $('gguf-cancel').addEventListener('click',cancelIfBusy);if($('ai-cancel'))$('ai-cancel').addEventListener('click',cancelIfBusy);
+  $('gguf-review-model').addEventListener('click',requestTwoReviewedHymns);
+  $('gguf-more-two').addEventListener('click',requestTwoReviewedHymns);
   $('gguf-compare-model').addEventListener('click',compareWithModel);
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
