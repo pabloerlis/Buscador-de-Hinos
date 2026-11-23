@@ -86,8 +86,30 @@ jobs:
                           print("UPGRADE_GRAPH_OPSET_FROM",imp.version,"TO",23,flush=True)
                           imp.version=23
           ''')
+          # Exportar atenção pela formula explícita de MatMul + Softmax.
+          # ORT 1.23 exige máscara no formato exato para Attention(opset23),
+          # mas o ModernBERT usa máscara broadcast Q. Manter equivalência
+          # verificada contra a atenção PyTorch original; nunca silenciosa.
+          source='    from torch.export.dynamic_shapes import Dim'
+          assert text.count(source)==1
+          text=text.replace(source,source+'''
+              import math
+              import torch.nn.functional as _f
+              def _manual_sdpa(q,k,v,attn_mask=None,dropout_p=0.0,is_causal=False,scale=None,enable_gqa=False):
+                  if is_causal or dropout_p or enable_gqa:
+                      raise RuntimeError("Unhandled SDPA export mode")
+                  factor=(1.0/math.sqrt(q.shape[-1])) if scale is None else scale
+                  weights=torch.matmul(q,k.transpose(-2,-1))*factor
+                  if attn_mask is not None:
+                      if attn_mask.dtype==torch.bool:
+                          weights=weights.masked_fill(~attn_mask,float("-inf"))
+                      else:
+                          weights=weights+attn_mask
+                  return torch.matmul(torch.softmax(weights,dim=-1),v)
+              _f.scaled_dot_product_attention=_manual_sdpa
+          ''')
           file.write_text(text)
-          print("Applied guarded native graph version fix; ONNX Runtime parity remains required",flush=True)
+          print("SDPA manual decomposition installed; Torch/ORT parity required",flush=True)
           PY
           python -m py_compile .tmp/upstream/export_onnx.py
           sha256sum .tmp/upstream/export_onnx.py
