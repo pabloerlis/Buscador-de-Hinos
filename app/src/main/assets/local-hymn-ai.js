@@ -146,6 +146,8 @@ const LocalHymnAI = (() => {
       '1=menção incidental ou relação secundária; 0=sem relação ou contraditório.',
       'Somente notas 2 ou 3 são recomendações. Leia início, refrão e desfecho.',
       'PEDIDO: ' + promptText(query, 450),
+      ...(context?.narratives||[]).slice(0,2).map(n=>
+        'SIGNIFICADO DO CONTEXTO: '+promptText(n.label,80)+' — '+promptText(n.description,260)), 
       exclusions?.length ? 'NÃO INCLUIR: ' + exclusions.slice(0, 5).map(x => promptText(x, 75)).join('; ') : '',
       context?.reference ? 'REFERÊNCIA: ' + promptText(context.reference, 80) : '',
       'HINO: ' + promptText(hymn.title, 100),
