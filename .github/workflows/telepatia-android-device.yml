@@ -166,6 +166,10 @@ jobs:
             grep -Eq 'INSTRUMENTATION_STATUS_CODE: 0' qa-report/telepatia-android-device.log
             if grep -Eq 'FAILURES!!!|INSTRUMENTATION_STATUS_CODE: -2' qa-report/telepatia-android-device.log; then exit 1; fi
             echo "TELEPATIA_DEVICE_QA_PASS"
+      - name: Agente 8 independente - revisar APK, hashes e provas de inferencia
+        run: |
+          set -euo pipefail
+          python3 scripts/qa_telepatia_android_review.py
       - name: Laudo APK e prova offline de inferencia sem LFM3
         if: success()
         uses: actions/upload-artifact@v4
@@ -174,6 +178,7 @@ jobs:
           path: |
             qa-report/telepatia-apk.sha256
             qa-report/telepatia-android-device.log
+            qa-report/telepatia-independent-review.json
           retention-days: 30
           if-no-files-found: error
       - name: APK candidato APENAS se inferencia real offline aprovou
