@@ -31,7 +31,7 @@ jobs:
         with:
           name: qwen3-reranker-real-benchmark
           run-id: 45244039769
-          github-token: \${{ github.token }}
+          github-token: ${{ github.token }}
           path: .tmp/qwen3
       - name: Baixar letras apenas para uso efemero no runner
         run: |
