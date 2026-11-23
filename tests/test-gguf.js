@@ -41,7 +41,7 @@ assert.match(cpp,/params\.load_mode=LLAMA_LOAD_MODE_MMAP/);
 assert.doesNotMatch(cpp,/params\.use_mmap|params\.use_mlock|params\.use_direct_io/);
 assert.match(cpp,/llama_log_set/);
 assert.match(cpp,/progress_callback=modelProgress/);
-assert.match(cpp,/cp\.n_ctx=1280/);
+assert.match(cpp,/cp\.n_ctx=3072/);
 assert.match(cpp,/cp\.n_batch=96/);
 assert.match(cpp,/llama_chat_apply_template/);
 assert.match(cpp,/llama_decode/);
