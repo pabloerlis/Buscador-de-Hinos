@@ -8,6 +8,10 @@ const read=x=>fs.readFileSync(path.join(assets,x),'utf8');
 
 assert.ok(tool.PLAN_GRAMMAR.includes('BUSCAR'));
 assert.ok(tool.PLAN_GRAMMAR.includes('BIBLIA'));
+assert.equal(tool.quickPlan('Procure hinos sobre perdão.'),'BUSCAR');
+assert.equal(tool.quickPlan('Leia o hino 20 e explique o sentido.'),'LER');
+assert.equal(tool.quickPlan('Consulte Lucas 15:20 para mim.'),'BIBLIA');
+assert.equal(tool.quickPlan('Quero conversar sobre isso.'),null);
 for(const x of ['BUSCAR','LER','BIBLIA','CONVERSAR'])assert.equal(tool.readPlan(JSON.stringify(x)),x);
 for(const output of ['BUSCAR','{"fetch":"url"}','"DELETE"','"hino 20"','["BUSCAR"]',''])assert.throws(()=>tool.readPlan(output));
 const session={topic:'',turns:[],preferences:[],candidates:[],bibleReference:null};
@@ -21,6 +25,7 @@ assert.throws(()=>tool.readPlan('"LER"',plan.allowed),/fora da lista/);
 assert.ok(tool.planPrompt('Leia hino 20',session).grammar.includes('LER'));
 assert.ok(tool.planPrompt('Consulte Lucas 15:20',session).grammar.includes('BIBLIA'));
 assert.ok(plan.prompt.length<1701);
+assert.equal(plan.timeoutMs,25000);
 tool.remember(session,'Quero hinos sobre o filho pródigo.');
 session.turns.push({role:'user',text:'Quero hinos sobre o filho pródigo.'},
  {role:'assistant',text:'Vou procurar na coletânea.'});

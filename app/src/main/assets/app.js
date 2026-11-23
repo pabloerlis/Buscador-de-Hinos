@@ -998,11 +998,16 @@ const HymnChatUI=(()=>{
     setBusy(true);
     const statusLine=bubble('assistant','Interpretando o pedido…');
     try{
-      const routing=HymnChatTools.planPrompt(userText,session);
-      const decision=await generate(routing);
-      if(epoch!==sequence)return;
-      const plan=HymnChatTools.readPlan(decision.text,routing.allowed);
-      trace('Decisão LFM3: '+plan+' · '+Math.round(performance.now()-start)+' ms');
+      let plan=HymnChatTools.quickPlan(userText);
+      if(plan){
+        trace('Pedido explícito: '+plan+' · roteador local, sem geração desnecessária.');
+      }else{
+        const routing=HymnChatTools.planPrompt(userText,session);
+        const decision=await generate(routing);
+        if(epoch!==sequence)return;
+        plan=HymnChatTools.readPlan(decision.text,routing.allowed);
+        trace('Decisão LFM3: '+plan+' · '+Math.round(performance.now()-start)+' ms');
+      }
       statusLine.textContent=plan==='CONVERSAR'?'Preparando resposta…':
         'Executando consulta '+{BUSCAR:'ao catálogo',LER:'à letra original',BIBLIA:'à Bíblia local'}[plan]+'…';
       const toolStart=performance.now();

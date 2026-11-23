@@ -25,6 +25,18 @@ const HymnChatTools=(()=>{
     return ACTIONS.filter(x=>(x!=='LER'||hasHymn||explicitHymn)&&
       (x!=='BIBLIA'||bibleRequest));
   }
+  // Solicitações explícitas e inequívocas não precisam de uma geração
+  // adicional de 17s apenas para decidir qual ferramenta chamar.
+  // Casos ambíguos continuam sob decisão do LFM3 com gramática limitada.
+  function quickPlan(message){
+    const text=clean(message,MAX_MESSAGE);
+    if(/\b(?:leia|ler|abra|mostre a letra|analis[ae])\b.{0,26}\bhino\s*\d{1,4}\b/i.test(text))return 'LER';
+    if(/\b(?:consulte|leia|explique|o que diz)\b.{0,38}\b(?:salmo|lucas|jo[aã]o|mateus|marcos|romanos|apocalipse|isa[ií]as)\s*\d{1,3}/i.test(text))return 'BIBLIA';
+    if(/\b(?:busque|buscar|procure|pesquise|encontre|recomende|sugira|indique|mostre)\b.{0,45}\b(?:hino|hinos|louvor|louvores)\b/i.test(text)||
+      /\bquero\s+(?:um\s+|alguns\s+|outros\s+)?(?:hino|hinos|louvor|louvores)\b/i.test(text))
+      return 'BUSCAR';
+    return null;
+  }
   function planPrompt(message,session){
     const candidates=(session.candidates||[]).slice(0,5).map(h=>h.hymn_id).join(',');
     const allowed=availableActions(message,session);
@@ -44,7 +56,7 @@ const HymnChatTools=(()=>{
       'Nova mensagem: '+quote(message,MAX_MESSAGE),
       'Ação:'
     ].join('\n');
-    return {prompt:prompt.slice(0,1700),grammar:'root ::= '+allowed.map(x=>JSON.stringify(JSON.stringify(x))).join(' | '),allowed,maxTokens:15,timeoutMs:12000};
+    return {prompt:prompt.slice(0,1700),grammar:'root ::= '+allowed.map(x=>JSON.stringify(JSON.stringify(x))).join(' | '),allowed,maxTokens:15,timeoutMs:25000};
   }
   function readPlan(output,allowed=ACTIONS){
     let plan;
@@ -162,14 +174,14 @@ const HymnChatTools=(()=>{
       'Resultado local de '+result.tool+':\n'+quote(result.modelContext,900),
       'Resposta ao usuário:'
     ].join('\n');
-    return {prompt:prompt.slice(0,2600),grammar:'',maxTokens:100,timeoutMs:28000};
+    return {prompt:prompt.slice(0,2100),grammar:'',maxTokens:72,timeoutMs:55000};
   }
   function sanitizeAnswer(text){
     const cleaned=String(text??'').replace(/<\|[^>]{1,36}\|>/g,'').trim().slice(0,850);
     if(!cleaned)throw Error('Modelo não produziu resposta legível');
     return cleaned;
   }
-  return {PLAN_GRAMMAR,availableActions,planPrompt,readPlan,remember,queryFor,extractLyrics,execute,
+  return {PLAN_GRAMMAR,availableActions,quickPlan,planPrompt,readPlan,remember,queryFor,extractLyrics,execute,
     answerPrompt,sanitizeAnswer,MAX_TURNS};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=HymnChatTools;

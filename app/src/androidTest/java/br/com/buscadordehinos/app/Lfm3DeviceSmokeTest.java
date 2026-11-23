@@ -116,6 +116,29 @@ public class Lfm3DeviceSmokeTest {
                     +(SystemClock.elapsedRealtime()-chatStart)+" setup_ms="+chatMetrics[0]
                     +" prefill_ms="+chatMetrics[1]+" first_token_ms="+chatMetrics[2]
                     +" generated="+chatMetrics[3]+" action="+action);
+
+                JSONObject answerFixture;
+                try (java.io.InputStream input=InstrumentationRegistry.getInstrumentation()
+                        .getContext().getAssets().open("lfm3-chat-answer.json")) {
+                    ByteArrayOutputStream data=new ByteArrayOutputStream();
+                    byte[] chunk=new byte[4096];
+                    for (int size; (size=input.read(chunk))!=-1;) data.write(chunk,0,size);
+                    answerFixture=new JSONObject(new String(data.toByteArray(),StandardCharsets.UTF_8));
+                }
+                long[] answerMetrics=new long[4];
+                long answerStart=SystemClock.elapsedRealtime();
+                byte[] answer=(byte[])generate.invoke(null,new Object[]{
+                    answerFixture.getString("prompt").getBytes(StandardCharsets.UTF_8),
+                    answerFixture.getString("grammar").getBytes(StandardCharsets.UTF_8),
+                    answerFixture.getInt("maxTokens"),answerFixture.getInt("timeoutMs"),answerMetrics
+                });
+                assertNotNull("LFM3 não respondeu ao segundo estágio do chat",answer);
+                assertTrue("Chat não produziu resposta em linguagem natural",
+                    new String(answer,StandardCharsets.UTF_8).trim().length()>3);
+                assertTrue("Sem tokens de resposta",answerMetrics[3]>0);
+                android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=chat-answer total_ms="
+                    +(SystemClock.elapsedRealtime()-answerStart)+" prefill_ms="+answerMetrics[1]
+                    +" first_token_ms="+answerMetrics[2]+" generated="+answerMetrics[3]);
             }
 
             android.util.Log.i("LFM3_SMOKE_SUCCESS","official QAD Q4_0, tokens="
