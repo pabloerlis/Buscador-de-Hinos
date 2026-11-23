@@ -143,9 +143,9 @@ const pagesInput=[
   [{id:31,title:'Outro resultado fora da página',number:'031',snippet:'O Senhor ampara na dificuldade.'}]
 ];
 const selected=ai.selectExpandedCandidates(pagesInput);
-assert.deepEqual(selected.map(h=>h.id),[1,2,3,21,31]);
+assert.deepEqual([...selected.map(h=>h.id)],[1,2,3,21,31]);
 assert.equal(ai.prepareComparison('Consolo',[],selected,null).candidates.size,5);
-assert.deepEqual(ai.selectExpandedCandidates([hymns.slice(0,2)]).map(h=>h.id),[1,2]);
+assert.deepEqual([...ai.selectExpandedCandidates([hymns.slice(0,2)]).map(h=>h.id)],[1,2]);
 assert.throws(()=>ai.selectExpandedCandidates([hymns,hymns,hymns,hymns]),/inválidas/);
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
