@@ -1,4 +1,4 @@
-# P4 piloto — Chat com ferramentas locais GGUF (v2.6.30)
+# P4 piloto — Chat com ferramentas locais GGUF (v2.6.31)
 
 ## Contrato implementado
 
