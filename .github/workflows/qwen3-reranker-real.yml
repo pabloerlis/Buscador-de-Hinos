@@ -1,0 +1,50 @@
+name: Reranker Qwen3 — inferencia real fora do APK
+on:
+  push:
+    branches:
+      - experiment/qwen3-reranker-real-benchmark-20261123
+    paths:
+      - scripts/qa_qwen3_reranker_real.py
+      - .github/workflows/qwen3-reranker-real.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  qwen3_real:
+    name: "Qwen3 0.6B real: repertorio e controles contextuais"
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar dependencias CPU para inferencia real
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.5.1" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "transformers==4.57.3" "accelerate==1.12.0" "huggingface-hub>=0.34,<1.0" "safetensors>=0.4"
+      - name: Baixar letras exclusivamente no ambiente temporario
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output .tmp/qa-catalog.json
+          test "$(wc -c < .tmp/qa-catalog.json)" -gt 100000
+      - name: Executar o Qwen3-Reranker oficial (CPU) em letras reais e controles
+        env:
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          TOKENIZERS_PARALLELISM: "false"
+          OMP_NUM_THREADS: "4"
+        run: |
+          python scripts/qa_qwen3_reranker_real.py .tmp/qa-catalog.json \
+            --output qa-report/qwen3-reranker-real.json
+      - name: Publicar métricas, sem letras ou pesos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qwen3-reranker-real-benchmark
+          path: qa-report/qwen3-reranker-real.json
+          retention-days: 90
+          if-no-files-found: warn
