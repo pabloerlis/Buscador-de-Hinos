@@ -35,6 +35,12 @@ import org.json.JSONObject;
 final class TelepatiaNliEngine implements AutoCloseable {
     static final String MODEL = "telepatia-ai/laya-pt-es-nli";
     static final String REV = "71459abd38f4e439b2f4e3a2dae87573ae40c77e";
+    // Hashes de um artefato realmente executado com paridade Torch/ONNX.
+    // O manifesto ZIP é autodeclarado; estas constantes evitam falsificação
+    // do modelo, não apenas corrupção acidental de arquivos.
+    private static final String PIN_GRAPH = "f8f3c23687be7efdd137b5ea6557eef9235b218e6d86fe866fbe40191a1d55f7";
+    private static final String PIN_WEIGHTS = "7dd89182a7a4f4100e98dc46f6ab4dd63699b9ab72219a1417d76578262d9e74";
+    private static final String PIN_TOKENIZER = "609d8f4c067cd3950f88594c5a802616cea245823836ef5848ee4fc40aab5b6f";
     private static final String ROOT = "telepatia-nli";
     private static final long MAX_TOTAL = 2_500_000_000L;
     private static final int MAX_INPUT = 8192;
@@ -120,12 +126,15 @@ final class TelepatiaNliEngine implements AutoCloseable {
             "O pacote não corresponde ao checkpoint Telepatia aprovado.");
         require("verified".equals(manifest.optString("status")),
             "O pacote não passou pela auditoria de exportação.");
-        require(digest(new File(dir,"model.onnx")).equalsIgnoreCase(manifest.optString("onnx_sha256")),
-            "SHA-256 do grafo ONNX inválido.");
-        require(digest(new File(dir,"model.onnx.data")).equalsIgnoreCase(manifest.optString("sidecar_sha256")),
-            "SHA-256 dos pesos ONNX inválido.");
-        require(digest(new File(dir,"tokenizer/tokenizer.json")).equalsIgnoreCase(manifest.optString("tokenizer_sha256")),
-            "SHA-256 do tokenizador inválido.");
+        require(PIN_GRAPH.equalsIgnoreCase(digest(new File(dir,"model.onnx")))
+            && PIN_GRAPH.equalsIgnoreCase(manifest.optString("onnx_sha256")),
+            "O grafo ONNX externo não corresponde ao checkpoint auditado.");
+        require(PIN_WEIGHTS.equalsIgnoreCase(digest(new File(dir,"model.onnx.data")))
+            && PIN_WEIGHTS.equalsIgnoreCase(manifest.optString("sidecar_sha256")),
+            "Os pesos externos não correspondem ao checkpoint auditado.");
+        require(PIN_TOKENIZER.equalsIgnoreCase(digest(new File(dir,"tokenizer/tokenizer.json")))
+            && PIN_TOKENIZER.equalsIgnoreCase(manifest.optString("tokenizer_sha256")),
+            "O tokenizador externo não corresponde ao checkpoint auditado.");
         JSONObject cfg=new JSONObject(new String(
             readSmall(new File(dir,"rl_agent_config.json"),1_000_000L),
             java.nio.charset.StandardCharsets.UTF_8));
