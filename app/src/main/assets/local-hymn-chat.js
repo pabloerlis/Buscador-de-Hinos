@@ -42,18 +42,24 @@ const HymnChatTools=(()=>{
     const allowed=availableActions(message,session);
     // Roteamento para LLM pequeno: preservar contexto essencial, reduzir prefill.
     // A gramática ainda limita a saída às ações realmente disponíveis.
-    const prompt=[
+    const required=[
       'Escolha UMA ação da lista em JSON. NÃO responda à pessoa.',
       'BUSCAR=procurar, sugerir ou refinar hinos; LER=ler hino identificado; BIBLIA=passagem bíblica; CONVERSAR=sem consulta.',
       'Se pediu hinos, escolha BUSCAR. Nunca repita perguntas respondidas.',
-      'Permitidas: '+allowed.join(', '),
-      'Tema: '+quote(session.topic,100),
-      'Preferências: '+(session.preferences||[]).slice(-3).map(p=>quote(p,75)).join('; '),
+      'Permitidas: '+allowed.join(', ')
+    ];
+    const ending=['Nova mensagem: '+quote(message,MAX_MESSAGE),'Ação:'];
+    const optional=[
+      'Tema: '+quote(session.topic,90),
+      'Preferências: '+(session.preferences||[]).slice(-3).map(p=>quote(p,70)).join('; '),
       'IDs: '+ids,
-      'Diálogo recente:\n'+briefHistory(session.turns||[],3),
-      'Nova mensagem: '+quote(message,MAX_MESSAGE),
-      'Ação:'
+      'Diálogo recente:\n'+briefHistory(session.turns||[],3)
     ].join('\n');
+    // Preservar sempre a mensagem nova e o marcador final; reduzir primeiro
+    // o histórico antigo, em vez de cortar o pedido atual no meio.
+    const available=Math.max(0,1050-[...required,...ending].join('\n').length-2);
+    const context=optional.slice(0,available);
+    const prompt=[...required,context,...ending].filter(Boolean).join('\n');
     return {prompt:prompt.slice(0,1050),
       grammar:'root ::= '+allowed.map(x=>JSON.stringify(JSON.stringify(x))).join(' | '),
       allowed,maxTokens:10,timeoutMs:40000};

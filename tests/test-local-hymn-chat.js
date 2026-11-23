@@ -26,6 +26,17 @@ assert.ok(tool.planPrompt('Leia hino 20',session).grammar.includes('LER'));
 assert.ok(tool.planPrompt('Consulte Lucas 15:20',session).grammar.includes('BIBLIA'));
 assert.ok(plan.prompt.length<=1050,'Roteador offline precisa respeitar orçamento curto');
 assert.equal(plan.timeoutMs,40000);
+const longText='Um contexto decisivo: '+'x'.repeat(420);
+const crowded=tool.planPrompt(longText,{
+  topic:'Tema antigo '.repeat(25),preferences:Array(8).fill('Evitar festa e focar no arrependimento'),
+  turns:Array(8).fill({role:'assistant',text:'Mensagem do histórico '.repeat(20)}),
+  candidates:[{hymn_id:3}],bibleReference:null
+});
+assert.ok(crowded.prompt.length<=1050);
+assert.ok(crowded.prompt.includes('Nova mensagem: '+longText),
+  'O contexto antigo nunca pode cortar a pergunta nova');
+assert.ok(crowded.prompt.endsWith('Ação:'),'O marcador da decisão deve sobreviver ao orçamento');
+
 tool.remember(session,'Quero hinos sobre o filho pródigo.');
 session.turns.push({role:'user',text:'Quero hinos sobre o filho pródigo.'},
  {role:'assistant',text:'Vou procurar na coletânea.'});
