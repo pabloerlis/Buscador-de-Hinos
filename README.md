@@ -1,5 +1,9 @@
 # Buscador de Hinos Android v2.6.11 — restauração sem perda funcional
 
+## PRÓXIMA IMPLEMENTAÇÃO — busca por significado integral da letra (NÃO IMPLEMENTADA)
+
+**Ordem vigente para o Codex: [issue #58](https://github.com/pabloerlis/Buscador-de-Hinos/issues/58) · [Especificação técnica](docs/contextual-semantic-architecture.md).** O primeiro passo é P0/P1: perfil semântico versionado de **letra completa**, evidências por estrofe, amostra diversa, gabarito humano e benchmark pareado. Em seguida: índice global E5, recuperação independente da página, reranking contextual com checagem integral dos finalistas e ferramentas locais para LFM3. Não iniciar ajustando palavras-chave/pesos nem remover funcionalidades; preservar E5, RRF, EventFrame, Bíblia, repertório, GGUF e QA. Documento/issue são plano para o Codex, não entrega funcional nem autorização para declarar APK pronto.
+
 ## v2.6.13 — redução do trabalho GGUF e diagnóstico de timeout
 
 - A inferência nativa agora **reutiliza o contexto** do modelo entre chamadas; o estado do contexto e o callback de cancelamento são reinicializados a cada chamada. Ao descarregar/trocar o GGUF, o contexto é liberado antes do modelo.
@@ -15,7 +19,7 @@
 
 **Correções de busca:** preservar integralmente o ranking híbrido E5/RRF e os motores de narrativas existentes. Os três agentes de letras completas revisam 1.557 hinos reais e 22 consultas, incluindo a recuperação dos hinos 286 (Filho Pródigo), 261 (Mulher do fluxo de sangue), e prioridade de múltiplos temas em estrofes diferentes. O gate `full_lyrics_qa` bloqueia o build junto com os demais agentes existentes. Os relatórios completo e simples são publicados como artefatos.
 
-**Próxima etapa:** revisar alertas contextuais e construir um gabarito humano de relevância (issue #25), sem desativar modelos, bibliotecas ou recursos preexistentes. Testes em emulador não substituem a validação física ARM64 do usuário.
+**Próxima etapa vigente:** issue #58 / RFC contextual acima, começando por P0/P1 e incorporando o gabarito humano da issue #25. O histórico antigo permanece como referência, não como ordem prioritária. Testes em emulador não substituem validação física ARM64.
 
 ---
 
