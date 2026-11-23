@@ -1,0 +1,678 @@
+{
+  "schema_version": "2",
+  "provenance": "Autores de exemplos originais sintéticos em português; não são transcrições de hinos",
+  "scenarios": {
+    "retorno": {
+      "episode": "O filho deixou seu pai e o lar, reconheceu o erro, regressou arrependido e foi acolhido.",
+      "outcome": "O filho voltou arrependido e recebeu perdão e acolhimento do pai.",
+      "cases": [
+        [
+          "Longe do pai, o filho consumiu os bens, arrependeu-se na miséria, voltou ao lar e foi recebido com abraço.",
+          "Longe do pai, o filho consumiu os bens, mas construiu outra vida e decidiu não procurar o lar.",
+          "ausencia_retorno"
+        ],
+        [
+          "A fome trouxe lucidez ao rapaz que fugira; ele pediu perdão, regressou e encontrou uma festa preparada pelo pai.",
+          "A fome trouxe lucidez ao rapaz que fugira; ele pediu emprego numa fazenda e permaneceu distante da família.",
+          "desfecho_alternativo"
+        ],
+        [
+          "O jovem abandonou a casa paterna por orgulho, lamentou sua escolha e voltou para ser perdoado e acolhido.",
+          "O jovem abandonou a casa paterna por orgulho, lamentou sua escolha, mas morreu antes de reencontrar o pai.",
+          "desfecho_interrompido"
+        ],
+        [
+          "Depois de cair em pobreza, o filho reconheceu sua culpa, apresentou-se humilde ao pai e foi recebido com misericórdia.",
+          "Depois de cair em pobreza, o filho reconheceu sua culpa e escreveu ao pai, que nunca chegou a encontrá-lo.",
+          "encontro_ausente"
+        ],
+        [
+          "O pai esperava o rapaz afastado; quando ele voltou confessando o erro, saiu ao seu encontro e lhe concedeu perdão.",
+          "O pai esperava o rapaz afastado; quando ele voltou, recusou o pedido de reconciliação e fechou a porta.",
+          "perdao_negado"
+        ],
+        [
+          "Ao deixar a terra estrangeira, o filho se arrependeu, procurou seu pai e foi restaurado ao convívio da família.",
+          "Ao deixar a terra estrangeira, o filho chegou à cidade do pai mas fugiu novamente antes do encontro.",
+          "retorno_incompleto"
+        ],
+        [
+          "Sem recursos, o filho decidiu abandonar a vida distante, voltar ao pai e aceitar o perdão que lhe era oferecido.",
+          "Sem recursos, o filho decidiu voltar à região natal para ganhar dinheiro, evitando encontrar o pai.",
+          "motivacao_diferente"
+        ],
+        [
+          "O jovem que se afastara reconheceu que ferira o pai; regressou com pedido de perdão e foi recebido em paz.",
+          "O pai e o filho celebraram juntos a esperança da morada celestial, lembrando anjos e cânticos de alegria.",
+          "coincidencia_lexical"
+        ],
+        [
+          "Depois de partir com a herança, o rapaz experimentou o vazio, arrependeu-se e reencontrou o pai disposto a abraçá-lo.",
+          "Depois de partir com a herança, o rapaz experimentou o vazio; a história termina com a espera do pai.",
+          "historia_parcial"
+        ],
+        [
+          "A família celebrou a volta do filho que reconheceu seus erros e recebeu do pai uma reconciliação inesperada.",
+          "A família celebrou a chegada de um visitante celestial, e pai e filho cantaram sobre a glória futura.",
+          "tema_celestial"
+        ]
+      ]
+    },
+    "cura": {
+      "episode": "Uma mulher sofria de enfermidade prolongada, tocou as vestes de Jesus com fé e foi curada.",
+      "outcome": "A mulher tocou nas vestes de Jesus e recebeu cura de sua enfermidade.",
+      "cases": [
+        [
+          "Há muitos anos enferma, a mulher atravessou a multidão, tocou o manto de Jesus e recuperou a saúde.",
+          "Há muitos anos enferma, a mulher atravessou a multidão, mas seguiu sem chegar perto de Jesus.",
+          "toque_ausente"
+        ],
+        [
+          "Mesmo fraca, ela alcançou a borda da roupa do Mestre com fé; naquele instante o sofrimento cessou.",
+          "Mesmo fraca, ela alcançou a borda da roupa de um viajante, sem qualquer mudança na enfermidade.",
+          "ator_errado"
+        ],
+        [
+          "A enferma encostou discretamente nas vestes do Salvador e sentiu que havia sido curada.",
+          "A enferma encostou discretamente nas vestes do Salvador, mas a narrativa diz que sua doença persistiu.",
+          "cura_negada"
+        ],
+        [
+          "No caminho, a mulher doente confiou em Jesus, tocou sua capa e recebeu o milagre que tanto procurava.",
+          "No caminho, a mulher doente confiou em Jesus e o ouviu ensinar, sem tocar sua capa nem receber cura.",
+          "episodio_parcial"
+        ],
+        [
+          "Depois de anos de aflição, ela tocou o manto do Senhor e saiu restaurada para testemunhar o que ocorrera.",
+          "Depois de anos de aflição, ela recebeu a visita de parentes e lhes contou suas dores enquanto Jesus passava.",
+          "tema_alternativo"
+        ],
+        [
+          "A mulher doente foi até Jesus entre muitas pessoas, alcançou suas vestes e ficou livre da enfermidade.",
+          "Uma mulher saudável admirou as vestes de Jesus entre muitas pessoas e ficou emocionada com a visita.",
+          "sem_enfermidade"
+        ],
+        [
+          "Seu sofrimento prolongado terminou quando, movida pela fé, ela estendeu a mão até a roupa de Jesus.",
+          "Seu sofrimento prolongado terminou após meses de repouso recomendado pelo médico da aldeia.",
+          "causa_alternativa"
+        ],
+        [
+          "A enferma buscou o Mestre, tocou a roupa dele e a cura se manifestou diante da multidão.",
+          "A multidão contemplou o Mestre e admirou a roupa que ele usava; a mensagem trata da humildade.",
+          "coincidencia_lexical"
+        ],
+        [
+          "A mulher que sofria há anos se aproximou por trás de Jesus, tocou o tecido e recebeu saúde.",
+          "A mulher que sofria há anos planejava tocar o tecido de Jesus, mas desistiu antes de alcançá-lo.",
+          "hipotetico_sem_ato"
+        ],
+        [
+          "Cansada de buscar remédios, a mulher tocou na veste de Jesus e foi curada imediatamente.",
+          "Um homem cego ouviu a voz de Jesus e recobrou a visão; a mulher apenas testemunhou o ocorrido.",
+          "milagre_diferente"
+        ]
+      ]
+    },
+    "ovelha": {
+      "episode": "Uma ovelha se perdeu; o pastor saiu para procurá-la, encontrou-a e a trouxe de volta ao rebanho.",
+      "outcome": "O pastor achou a ovelha perdida e a resgatou.",
+      "cases": [
+        [
+          "Uma ovelha se afastou do aprisco; o pastor a procurou na encosta, encontrou-a e a levou de volta.",
+          "O rebanho permaneceu inteiro no aprisco, e o pastor conduziu todos ao pasto pela manhã.",
+          "sem_perda"
+        ],
+        [
+          "Ao perceber que faltava um animal, o pastor saiu pelo vale, achou a ovelhinha e voltou com ela nos braços.",
+          "Ao perceber que faltava um animal, o pastor percorreu o vale e regressou sem localizar a ovelhinha.",
+          "resgate_falhou"
+        ],
+        [
+          "O pequeno animal extraviado foi buscado com perseverança; o pastor o encontrou entre as rochas e o salvou.",
+          "O pequeno animal extraviado foi comprado por um comerciante, e seu antigo pastor seguiu adiante.",
+          "desfecho_alternativo"
+        ],
+        [
+          "A ovelha perdida ouvia a voz do pastor que a buscava; quando ele a achou, foi trazida para casa.",
+          "A ovelha ouvia a voz do pastor enquanto descansava junto às demais, sem ter saído do redil.",
+          "sem_busca"
+        ],
+        [
+          "O pastor deixou as outras ovelhas protegidas e saiu à procura da desaparecida, até resgatá-la.",
+          "O pastor deixou as ovelhas protegidas, mas foi à cidade comprar alimento para o rebanho.",
+          "motivacao_diferente"
+        ],
+        [
+          "Ao cair da tarde o pastor encontrou a ovelhinha que buscava e a conduziu de volta ao abrigo.",
+          "Ao cair da tarde o pastor viu uma ovelha saudável e a conduziu ao riacho para beber.",
+          "encontro_casual"
+        ],
+        [
+          "Depois de seguir rastros na montanha, ele recuperou a ovelha que se perdera e celebrou seu retorno.",
+          "Depois de seguir rastros na montanha, o pastor encontrou apenas o cajado que havia perdido.",
+          "objeto_errado"
+        ],
+        [
+          "O pastor percorreu a tempestade procurando a ovelha ausente, encontrou-a viva e a carregou ao redil.",
+          "O pastor enfrentou uma tempestade com todo o rebanho, mantendo os animais unidos e seguros.",
+          "tema_meteorologico"
+        ],
+        [
+          "Ovelhinha sem rumo foi alcançada pelo pastor que a procurava e voltou a descansar entre as demais.",
+          "Uma ovelha fugiu e foi encontrada por caçadores, mas o pastor nunca veio procurá-la.",
+          "ator_errado"
+        ],
+        [
+          "Uma única ovelha desapareceu, e a alegria do pastor veio quando a encontrou e restituiu ao rebanho.",
+          "O pastor contou suas ovelhas ao anoitecer e agradeceu por todas estarem presentes no aprisco.",
+          "coincidencia_lexical"
+        ]
+      ]
+    },
+    "tempestade": {
+      "episode": "Os discípulos temeram uma tempestade no barco e Jesus acalmou o vento e as ondas com sua ordem.",
+      "outcome": "Jesus ordenou ao vento e às ondas que cessassem, e a tempestade se acalmou.",
+      "cases": [
+        [
+          "As ondas ameaçaram o barco e assustaram os discípulos; Jesus ordenou ao vento que cessasse, trazendo bonança.",
+          "As ondas ameaçaram o barco e assustaram os discípulos; eles remaram até a margem antes do naufrágio.",
+          "ator_diferente"
+        ],
+        [
+          "No meio do lago, o grupo temeu pela vida, mas a palavra do Mestre deteve o vento e serenou o mar.",
+          "No meio do lago, o grupo temeu pela vida e permaneceu à deriva, esperando que o temporal passasse sozinho.",
+          "causa_natural"
+        ],
+        [
+          "Uma tempestade surpreendeu a embarcação; os discípulos clamaram, Jesus repreendeu o vento e as águas sossegaram.",
+          "Uma tempestade surpreendeu a embarcação; os discípulos clamaram, mas a cena termina enquanto as ondas aumentam.",
+          "desfecho_ausente"
+        ],
+        [
+          "Os seguidores tremeram sob a tormenta, até o Senhor ordenar silêncio ao mar e conduzi-los à tranquilidade.",
+          "Os seguidores caminharam pela margem sob chuva leve, celebrando a beleza do mar tranquilo.",
+          "sem_tempestade"
+        ],
+        [
+          "O barco quase se encheu de água; Jesus levantou-se, mandou cessar a tormenta e o perigo terminou.",
+          "O barco quase se encheu de água; um pescador experiente corrigiu a vela e conduziu todos ao porto.",
+          "agente_alternativo"
+        ],
+        [
+          "Quando o vento se ergueu contra a travessia, o Senhor pronunciou sua ordem e a tempestade cedeu.",
+          "Quando o vento se ergueu contra a travessia, o Senhor ensinou sobre esperança, sem ordenar nada às águas.",
+          "falta_acao"
+        ],
+        [
+          "Os discípulos temiam as ondas violentas, mas Jesus falou e o lago recuperou sua calmaria.",
+          "Os discípulos temiam as ondas violentas, mas o vento cessou ao nascer do sol, antes de Jesus falar.",
+          "ordem_temporal"
+        ],
+        [
+          "A palavra de Jesus deteve a fúria do mar quando os discípulos se desesperavam dentro da embarcação.",
+          "A canção fala de tempestades da alma e pede conforto espiritual, sem narrar uma travessia de barco.",
+          "metafora"
+        ],
+        [
+          "O Mestre enfrentou a tormenta com os discípulos, repreendeu o vento e encerrou o medo ao acalmar o lago.",
+          "O Mestre enfrentou a tormenta com os discípulos, porém o barco seguiu sob ondas intensas até amanhecer.",
+          "resultado_contrario"
+        ],
+        [
+          "Durante a viagem, o barco balançou e os seguidores temeram; Jesus ordenou silêncio e a água ficou serena.",
+          "Durante a viagem, os seguidores louvaram no barco sob céu claro, agradecendo pelas águas serenas.",
+          "coincidencia_lexical"
+        ]
+      ]
+    },
+    "samaritano": {
+      "episode": "Um viajante ferido por assaltantes recebeu cuidados de um samaritano, que o levou a abrigo e pagou sua recuperação.",
+      "outcome": "O samaritano socorreu o homem ferido e providenciou cuidados para ele.",
+      "cases": [
+        [
+          "Após o roubo na estrada, o ferido foi acolhido por um samaritano que cuidou das feridas e pagou sua hospedagem.",
+          "Após o roubo na estrada, o ferido foi visto por vários viajantes, mas permaneceu caído sem receber socorro.",
+          "ausencia_socorro"
+        ],
+        [
+          "Um estranho encontrou o homem agredido no caminho, tratou suas dores e o conduziu a uma hospedaria segura.",
+          "Um estranho encontrou o homem agredido no caminho, recuperou suas bolsas e continuou a viagem.",
+          "ajuda_superficial"
+        ],
+        [
+          "O samaritano interrompeu a jornada para limpar os ferimentos do viajante e garantir seu cuidado no abrigo.",
+          "O samaritano interrompeu a jornada para perguntar notícias ao viajante ileso e depois partiu.",
+          "vitima_ausente"
+        ],
+        [
+          "Ferido pelos ladrões, o homem foi levado à hospedaria por quem teve compaixão e assumiu os custos de sua recuperação.",
+          "Ferido pelos ladrões, o homem caminhou sozinho até uma hospedaria e pagou por seus próprios cuidados.",
+          "agente_alternativo"
+        ],
+        [
+          "Quando encontrou o peregrino machucado, o samaritano aproximou-se, fez curativos e providenciou descanso protegido.",
+          "Quando encontrou o peregrino machucado, o samaritano apenas o aconselhou a continuar pela estrada.",
+          "apoio_insuficiente"
+        ],
+        [
+          "O viajante caído recebeu do samaritano azeite para as feridas, transporte e abrigo até se recuperar.",
+          "O viajante caído recebeu do samaritano uma saudação de longe, enquanto este seguia rumo à cidade.",
+          "gesto_incidendal"
+        ],
+        [
+          "A compaixão moveu o homem a resgatar um desconhecido atacado, tratá-lo e financiar sua estadia.",
+          "A compaixão moveu o homem a dividir uma refeição com um viajante saudável à beira da estrada.",
+          "tema_generico"
+        ],
+        [
+          "Um samaritano cuidou pessoalmente do ferido deixado no caminho e pediu ao hospedeiro que prosseguisse o tratamento.",
+          "Um samaritano hospedou-se sozinho e pagou suas despesas depois de uma viagem tranquila.",
+          "coincidencia_lexical"
+        ],
+        [
+          "O socorro veio de quem parou diante da vítima de ladrões, enfaixou suas feridas e a levou a lugar seguro.",
+          "O socorro veio de guardas da estrada que prenderam os ladrões, mas ninguém cuidou do homem ferido.",
+          "resultado_ausente"
+        ],
+        [
+          "Vendo o desconhecido quase sem forças, o samaritano tratou suas lesões e garantiu que seria acompanhado.",
+          "Vendo o desconhecido quase sem forças, o samaritano prometeu voltar no dia seguinte, mas a narrativa não relata atendimento.",
+          "promessa"
+        ]
+      ]
+    },
+    "zaqueu": {
+      "episode": "Zaqueu subiu numa árvore para ver Jesus; Jesus visitou sua casa e ele decidiu reparar injustiças.",
+      "outcome": "Zaqueu recebeu Jesus e mudou de conduta, comprometendo-se a reparar seus erros.",
+      "cases": [
+        [
+          "O cobrador de impostos subiu ao sicômoro para enxergar Jesus, recebeu-o em casa e prometeu restituir o que cobrara injustamente.",
+          "O cobrador de impostos subiu ao sicômoro para enxergar Jesus, mas saiu da multidão antes de conversar com ele.",
+          "encontro_ausente"
+        ],
+        [
+          "Baixo de estatura, Zaqueu escalou a árvore; o Mestre o chamou, entrou em sua casa e ouviu sua decisão de devolver o dinheiro.",
+          "Baixo de estatura, Zaqueu escalou a árvore; o Mestre passou ao longe e ele voltou às cobranças habituais.",
+          "sem_transformacao"
+        ],
+        [
+          "Do alto dos galhos Zaqueu viu Jesus, acolheu a visita e ofereceu compensação àqueles que havia prejudicado.",
+          "Do alto dos galhos Zaqueu viu Jesus, mas sua história se concentra apenas na curiosidade pela multidão.",
+          "tema_diferente"
+        ],
+        [
+          "Jesus chamou pelo nome o homem que subira à árvore, visitou seu lar e presenciou sua mudança de vida.",
+          "Jesus chamou pelo nome um homem no mercado e recebeu dele uma oferta, sem visitar a casa de Zaqueu.",
+          "personagem_diferente"
+        ],
+        [
+          "Ao descer da árvore para receber Jesus, Zaqueu abandonou as cobranças injustas e prometeu restituir bens.",
+          "Ao descer da árvore, Zaqueu reuniu moedas para uma nova cobrança e partiu sem acolher Jesus.",
+          "desfecho_invertido"
+        ],
+        [
+          "O publicano que buscava ver o Mestre foi convidado a recebê-lo em casa e reconheceu o dever de reparar seus erros.",
+          "O publicano que buscava ver o Mestre escutou uma parábola, mas sua reação não passou de curiosidade.",
+          "historia_parcial"
+        ],
+        [
+          "Zaqueu procurou um lugar alto para olhar a chegada de Jesus; depois da visita, escolheu agir com justiça.",
+          "Zaqueu procurou um lugar alto para olhar a chegada de Jesus; depois da passagem, continuou enganando seus vizinhos.",
+          "resultados_opostos"
+        ],
+        [
+          "De uma árvore ele avistou o Salvador; a hospitalidade em sua casa conduziu Zaqueu à restituição.",
+          "De uma árvore ele avistou o Salvador; o cântico celebra somente a sombra e os frutos daquele lugar.",
+          "coincidencia_lexical"
+        ],
+        [
+          "Jesus deteve-se diante do sicômoro, visitou o cobrador e sua presença inspirou devolução e generosidade.",
+          "Jesus deteve-se diante do sicômoro, mas foi recebido por outra família; Zaqueu permaneceu afastado.",
+          "ator_errado"
+        ],
+        [
+          "O encontro iniciado na árvore terminou à mesa, com Zaqueu confessando fraudes e prometendo reparação.",
+          "O encontro iniciado na árvore terminou quando Zaqueu adormeceu, sem convite, refeição ou arrependimento.",
+          "evento_incompleto"
+        ]
+      ]
+    },
+    "multiplicacao": {
+      "episode": "Jesus alimentou uma multidão com poucos pães e peixes, multiplicando o alimento para todos.",
+      "outcome": "A pequena quantidade de pães e peixes foi suficiente por milagre para alimentar a multidão.",
+      "cases": [
+        [
+          "Diante da multidão faminta, Jesus abençoou poucos pães e peixes, repartindo-os até todos ficarem satisfeitos.",
+          "Diante da multidão faminta, os discípulos contaram os poucos pães e peixes e decidiram mandá-la embora.",
+          "sem_milagre"
+        ],
+        [
+          "Uma criança ofereceu pequena refeição; nas mãos de Jesus ela se multiplicou e alimentou muitas pessoas.",
+          "Uma criança ofereceu pequena refeição; Jesus agradeceu o gesto, mas a comida foi consumida por poucos.",
+          "escala_errada"
+        ],
+        [
+          "Mesmo com escassez, o Mestre fez render os pães e os peixes e ninguém voltou da reunião com fome.",
+          "Mesmo com escassez, o Mestre ensinou sobre confiança e pediu à multidão que procurasse comida na cidade.",
+          "resultado_alternativo"
+        ],
+        [
+          "Os seguidores trouxeram o alimento limitado a Jesus; após a bênção, a multidão comeu e ainda houve sobras.",
+          "Os seguidores trouxeram o alimento limitado a Jesus; depois do encontro compraram novas provisões no mercado.",
+          "causa_alternativa"
+        ],
+        [
+          "O Senhor tomou poucos pães e peixes, agradeceu e os distribuiu em abundância à gente reunida.",
+          "O Senhor tomou poucos pães e peixes, preparou sua própria refeição e permaneceu sozinho em oração.",
+          "destinatario_errado"
+        ],
+        [
+          "Da pequena oferta nasceram por milagre porções suficientes para uma multidão que estava cansada e com fome.",
+          "Da pequena oferta nasceram conselhos sobre repartir, mas não ocorreu distribuição de alimento à multidão.",
+          "metafora"
+        ],
+        [
+          "A grande assembleia recebeu de Jesus pão e peixe multiplicados, embora a provisão inicial fosse insuficiente.",
+          "A grande assembleia trouxe alimentos de casa e cada família repartiu o que tinha; não houve multiplicação.",
+          "mecanismo_diferente"
+        ],
+        [
+          "A bênção do Mestre fez poucos alimentos alcançarem todas as pessoas que o seguiam no campo.",
+          "A bênção do Mestre precedeu uma viagem, e o cântico fala apenas de gratidão por futuras colheitas.",
+          "tema_generico"
+        ],
+        [
+          "Com apenas algumas porções, os discípulos distribuíram o que Jesus multiplicou até saciar a todos.",
+          "Com apenas algumas porções, os discípulos alimentaram uma criança e guardaram o restante para o caminho.",
+          "distribuicao_parcial"
+        ],
+        [
+          "Pães e peixes escassos foram postos diante de Cristo e bastaram para uma multidão pela sua ação.",
+          "Pães e peixes foram pintados nas paredes da casa como símbolos de abundância, sem refeição narrada.",
+          "coincidencia_lexical"
+        ]
+      ]
+    },
+    "paralitico": {
+      "episode": "Amigos levaram um paralítico até Jesus pelo telhado; Jesus o curou e ele voltou a andar.",
+      "outcome": "O homem paralítico foi curado por Jesus e conseguiu andar.",
+      "cases": [
+        [
+          "Sem conseguir atravessar a multidão, os amigos abriram o telhado e desceram o paralítico diante de Jesus, que o fez andar.",
+          "Sem conseguir atravessar a multidão, os amigos abriram o telhado, mas retiraram o enfermo antes que Jesus o atendesse.",
+          "cura_ausente"
+        ],
+        [
+          "O homem imóvel foi baixado por cordas até o Mestre; ao ouvir sua palavra, levantou-se e levou sua maca.",
+          "O homem imóvel foi baixado por cordas até o Mestre; depois permaneceu deitado e os amigos o levaram embora.",
+          "resultado_invertido"
+        ],
+        [
+          "Seus companheiros carregaram a maca ao teto, desceram o enfermo diante de Jesus e celebraram sua recuperação.",
+          "Seus companheiros carregaram a maca até a praça, onde descansaram juntos sem encontrar Jesus.",
+          "encontro_ausente"
+        ],
+        [
+          "Por causa da casa lotada, os amigos entraram pelo alto com o paralítico; Cristo o curou e ele caminhou.",
+          "Por causa da casa lotada, os amigos decidiram voltar no dia seguinte, deixando o paralítico sem atendimento.",
+          "plano_sem_ato"
+        ],
+        [
+          "Jesus viu a fé dos homens que trouxeram o enfermo pelo telhado e ordenou que ele se levantasse.",
+          "Jesus viu a fé dos homens que trouxeram uma criança pelo portão e a abençoou durante a reunião.",
+          "personagem_diferente"
+        ],
+        [
+          "O paralítico foi colocado aos pés do Senhor pela abertura do teto e saiu da casa andando por si mesmo.",
+          "O paralítico foi colocado aos pés de um curandeiro que lhe deu remédios, sem participação de Jesus.",
+          "causa_alternativa"
+        ],
+        [
+          "A dificuldade de chegar ao Mestre levou os amigos a descer a maca pelo teto; o homem saiu curado.",
+          "A dificuldade de chegar ao Mestre levou os amigos a consertar o telhado, mas nenhum enfermo entrou.",
+          "coincidencia_lexical"
+        ],
+        [
+          "O doente sem movimentos foi levado por amigos até Jesus pelo alto da casa e voltou caminhando.",
+          "O doente sem movimentos foi levado por amigos pela estrada até a própria casa, sem qualquer cura narrada.",
+          "outro_desfecho"
+        ],
+        [
+          "Através do telhado, os amigos aproximaram o homem de Cristo; a ordem do Senhor devolveu-lhe as pernas.",
+          "Através do telhado, os amigos observaram o Mestre falar, mas o homem enfermo ficou no pátio.",
+          "presenca_insuficiente"
+        ],
+        [
+          "Jesus mandou o homem que fora descido do teto erguer-se; diante de todos ele pegou sua cama e andou.",
+          "Um homem carregou sua cama depois de descansar no telhado, e todos celebraram o fim da viagem.",
+          "metafora_cama"
+        ]
+      ]
+    },
+    "pedro": {
+      "episode": "Pedro negou conhecer Jesus três vezes; o galo cantou, e ele reconheceu a culpa e chorou arrependido.",
+      "outcome": "Depois das três negações e do canto do galo, Pedro arrependeu-se profundamente.",
+      "cases": [
+        [
+          "Com medo, Pedro negou três vezes conhecer Jesus; ao ouvir o galo, lembrou-se do aviso e chorou amargamente.",
+          "Com medo, Pedro negou três vezes conhecer Jesus; depois fugiu sem reconhecer o erro ou demonstrar remorso.",
+          "arrependimento_ausente"
+        ],
+        [
+          "Antes do amanhecer, o discípulo repetiu três negações; o canto do galo despertou nele profundo arrependimento.",
+          "Antes do amanhecer, o discípulo declarou três vezes sua lealdade; o galo cantou enquanto ele permanecia firme.",
+          "acao_oposta"
+        ],
+        [
+          "Pedro afirmou não conhecer seu Mestre por três vezes; o galo cantou e ele percebeu sua fraqueza entre lágrimas.",
+          "Pedro afirmou não conhecer um viajante desconhecido e ouviu o galo durante sua caminhada habitual.",
+          "personagem_errado"
+        ],
+        [
+          "Depois de negar Jesus no pátio, Pedro ouviu o galo e chorou pela escolha que fizera.",
+          "Depois de negar Jesus no pátio, Pedro ouviu uma discussão e se juntou aos perseguidores sem lamentar.",
+          "atitude_errada"
+        ],
+        [
+          "O discípulo foi questionado três vezes e negou ligação com Cristo; o canto do galo o levou a se arrepender.",
+          "O discípulo foi questionado três vezes sobre o caminho de casa e respondeu corretamente a cada pergunta.",
+          "episodio_diferente"
+        ],
+        [
+          "No frio da noite, Pedro declarou que não seguia Jesus; quando o galo anunciou a manhã, seu coração se quebrantou.",
+          "No frio da noite, Pedro reuniu os amigos e cantou de alegria quando o galo anunciou a manhã.",
+          "coincidencia_lexical"
+        ],
+        [
+          "A lembrança da palavra de Cristo veio depois do terceiro desmentido e do canto do galo; Pedro chorou.",
+          "A lembrança da palavra de Cristo veio antes de qualquer ameaça e o discípulo prometeu permanecer fiel.",
+          "ordem_alterada"
+        ],
+        [
+          "As três negativas de Pedro foram seguidas pelo canto do galo e por lágrimas de arrependimento.",
+          "As três perguntas a Pedro foram seguidas pelo canto do galo e por uma conversa sobre pesca.",
+          "narrativa_incidendal"
+        ],
+        [
+          "Ele tentou se proteger negando o Mestre repetidas vezes, mas o galo cantou e Pedro lamentou o erro.",
+          "Ele tentou se proteger negando o Mestre repetidas vezes, mas o cântico se encerra antes de qualquer remorso.",
+          "desfecho_interrompido"
+        ],
+        [
+          "O canto do galo recordou a Pedro suas três negações de Jesus e o fez chorar com sincero pesar.",
+          "O canto do galo recordou a Pedro as manhãs no lago, e ele agradeceu pela pesca farta.",
+          "tema_alternativo"
+        ]
+      ]
+    },
+    "daniel": {
+      "episode": "Daniel permaneceu fiel em oração, foi lançado na cova dos leões e Deus o protegeu dos animais.",
+      "outcome": "Daniel saiu ileso da cova dos leões por proteção divina.",
+      "cases": [
+        [
+          "Mesmo proibido de orar, Daniel permaneceu fiel, foi lançado entre leões e saiu vivo porque Deus o guardou.",
+          "Mesmo proibido de orar, Daniel permaneceu escondido em casa e nunca foi levado diante dos leões.",
+          "cova_ausente"
+        ],
+        [
+          "Por continuar suas orações, Daniel recebeu a sentença da cova; ali os leões não o feriram.",
+          "Por continuar suas orações, Daniel recebeu uma multa e foi liberado, sem entrar na cova.",
+          "punicao_diferente"
+        ],
+        [
+          "O fiel servo entrou no lugar dos leões, mas a proteção divina impediu que os animais o atacassem.",
+          "O fiel servo entrou no lugar dos leões e precisou ser resgatado por guardas armados.",
+          "causa_alternativa"
+        ],
+        [
+          "Na cova, Daniel confiou no Senhor e foi preservado dos leões até que o retiraram ileso.",
+          "Na cova, Daniel confiou no Senhor, mas a narrativa termina antes de qualquer resgate.",
+          "resultado_desconhecido"
+        ],
+        [
+          "O decreto não deteve as orações de Daniel; ele foi atirado aos leões e Deus fechou suas bocas.",
+          "O decreto não deteve as orações de Daniel; ele ficou no palácio e venceu um debate com conselheiros.",
+          "tema_diferente"
+        ],
+        [
+          "A fidelidade levou Daniel à cova dos leões, onde um anjo enviado por Deus o manteve em segurança.",
+          "A fidelidade levou Daniel a um jardim onde observou leões pintados, sem enfrentar perigo real.",
+          "literalidade_falsa"
+        ],
+        [
+          "Quando os leões deveriam atacá-lo, Daniel permaneceu protegido pelo Senhor e voltou vivo para fora da cova.",
+          "Quando os leões deveriam atacá-lo, os guardas os afastaram e transportaram Daniel por um túnel.",
+          "agente_alternativo"
+        ],
+        [
+          "O servo orou apesar da lei e foi entregue aos leões; nenhum deles o machucou porque Deus o socorreu.",
+          "O servo orou apesar da lei e foi expulso da cidade, permanecendo longe de qualquer cova.",
+          "coincidencia_lexical"
+        ],
+        [
+          "Daniel enfrentou a noite entre feras sem ferimento, sustentado pela proteção de Deus.",
+          "Daniel enfrentou a noite no campo cuidando de ovelhas; ouviu rugidos distantes e voltou ao lar.",
+          "cenario_alternativo"
+        ],
+        [
+          "A cova não foi o fim de Daniel: o Senhor o livrou das feras e ele saiu testemunhando o socorro.",
+          "A cova foi uma metáfora das dificuldades de Daniel na escola, e a canção celebra sua aprendizagem.",
+          "metafora"
+        ]
+      ]
+    },
+    "ester": {
+      "episode": "Ester arriscou aproximar-se do rei sem ser chamada para defender seu povo e conseguiu livrá-lo da ameaça.",
+      "outcome": "A intervenção corajosa de Ester diante do rei ajudou a salvar seu povo.",
+      "cases": [
+        [
+          "Sem convocação, Ester entrou perante o rei arriscando a vida, pediu por seu povo e conseguiu evitar sua destruição.",
+          "Sem convocação, Ester entrou perante o rei para pedir uma joia e voltou ao palácio com seu presente.",
+          "pedido_diferente"
+        ],
+        [
+          "A rainha decidiu enfrentar o perigo, apresentou-se ao soberano e intercedeu pelos que estavam ameaçados.",
+          "A rainha decidiu enfrentar o perigo, mas enviou apenas uma carta e a narrativa não relata proteção ao povo.",
+          "resultado_ausente"
+        ],
+        [
+          "Ester jejuou, compareceu ao rei apesar da proibição e suplicou que a sentença contra seu povo fosse impedida.",
+          "Ester jejuou, compareceu ao rei apesar da proibição e pediu autorização para realizar uma festa privada.",
+          "motivacao_diferente"
+        ],
+        [
+          "Quando seus parentes corriam risco, Ester pediu audiência mesmo sem chamada e sua intervenção levou à libertação.",
+          "Quando seus parentes corriam risco, Ester permaneceu em silêncio e aceitou a decisão do palácio.",
+          "intercessao_ausente"
+        ],
+        [
+          "A coragem de Ester diante do trono levou à revelação da conspiração e à segurança de seu povo.",
+          "A coragem de uma serva diante do trono levou à revelação de um segredo familiar, sem ameaças coletivas.",
+          "personagem_diferente"
+        ],
+        [
+          "A rainha poderia ser punida ao se aproximar do rei, mas foi recebida e conseguiu defender sua comunidade.",
+          "A rainha poderia ser punida ao se aproximar do rei e desistiu no corredor antes de falar com ele.",
+          "ato_incompleto"
+        ],
+        [
+          "Ester colocou a própria vida em risco ao pedir ao soberano que poupasse aqueles a quem ela pertencia.",
+          "Ester colocou a própria vida em risco ao atravessar uma ponte na viagem até outra cidade.",
+          "coincidencia_lexical"
+        ],
+        [
+          "O pedido de Ester ao monarca transformou a ameaça de extermínio em possibilidade de salvação para seu povo.",
+          "O pedido de Ester ao monarca buscava apenas mudar a decoração do palácio antes de uma celebração.",
+          "tema_alternativo"
+        ],
+        [
+          "Em favor da sua gente, Ester superou o medo, compareceu ao rei e ajudou a reverter a sentença.",
+          "Em favor da sua gente, Ester planejava comparecer ao rei, porém adoeceu antes da audiência.",
+          "hipotetico"
+        ],
+        [
+          "A jovem rainha falou ao rei em momento arriscado, denunciando o plano contra seu povo e obtendo proteção.",
+          "A jovem rainha falou ao rei em momento arriscado, denunciando a falta de alimentos nos jardins.",
+          "desfecho_diferente"
+        ]
+      ]
+    },
+    "jose": {
+      "episode": "José foi vendido por seus irmãos, tornou-se autoridade no Egito e mais tarde acolheu e perdoou a família.",
+      "outcome": "José reencontrou seus irmãos e os perdoou, apesar da traição anterior.",
+      "cases": [
+        [
+          "Vendido pelos irmãos, José chegou ao Egito, ganhou autoridade e depois acolheu e perdoou os que o haviam traído.",
+          "Vendido pelos irmãos, José chegou ao Egito e nunca mais ouviu notícias da família de origem.",
+          "reencontro_ausente"
+        ],
+        [
+          "Após anos de separação, José, agora governante, reconheceu os irmãos que o venderam e escolheu perdoá-los.",
+          "Após anos de separação, José, agora governante, reconheceu os irmãos e ordenou que fossem presos para sempre.",
+          "perdao_negado"
+        ],
+        [
+          "A traição familiar levou José a uma terra distante, mas ele alcançou posição elevada e reconciliou-se com os irmãos.",
+          "A traição familiar levou José a uma terra distante, onde ele permaneceu trabalhador sem reencontrar os irmãos.",
+          "historia_parcial"
+        ],
+        [
+          "Quando os irmãos vieram buscar alimento ao Egito, José tinha poder para puni-los, mas lhes ofereceu misericórdia.",
+          "Quando os irmãos vieram buscar alimento ao Egito, José cobrou o preço habitual e não revelou quem era.",
+          "reconciliacao_ausente"
+        ],
+        [
+          "Mesmo depois de ser vendido, José decidiu acolher os irmãos necessitados e reunir novamente a família.",
+          "Mesmo depois de ser vendido, José recusou qualquer contato futuro com a família que o rejeitara.",
+          "resultado_invertido"
+        ],
+        [
+          "O homem que fora traído tornou-se responsável pelos mantimentos egípcios e usou essa condição para ajudar os irmãos.",
+          "O homem que fora traído tornou-se responsável pelos mantimentos egípcios e proibiu os irmãos de entrar no país.",
+          "uso_do_poder"
+        ],
+        [
+          "José atravessou prisão e injustiça, ganhou autoridade no Egito e perdoou aqueles que o venderam.",
+          "José atravessou prisão e injustiça, ganhou autoridade no Egito e passou a perseguir aqueles que o venderam.",
+          "tema_vinganca"
+        ],
+        [
+          "Os irmãos recearam a reação de José, mas ele lhes ofereceu alimento, reencontro e perdão.",
+          "Os irmãos recearam a reação de José, mas a canção termina com a chegada deles à fronteira.",
+          "desfecho_ausente"
+        ],
+        [
+          "A narrativa mostra José vendido e depois elevado no Egito, onde escolheu a reconciliação com seus irmãos.",
+          "A narrativa mostra um comerciante chamado José que compra e vende mercadorias, sem qualquer traição familiar.",
+          "homonimia"
+        ],
+        [
+          "A graça superou a ofensa quando José reconheceu seus irmãos na fome, ajudou-os e lhes concedeu perdão.",
+          "A graça foi cantada num banquete egípcio, mas José e seus irmãos aparecem apenas como convidados.",
+          "coincidencia_lexical"
+        ]
+      ]
+    }
+  }
+}
