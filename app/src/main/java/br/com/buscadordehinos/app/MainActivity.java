@@ -251,7 +251,7 @@ public final class MainActivity extends Activity {
     }
     private static String mimeType(String file){
         if(file.endsWith(".html"))return "text/html";
-        if(file.endsWith(".js"))return "application/javascript";
+        if(file.endsWith(".js")||file.endsWith(".mjs"))return "application/javascript";
         if(file.endsWith(".css"))return "text/css";
         if(file.endsWith(".json")||file.endsWith(".webmanifest"))return "application/json";
         if(file.endsWith(".svg"))return "image/svg+xml";
