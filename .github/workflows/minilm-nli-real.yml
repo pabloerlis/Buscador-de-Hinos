@@ -1,0 +1,62 @@
+name: MiniLM NLI real benchmark — sem APK e sem pesos no repositorio
+on:
+  push:
+    branches:
+      - experiment/minilm-nli-real-benchmark-20261123
+    paths:
+      - scripts/qa_minilm_nli_real.py
+      - .github/workflows/minilm-nli-real.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  nli_real:
+    name: "MiniLM NLI real: mesmas 31 letras do Qwen3"
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Instalar PyTorch CPU e transformers
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.5.1" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "transformers==4.57.3" "accelerate==1.12.0" "huggingface-hub>=0.34,<1.0" "safetensors>=0.4"
+      - name: Recuperar benchmark Qwen3 aprovado (mesmo catalogo e mesmos rotulos)
+        uses: actions/download-artifact@v4
+        with:
+          name: qwen3-reranker-real-benchmark
+          run-id: 45244039769
+          github-token: \${{ github.token }}
+          path: .tmp/qwen3
+      - name: Baixar letras apenas para uso efemero no runner
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output .tmp/catalog.json
+          test "$(wc -c < .tmp/catalog.json)" -gt 100000
+      - name: Testar MiniLM de verdade e comparar com Qwen3 fixado
+        env:
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          TOKENIZERS_PARALLELISM: "false"
+          OMP_NUM_THREADS: "4"
+        run: |
+          set -euo pipefail
+          test -f .tmp/qwen3/qwen3-reranker-real.json
+          python scripts/qa_minilm_nli_real.py .tmp/catalog.json \
+            --baseline .tmp/qwen3/qwen3-reranker-real.json \
+            --output qa-report/minilm-nli-real.json
+      - name: Guardar somente as metricas e decisoes (sem letras e sem pesos)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: minilm-nli-real-benchmark
+          path: qa-report/minilm-nli-real.json
+          if-no-files-found: warn
+          retention-days: 90
