@@ -80,7 +80,12 @@ jobs:
           ref={'revision':'71459abd38f4e439b2f4e3a2dae87573ae40c77e',
                'samples':[{'index':i,'text':s,'ids':tok.encode(s,add_special_tokens=False).ids}
                           for i,s in enumerate(texts)],
-               'specials':{name:tok.token_to_id(name) for name in ['[CLS]','[SEP]','[MASK]']}}
+               'specials':{name:tok.token_to_id(name) for name in
+                   [item['content'] if isinstance(item,dict) else item
+                    for item in [
+                        json.loads(Path('.tmp/model/tokenizer/tokenizer_config.json').read_text())['cls_token'],
+                        json.loads(Path('.tmp/model/tokenizer/tokenizer_config.json').read_text())['sep_token'],
+                        json.loads(Path('.tmp/model/tokenizer/tokenizer_config.json').read_text())['mask_token']]]}}
           assert len(ref['samples'])>=50
           Path('.tmp/tokenizer-reference.json').write_text(json.dumps(ref,ensure_ascii=False))
           print('Rust token reference generated',len(texts), 'cases')
