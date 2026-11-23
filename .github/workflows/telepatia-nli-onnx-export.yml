@@ -75,8 +75,19 @@ jobs:
                   return model
               _api.convert_version = _native_version
           ''')
+          # O trace deixa a importacao do dominio padrao no opset 18, embora
+          # use a operacao padrao Gelu introduzida em opsets posteriores.
+          # Declarar opset 23 e VALIDAR executando o grafo em ORT contra Torch.
+          onnx_anchor="        proto = onnx.load(tmp_path)"
+          assert text.count(onnx_anchor)==1
+          text=text.replace(onnx_anchor,onnx_anchor+'''
+            for imp in proto.opset_import:
+                if imp.domain == "":
+                    print("UPGRADE_GRAPH_OPSET_FROM",imp.version,"TO",23,flush=True)
+                    imp.version=23
+          ''')
           file.write_text(text)
-          print("Applied PyTorch symbolic guard fix and guarded ONNX native-version experiment",flush=True)
+          print("Applied guarded native graph version fix; ONNX Runtime parity remains required",flush=True)
           PY
           python -m py_compile .tmp/upstream/export_onnx.py
           sha256sum .tmp/upstream/export_onnx.py
