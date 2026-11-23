@@ -700,8 +700,17 @@ const OfflineAPI = (() => {
       const vectorText=vectorEnabled&&hit.vector_similarity>=76&&!sharedPassage&&!numberMatch&&
         !quoted.length&&!required.length&&typeof VectorIndex.passageForSong==='function'?
         VectorIndex.passageForSong(hymn,_vectorRange):'';
+      // Sinais já produzidos pela busca; o painel apenas os reordena.
+      // "actions" não é uma inferência NLI nem uma prova do desfecho da narrativa.
+      const tunerSignals={lexical:Math.max(0,_fusionSignals?.lexical||0),
+        semantic:Math.max(0,_fusionSignals?.semantic||0),
+        biblical:Math.max(0,_fusionSignals?.biblical||0),
+        narrative:Math.max(0,_fusionSignals?.narrative||0),
+        vector:hit.vector_similarity||0,actions:Math.max(0,_eventPoints||0),
+        tier:Math.max(0,_narrativeTier||0)};
       return {...hit,snippet:sharedPassage?.text||_eventSnippet||vectorText||
-        makeSnippet(hymn,[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)};
+        makeSnippet(hymn,[...qTokens,...spelling],selectedTopics,cues,snippetPhrases),
+        ...(payload?.tuner_pool===true?{tuner_signals:tunerSignals}:{})};
     };
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
     const interpretation=opts.showConcepts?[
@@ -719,6 +728,9 @@ const OfflineAPI = (() => {
     ]:[];
     return {page,page_size:opts.pageSize,total:available.length,has_more:from+opts.pageSize<available.length,
       results:available.slice(from,from+opts.pageSize).map(withSnippet),
+      tuner_candidates:payload?.tuner_pool===true&&page===1
+        ?available.slice(0,60).map(withSnippet):undefined,
+      tuner_pool_limit:payload?.tuner_pool===true?60:undefined,
       not_learned_total:notLearned.length,not_learned_page:hiddenPage,
       not_learned_results:notLearned.slice(hiddenFrom,hiddenFrom+hiddenSize).map(withSnippet),
       not_learned_has_more:hiddenFrom+hiddenSize<notLearned.length,
