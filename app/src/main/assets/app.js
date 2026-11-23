@@ -120,7 +120,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     $('load-more').classList.toggle('hidden',!data.has_more);
     if(page===1)RepertoireUI.renderSearch(data);
     $('load-more').textContent='Carregar mais '+data.page_size+' hinos';
-    if(page===1){SearchTuner.accept(data);if(!refine&&!preserveContext)SearchTuner.record(query);}
+    if(page===1&&typeof SearchTuner!=='undefined'){SearchTuner.accept(data);if(!refine&&!preserveContext)SearchTuner.record(query);}
     succeeded=true;
   }catch(error){
     if(page===1&&!preserveContext){
@@ -131,7 +131,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     toast(error.message);
   }finally{busySearch(false);}
   if(succeeded&&page===1&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
-  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && !SearchTuner.isDirect() && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
+  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && (typeof SearchTuner==='undefined'||!SearchTuner.isDirect()) && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
   GGUF.info?.();
   return succeeded;
 }
