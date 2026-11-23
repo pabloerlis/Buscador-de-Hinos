@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "source_main_commit": "fa1b0feac944a9590408cf80893e2eaaacfd15ab",
+  "snapshot_date_utc": "2026-11-23",
+  "baseline_workflow": "https://github.com/pabloerlis/Buscador-de-Hinos/actions/runs/45071254142",
+  "baseline_workflow_note": "Aprovado na branch codex/chat-ocasiao-tema; não é medição do P1.",
+  "catalogue_hymns_reported": 1557,
+  "existing_queries_reported": 22,
+  "semantic_alerts_reported": 19,
+  "semantic_alerts_source": "https://github.com/pabloerlis/Buscador-de-Hinos/issues/25",
+  "human_review": {
+    "available": false,
+    "judgments": 0,
+    "holdout_locked": false
+  },
+  "baseline_metrics": {
+    "recall_at_50": null,
+    "precision_at_5": null,
+    "ndcg_at_5": null,
+    "false_positives_top_5": null
+  },
+  "experimental_metrics": {
+    "recall_at_50": null,
+    "precision_at_5": null,
+    "ndcg_at_5": null,
+    "false_positives_top_5": null
+  },
+  "notes": "Baseline de processo P0. Não interpretar gates existentes ou fixtures sintéticas como ganho de relevância no catálogo real. Ranking do app inalterado."
+}
