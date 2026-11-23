@@ -787,7 +787,8 @@ const OfflineAPI = (() => {
       ai_context:{
         reference:graphCtx?.reference||scripture?.reference||null,
         passage:(graphCtx?.sourceText||scripture?.text||'').slice(0,220),
-        topics:[...new Set([...(graphCtx?.concepts||[]).map(topic=>topic.label),...selectedTopics])].slice(0,4)
+        topics:[...new Set([...(graphCtx?.concepts||[]).map(topic=>topic.label),...selectedTopics])].slice(0,4),
+        narratives:(storyIntent?.matches||[]).slice(0,2).map(n=>({label:n.label,description:n.description,reference:n.reference}))
       },
       interpretation,...criteria,exact_number:Boolean(numberMatch),used_ai:hints.length>0,applied_hints:hints,
       _fullRanked:payload?._forRecommendations===true?ranked:undefined,
