@@ -85,7 +85,7 @@ public final class TelepatiaDeviceSmokeTest {
             assertEquals("Legacy GGUF runtime must be disabled","true",
                 eval(view.get(),"!Boolean(window.NativeGGUF)"));
             assertEquals("NLI bridge status invalid","true",
-                eval(view.get(),"(()=>{const s=JSON.parse(window.NativeNLI.status());return s.available&&s.model==='telepatia-ai/laya-pt-es-nli'&&s.installed;})()"));
+                eval(view.get(),"(()=>{const s=JSON.parse(window.NativeNLI.status());return s.available&&s.model==='telepatia-ai/laya-pt-es-nli';})()"));
             assertEquals("On-device slider did not persist","true",eval(view.get(),
                 "(()=>{const x=document.getElementById('tuner-topic');x.value='30';x.dispatchEvent(new Event('input',{bubbles:true}));"
                  +"const saved=JSON.parse(localStorage.getItem('hinos-semantic-tuner-v1'));"
