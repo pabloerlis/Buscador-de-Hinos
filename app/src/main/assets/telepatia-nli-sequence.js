@@ -15,6 +15,13 @@
     neutral:'O texto não fornece evidências suficientes para confirmar ou contradizer.'
   });
   const INS_PREFIX='Leia integralmente o texto e avalie a relação lógica com esta hipótese: ';
+  function tokenName(tok,property,alternate){
+    const cfg=tok.config||{};
+    const value=cfg[property]||cfg[alternate];
+    const name=typeof value==='string'?value:value&&typeof value.content==='string'?value.content:null;
+    if(!name)throw Error('Configuração do tokenizador sem '+property+'.');
+    return name;
+  }
   function tokenId(tok,name){
     const k=tok.token_to_id(name);
     if(!Number.isInteger(k)||k<0)throw Error('Tokenizador incompatível: token especial '+name+' ausente.');
@@ -31,12 +38,15 @@
     if(state.length>12000||hypothesis.length>450)throw Error('Texto excede o limite do classificador.');
     if(maxLen<128||maxLen>8192||headMaxLen<64||headMaxLen>=maxLen)
       throw Error('Configuração de tokens incompatível.');
-    const cls=tokenId(tok,'[CLS]'),sep=tokenId(tok,'[SEP]'),mask=tokenId(tok,'[MASK]');
+    const clsName=tokenName(tok,'cls_token','bos_token');
+    const sepName=tokenName(tok,'sep_token','eos_token');
+    const maskName=tokenName(tok,'mask_token');
+    const cls=tokenId(tok,clsName),sep=tokenId(tok,sepName),mask=tokenId(tok,maskName);
     const instructions=INS_PREFIX+hypothesis;
-    const header=encode(tok,'choice question: '+instructions.replaceAll('[MASK]',' '));
+    const header=encode(tok,'choice question: '+instructions.replaceAll(maskName,' '));
     const opts=LABELS.map(label=>{
       const option=' '+label+': '+CRITERIA[label];
-      return [mask,...encode(tok,option.replaceAll('[MASK]',' ')).slice(0,48)];
+      return [mask,...encode(tok,option.replaceAll(maskName,' ')).slice(0,48)];
     });
     let budget=headMaxLen-opts.reduce((sum,ids)=>sum+ids.length,0);
     if(budget<16){
@@ -52,7 +62,7 @@
       throw Error('As alternativas NLI colidiram após a redução de tokens.');
     const capacity=maxLen-head.length-1;
     if(capacity<24)throw Error('Pergunta consumiu o espaço disponível para a letra.');
-    const source=encode(tok,serializeState(state.replaceAll('[MASK]',' ')));
+    const source=encode(tok,serializeState(state.replaceAll(maskName,' ')));
     const stride=Math.max(1,Math.floor(capacity*0.72));
     const result=[];
     for(let start=0;start<source.length;start+=stride){
