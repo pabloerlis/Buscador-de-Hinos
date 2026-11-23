@@ -115,6 +115,8 @@ jobs:
             --checkpoint .tmp/checkpoint/telepatia-pt-es-nli \
             --bundle .tmp/exports/telepatia-pt-es-nli \
             --report qa-report/telepatia-onnx-export-manifest.json
+          cp qa-report/telepatia-onnx-export-manifest.json \
+            .tmp/exports/telepatia-pt-es-nli/manifest.json
       - name: Publicar relatorio somente se a comparacao passar
         if: success()
         uses: actions/upload-artifact@v4
@@ -132,6 +134,7 @@ jobs:
             .tmp/exports/telepatia-pt-es-nli/model.onnx
             .tmp/exports/telepatia-pt-es-nli/model.onnx.data
             .tmp/exports/telepatia-pt-es-nli/rl_agent_config.json
+            .tmp/exports/telepatia-pt-es-nli/manifest.json
             .tmp/exports/telepatia-pt-es-nli/tokenizer/
           compression-level: 0
           retention-days: 30
