@@ -1,0 +1,186 @@
+name: Telepatia Android - end-to-end NLI externo offline (sem LFM3)
+on:
+  push:
+    branches: [feat/semantic-sliders-live-20261123]
+    paths:
+      - app/src/androidTest/java/br/com/buscadordehinos/app/TelepatiaDeviceSmokeTest.java
+      - .github/workflows/telepatia-android-device.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  android_real_nli:
+    name: Agente de dispositivo | Telepatia ONNX com hashes no Android offline
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Download dos ativos E5 aprovados em build anterior
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 45087404605
+          name: e5-stanza-assets-qa
+          github-token: ${{ github.token }}
+          path: app/src/main/assets
+      - name: Download dos indices biblicos aprovados
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 45087404605
+          name: bible-indexes-qa
+          github-token: ${{ github.token }}
+          path: app/src/main/assets
+      - name: Codigo tokenizer auditado independentemente (sem pesos)
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 45288017635
+          name: telepatia-nli-tokenizer-js-reviewed
+          github-token: ${{ github.token }}
+          path: .tmp/tokenizer-lib
+      - name: Preparar tokenizer puro JS e verifica-lo por SHA
+        run: |
+          set -euo pipefail
+          FILE="$(find .tmp/tokenizer-lib -type f -name tokenizers.mjs -print -quit)"
+          test -s "$FILE"
+          echo "1c4a848f86156201c033d6cd08c4cf81ae1088552acec3367f31ef086edf5af0  $FILE" | sha256sum -c
+          cp "$FILE" app/src/main/assets/telepatia-tokenizers.mjs
+          cp "$(find .tmp/tokenizer-lib -type f -name LICENSE -print -quit)" app/src/main/assets/telepatia-tokenizers-LICENSE.txt
+          node --check app/src/main/assets/telepatia-tokenizers.mjs
+          node tests/test-telepatia-sequence.js
+          node tests/test-semantic-tuner.js
+      - name: Baixar exportacao Telepatia ONNX aprovada (apenas para teste, fora do APK)
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 45289501549
+          name: telepatia-nli-onnx-external-fp32
+          github-token: ${{ github.token }}
+          path: .tmp/nli-model
+      - name: Arquivos externos autenticados e caso de inferencia com tokenizer auditado
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/device-transfer
+          python - <<'PY'
+          import os,hashlib,json
+          from pathlib import Path
+          roots=list(Path('.tmp/nli-model').rglob('model.onnx'))
+          assert len(roots)==1,roots
+          base=roots[0].parent
+          for name in ('model.onnx','model.onnx.data','tokenizer/tokenizer.json',
+                       'tokenizer/tokenizer_config.json','rl_agent_config.json','manifest.json'):
+              f=base/name
+              assert f.is_file() and f.stat().st_size>0,name
+          manifest=json.loads((base/'manifest.json').read_text())
+          assert manifest['model']=='telepatia-ai/laya-pt-es-nli'
+          assert manifest['status']=='verified'
+          for name,field in (('model.onnx','onnx_sha256'),
+                            ('model.onnx.data','sidecar_sha256'),
+                            ('tokenizer/tokenizer.json','tokenizer_sha256')):
+              h=hashlib.file_digest(open(base/name,'rb'),'sha256').hexdigest()
+              assert h==manifest[field],name
+          Path('.tmp/device-transfer/model-root.txt').write_text(str(base.resolve()))
+          print('EXTERNAL_MODEL_OK',base,manifest['revision'],flush=True)
+          PY
+          MODEL_ROOT="$(cat .tmp/device-transfer/model-root.txt)"
+          MODEL_ROOT="$MODEL_ROOT" node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {createRequire} from 'node:module';
+          import {pathToFileURL} from 'node:url';
+          const require=createRequire(import.meta.url);
+          const {Tokenizer}=await import(pathToFileURL(process.cwd()+'/app/src/main/assets/telepatia-tokenizers.mjs').href);
+          const sequence=require('./app/src/main/assets/telepatia-nli-sequence.js');
+          const root=process.env.MODEL_ROOT;
+          const tok=new Tokenizer(JSON.parse(fs.readFileSync(root+'/tokenizer/tokenizer.json','utf8')),
+            JSON.parse(fs.readFileSync(root+'/tokenizer/tokenizer_config.json','utf8')));
+          const [item]=sequence.sequence(tok,'Um gato dorme no sofá.','Um animal está dormindo.');
+          if(!item||item.marker_pos.length!==3)throw Error('Invalid reference NLI input');
+          fs.writeFileSync('.tmp/device-transfer/telepatia-golden.json',JSON.stringify({
+            input_ids:item.input_ids,marker_pos:item.marker_pos,expected_label:'entailment'
+          }));
+          console.log('NLI_QA_INPUT_TOKENS',item.input_ids.length);
+          JS
+          mkdir -p .tmp/device-bundle/telepatia-pt-es-nli
+          cp -r "$MODEL_ROOT"/. .tmp/device-bundle/telepatia-pt-es-nli/
+          cd .tmp/device-bundle
+          zip -0 -q -r ../device-transfer/telepatia.zip telepatia-pt-es-nli
+          cd -
+          test "$(wc -c < .tmp/device-transfer/telepatia.zip)" -gt 400000000
+      - name: Android SDK e compilacao sem GGUF
+        run: |
+          set -euo pipefail
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | head -n 1)"
+          "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0'
+          gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest \
+            -PenableLocalEmbeddings=true -PenableLocalModels=false
+          test -s app/build/outputs/apk/debug/app-debug.apk
+          test -s app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+          if unzip -l app/build/outputs/apk/debug/app-debug.apk | grep -Ei '\.gguf|hinosllm|libllama';then
+            echo "FAIL legacy LFM3/GGUF bundled";exit 1
+          fi
+          mkdir -p qa-report
+          sha256sum app/build/outputs/apk/debug/app-debug.apk > qa-report/telepatia-apk.sha256
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Instalar APK e modelo externo no Android e classificar offline
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          ram-size: 6144M
+          heap-size: 512M
+          disable-animations: true
+          emulator-options: -no-window -no-audio -no-boot-anim -gpu swiftshader_indirect
+          script: |
+            set -euo pipefail
+            adb install -r app/build/outputs/apk/debug/app-debug.apk
+            adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
+            adb shell am start -n br.com.buscadordehinos.app/.MainActivity
+            sleep 3
+            adb shell mkdir -p /sdcard/Android/data/br.com.buscadordehinos.app/files
+            adb push .tmp/device-transfer/telepatia.zip /sdcard/Android/data/br.com.buscadordehinos.app/files/telepatia.zip
+            adb push .tmp/device-transfer/telepatia-golden.json /sdcard/Android/data/br.com.buscadordehinos.app/files/telepatia-golden.json
+            adb shell svc wifi disable
+            adb shell svc data disable
+            adb shell am force-stop br.com.buscadordehinos.app
+            timeout 900 adb shell am instrument -w -r -e class \
+              br.com.buscadordehinos.app.TelepatiaDeviceSmokeTest \
+              br.com.buscadordehinos.app.test/androidx.test.runner.AndroidJUnitRunner | tee qa-report/telepatia-android-device.log
+            grep -Eq 'OK \(2 tests?\)' qa-report/telepatia-android-device.log
+            grep -Eq 'INSTRUMENTATION_STATUS_CODE: 0' qa-report/telepatia-android-device.log
+            if grep -Eq 'FAILURES!!!|INSTRUMENTATION_STATUS_CODE: -2' qa-report/telepatia-android-device.log; then exit 1; fi
+            echo "TELEPATIA_DEVICE_QA_PASS"
+      - name: Laudo APK e prova offline de inferencia sem LFM3
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telepatia-android-offline-device-reviewed
+          path: |
+            qa-report/telepatia-apk.sha256
+            qa-report/telepatia-android-device.log
+          retention-days: 30
+          if-no-files-found: error
+      - name: APK candidato APENAS se inferencia real offline aprovou
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Buscador-Hinos-v2.6.21-Telepatia-NLI-Android-QA
+          path: app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 30
+          if-no-files-found: error
