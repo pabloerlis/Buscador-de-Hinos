@@ -95,7 +95,7 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
   const grades=['0','3','2','3','2','3'];
   let cursor=0;
   // O hino duplicado 3 não será enviado ao modelo.
-  while(cursor<4){
+  while(cursor<3){
     const call=emitted[cursor];
     assert.ok(call,'Faltou chamada ao modelo '+cursor);
     window.__ggufNativeEvent('generate',true,grades[cursor],call[1],{tokens:1});
@@ -109,11 +109,11 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
   assert.equal($('gguf-more-two').classList.contains('hidden'),false);
   $('gguf-more-two').click();
   await tick();
-  assert.equal(emitted.length,5);
-  window.__ggufNativeEvent('generate',true,'3',emitted[4][1],{tokens:1});
+  assert.equal(emitted.length,4);
+  window.__ggufNativeEvent('generate',true,'3',emitted[3][1],{tokens:1});
   await tick();
-  assert.equal(emitted.length,6);
-  window.__ggufNativeEvent('generate',true,'2',emitted[5][1],{tokens:1});
+  assert.equal(emitted.length,5);
+  window.__ggufNativeEvent('generate',true,'2',emitted[4][1],{tokens:1});
   await tick();
   assert.equal($('gguf-comparison-actions').children.length,4);
   const text=$('gguf-comparison-text').textContent;
