@@ -85,7 +85,7 @@ def render(core,topic,pair_index,style):
     j=(topic*19+pair_index*13+style*5)%len(OUTRO)
     a,b=INTRO[k],OUTRO[j]
     if style==0:return a+"\n\n"+core
-    if style==1:return core+"\n\n"+b
+    if style==1:return INTRO[(k+11)%len(INTRO)]+"\n\n"+core+"\n\n"+b
     if style==2:return a+"\n\n"+core+"\n\n"+b
     if style==3:return core+" "+b+" "+INTRO[(k+4)%len(INTRO)]
     if style==4:return INTRO[(k+8)%len(INTRO)]+" "+core+" "+b
