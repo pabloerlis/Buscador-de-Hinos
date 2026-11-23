@@ -100,6 +100,15 @@ const api=async(url,payload)=>{
   assert.ok(answer.prompt.includes('sem foco'));
   assert.ok(answer.prompt.length<=2600);
   assert.equal(answer.grammar,'');
+  const longMessage='Pedido atual prioritário: '+'z'.repeat(400);
+  const longAnswer=tool.answerPrompt(longMessage,{
+    preferences:Array(6).fill('Não destacar alegria nem a festa do reencontro'),
+    turns:Array(8).fill({role:'assistant',text:'Última resposta '.repeat(25)})
+  },{tool:'get_hymn_full_lyrics',modelContext:'Letra original: '+'L'.repeat(900)});
+  assert.ok(longAnswer.prompt.length<=1600);
+  assert.ok(longAnswer.prompt.includes('Mensagem nova: '+longMessage));
+  assert.ok(longAnswer.prompt.endsWith('Resposta ao usuário:'));
+
   assert.equal(tool.sanitizeAnswer('<|assistant|>Fala de reconciliação.'),'Fala de reconciliação.');
   const talk=await tool.execute('CONVERSAR','Entendi',session,api,options);
   assert.equal(talk.tool,'none');
