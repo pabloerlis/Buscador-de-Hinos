@@ -1001,7 +1001,7 @@ const HymnChatUI=(()=>{
       const routing=HymnChatTools.planPrompt(userText,session);
       const decision=await generate(routing);
       if(epoch!==sequence)return;
-      const plan=HymnChatTools.readPlan(decision.text);
+      const plan=HymnChatTools.readPlan(decision.text,routing.allowed);
       trace('Decisão LFM3: '+plan+' · '+Math.round(performance.now()-start)+' ms');
       statusLine.textContent=plan==='CONVERSAR'?'Preparando resposta…':
         'Executando consulta '+{BUSCAR:'ao catálogo',LER:'à letra original',BIBLIA:'à Bíblia local'}[plan]+'…';

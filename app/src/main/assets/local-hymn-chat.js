@@ -15,10 +15,23 @@ const HymnChatTools=(()=>{
     return turns.slice(-Math.max(1,Math.min(5,limit))).map(t=>
       (t.role==='assistant'?'IA':'Pessoa')+': '+quote(t.text,140)).join('\n');
   }
+  // Não permitir que o GGUF escolha ferramenta sem os argumentos mínimos.
+  function availableActions(message,session){
+    const hasHymn=(session.candidates||[]).some(h=>
+      Number.isSafeInteger(h.hymn_id)&&h.hymn_id>0);
+    const explicitHymn=/\b(?:hino|número|numero|n[ºo])\s*\d{1,4}\b/i.test(String(message));
+    const bibleRequest=/(?:b[ií]blia|passagem|vers[ií]culo|salmo|jo[aã]o|lucas|mateus|marcos|apocalipse|prov[eé]rbios)/i.test(String(message))||
+      Boolean(session.bibleReference);
+    return ACTIONS.filter(x=>(x!=='LER'||hasHymn||explicitHymn)&&
+      (x!=='BIBLIA'||bibleRequest));
+  }
   function planPrompt(message,session){
     const candidates=(session.candidates||[]).slice(0,5).map(h=>h.hymn_id).join(',');
+    const allowed=availableActions(message,session);
     const prompt=[
-      'Escolha exatamente UMA ação para a conversa, sem responder à pessoa.',
+      'Escolha exatamente UMA ação disponível, sem responder à pessoa.',
+      'Se a pessoa pede procura, seleção ou sugestão de HINOS, escolha BUSCAR. Não escolha LER sem hino previamente identificado.',
+      'Ações disponíveis: '+allowed.join(', ')+'.',
       'BUSCAR: pessoa pediu hinos, recomendação, sugestões, trocar ou refinar resultados.',
       'LER: pessoa pediu conteúdo ou avaliação de um hino já citado.',
       'BIBLIA: pessoa pediu explicar/consultar uma passagem bíblica local.',
@@ -31,12 +44,12 @@ const HymnChatTools=(()=>{
       'Nova mensagem: '+quote(message,MAX_MESSAGE),
       'Ação:'
     ].join('\n');
-    return {prompt:prompt.slice(0,1700),grammar:PLAN_GRAMMAR,maxTokens:15,timeoutMs:12000};
+    return {prompt:prompt.slice(0,1700),grammar:'root ::= '+allowed.map(x=>JSON.stringify(JSON.stringify(x))).join(' | '),allowed,maxTokens:15,timeoutMs:12000};
   }
-  function readPlan(output){
+  function readPlan(output,allowed=ACTIONS){
     let plan;
     try{plan=JSON.parse(String(output).trim());}catch{throw Error('A IA não retornou uma ação válida.');}
-    if(typeof plan!=='string'||!ACTIONS.includes(plan))throw Error('Ação fora da lista permitida.');
+    if(typeof plan!=='string'||!ACTIONS.includes(plan)||!allowed.includes(plan))throw Error('Ação fora da lista permitida.');
     return plan;
   }
   function remember(session,message){
@@ -156,7 +169,7 @@ const HymnChatTools=(()=>{
     if(!cleaned)throw Error('Modelo não produziu resposta legível');
     return cleaned;
   }
-  return {PLAN_GRAMMAR,planPrompt,readPlan,remember,queryFor,extractLyrics,execute,
+  return {PLAN_GRAMMAR,availableActions,planPrompt,readPlan,remember,queryFor,extractLyrics,execute,
     answerPrompt,sanitizeAnswer,MAX_TURNS};
 })();
 if(typeof module!=='undefined'&&module.exports)module.exports=HymnChatTools;

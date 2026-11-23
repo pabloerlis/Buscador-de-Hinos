@@ -14,6 +14,12 @@ const session={topic:'',turns:[],preferences:[],candidates:[],bibleReference:nul
 const plan=tool.planPrompt('Quando o filho pródigo voltou, quero um hino para reconciliação',session);
 assert.ok(plan.prompt.includes('Nova mensagem'));
 assert.ok(plan.grammar.includes('CONVERSAR'));
+assert.ok(!plan.grammar.includes('LER'),'Without hymn, reading tool must not exist');
+assert.ok(!plan.grammar.includes('BIBLIA'),'Without Bible request, Bible tool must not exist');
+assert.deepEqual(tool.availableActions('Procure hinos sobre esperança',session),['BUSCAR','CONVERSAR']);
+assert.throws(()=>tool.readPlan('"LER"',plan.allowed),/fora da lista/);
+assert.ok(tool.planPrompt('Leia hino 20',session).grammar.includes('LER'));
+assert.ok(tool.planPrompt('Consulte Lucas 15:20',session).grammar.includes('BIBLIA'));
 assert.ok(plan.prompt.length<1701);
 tool.remember(session,'Quero hinos sobre o filho pródigo.');
 session.turns.push({role:'user',text:'Quero hinos sobre o filho pródigo.'},
