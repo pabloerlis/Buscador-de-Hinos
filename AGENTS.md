@@ -1,5 +1,15 @@
 # AGENTS.md — verificação obrigatória antes de cada APK
 
+## PRÓXIMA ETAPA PRIORITÁRIA — Codex: significado global da letra (issue #58)
+
+**Status: apenas especificada; NÃO implementada.** Ler obrigatoriamente [issue #58](https://github.com/pabloerlis/Buscador-de-Hinos/issues/58) e [RFC contextual](docs/contextual-semantic-architecture.md) antes de retomar qualquer desenvolvimento. Esta diretriz **substitui como prioridade imediata** as antigas notas de "próxima etapa" distribuídas pelo histórico do README; preserva todas as regras existentes de QA e entrega.
+
+**Primeira subtarefa de implementação (P0/P1):** registrar baseline e incorporar a revisão independente da issue #25; desenvolver esquema versionado de **perfil semântico da letra integral** (mensagem central, perspectiva, abertura/conflito/transformação/desfecho, temas centrais/secundários, menções incidentais, negações e evidências por estrofe/linha); validar um protótipo em amostra diversa contra a busca atual. O hino continua disponível sem perfil. **Não** modificar ranking padrão nem migrar banco na primeira prova de conceito; primeiro demonstrar qualidade e ausência de regressão.
+
+**Depois, em fases separadas:** (P2) E5 dos perfis globais + recuperação ampla independente da página; (P3) reranker por contexto global com verificação de **letra completa** nos finalistas, não apenas snippets; (P4) ferramentas locais controladas para LFM3/llama.cpp — **sem obrigatoriedade de MCP**; (P5) otimização/benchmarks ARM64; (P6) expansão e gabarito humano >=100 consultas. Preservar E5, RRF, lexical, Bíblia, narrativas, EventFrame, repertório e GGUF, sem exceções hardcoded por hino.
+
+**Critérios de aceite:** gabarito e relatórios independentes (revisão humana não pode ser substituída por julgamento gerado), Recall@50/Precision@5/nDCG@5 e falsos positivos antes/depois, checagem de evidências/hash e negações, testes existentes + agentes 8/9 + auditoria de letras completas + emulador offline, sem letras no Git/APK/relatórios. Para toda mudança funcional, novo APK completo e distinto com E5 ONNX + motor GGUF ARM64, assinatura, SHA e entrega ao usuário; sem afirmar teste físico não realizado. Deixar a próxima issue/etapa documentada e PR draft, sem merge automático.
+
 Este projeto utiliza **agentes automatizados do GitHub Actions** (jobs independentes de validação), não agentes de IA que substituem testes.
 
 ## Regra obrigatória de conclusão, testes e entrega ao usuário
