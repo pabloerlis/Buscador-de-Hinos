@@ -689,7 +689,7 @@ const OfflineAPI = (() => {
       const explanations=[...(eventResult?.reason?[eventResult.reason]:[]),...(graphResult?.reasons||[]),
         ...(storyResult?.reasons||[]),...(semanticResult?.proof||[])].slice(0,3);
       const selectedRef=numberMatch? song.collectionRefs.find(ref=>Number(ref.number)===Number(numberMatch[2])&&(!namedCollection||ref.id===namedCollection)) : song.collectionRefs.find(ref=>opts.collections[ref.id]!==false);
-      ranked.push({id:song.id,number:selectedRef?.number||song.number,title:song.title,collection:selectedRef?.name||song.collection,collection_ids:song.collections.slice(),edition:selectedRef?.edition||song.edition,
+      ranked.push({id:song.id,_familyId:familyById.get(song.id)||song.id, family_ids:familyOf(song.id).map(member=>member.id), number:selectedRef?.number||song.number,title:song.title,collection:selectedRef?.name||song.collection,collection_ids:song.collections.slice(),edition:selectedRef?.edition||song.edition,
         topics:[...new Set([...(graphResult?.matched||[]),...(storyResult?.matched||[]),...song.topics])].slice(0,7),
         spelling,sharedPassage,cues:[...requiredCriteria.flatMap(criterion=>matchesTopic(criterion)?.evidence||[]),
           ...(graphResult?.cues||[]),...(storyResult?.cues||[]),...(semanticResult?.cues||[])],
