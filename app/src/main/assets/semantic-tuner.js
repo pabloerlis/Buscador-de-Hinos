@@ -47,7 +47,13 @@
     // on lyrics that match through lexical evidence but have no E5 vector.
     const topical=clamp(Math.max(clamp(item.relevance_percent)*.55,
       Math.min(100,lexical*4+semantic*2.2+Math.max(0,vector-70)*2.4)));
-    const narrativeScore=clamp(Math.max(narrative*3.8,biblical*2.2,tier*18));
+    const baseNarrative=clamp(Math.max(narrative*3.8,biblical*2.2,tier*18));
+    // Ordem categórica de decisão NLI (NÃO probabilidade), aplicada apenas
+    // quando o modelo foi realmente executado e devolveu um rótulo válido.
+    const nliLevels={entailment:100,neutral:50,contradiction:0};
+    const nli=Object.prototype.hasOwnProperty.call(nliLevels,item?.nli_label)
+      ?nliLevels[item.nli_label]:null;
+    const narrativeScore=nli===null?baseNarrative:clamp(.35*baseNarrative+.65*nli);
     const eventScore=clamp(actions*7.5);
     return {topic:topical,narrative:narrativeScore,events:eventScore};
   }
