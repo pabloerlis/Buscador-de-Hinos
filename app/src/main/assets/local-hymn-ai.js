@@ -3,7 +3,9 @@
 const LocalHymnAI = (() => {
   const MAX_CANDIDATES = 5;
   const MAX_PICKS = 2;
-  const COMPARISON_TIMEOUT_MS = 20000;
+  // Medição em Android x86_64: 20s pode expirar antes do primeiro resultado GBNF.
+  // Limite explícito de 35s, não ocultar demora nem assumir latência ARM64.
+  const COMPARISON_TIMEOUT_MS = 35000;
   const MAX_THEME_OPTIONS = 8;
   const LOOKUP_CHARACTERS = 'A-Za-zÀ-ÖØ-öø-ÿ ';
   const invalidLookupCharacter = new RegExp(`[^${LOOKUP_CHARACTERS}]`);
