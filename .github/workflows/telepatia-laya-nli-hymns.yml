@@ -1,0 +1,96 @@
+name: Teste REAL telepatia Laya PT ES NLI — 31 hinos e 48 controles
+on:
+  push:
+    branches:
+      - experiment/telepatia-laya-nli-hymns-20261123
+    paths:
+      - scripts/qa_telepatia_laya_nli_hymns.py
+      - .github/workflows/telepatia-laya-nli-hymns.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  cpu_real_model:
+    name: "Telepatia Laya PT ES NLI CPU: 31 historicos + 48 dev"
+    runs-on: ubuntu-latest
+    timeout-minutes: 70
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Preparar bibliotecas da mesma familia usadas nos testes anteriores
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.5.1" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "laya==0.4.20" "transformers==4.57.3" "huggingface-hub>=0.34,<1.0"
+          python -m py_compile scripts/qa_telepatia_laya_nli_hymns.py
+      - name: Importar relatorio original do Laya sem mudar as respostas antigas
+        uses: actions/download-artifact@v4
+        with:
+          name: laya-multilingual-real-benchmark
+          run-id: 45247089241
+          github-token: ${{ github.token }}
+          path: .tmp/original
+      - name: Importar relatorio do Laya ajustado com 1440 exemplos
+        uses: actions/download-artifact@v4
+        with:
+          name: laya-1440-finetune-metrics
+          run-id: 45258854115
+          github-token: ${{ github.token }}
+          path: .tmp/1440
+      - name: Importar 288 controles auditados e seus hashes
+        uses: actions/download-artifact@v4
+        with:
+          name: laya-1440-dataset-reviewed
+          run-id: 45257257213
+          github-token: ${{ github.token }}
+          path: .tmp/audited
+      - name: Recuperar catalogo usado no benchmark fixo
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output .tmp/catalog.json
+          test "$(wc -c < .tmp/catalog.json)" -gt 100000
+          python scripts/qa_laya_1440_generator.py --out .tmp/reconstructed
+          python - <<'PY'
+          import hashlib,pathlib
+          for name in ("train.jsonl","dev.jsonl","manifest.json"):
+              frozen=pathlib.Path(".tmp/audited")/name
+              recreated=pathlib.Path(".tmp/reconstructed")/name
+              assert frozen.is_file() and recreated.is_file(),name
+              assert hashlib.sha256(frozen.read_bytes()).digest()==hashlib.sha256(recreated.read_bytes()).digest(),f"Mismatch {name}"
+          print("Audited dataset hashes identical",flush=True)
+          PY
+      - name: Inferencia REAL em CPU no checkpoint Telepatia e comparacao pareada
+        env:
+          OMP_NUM_THREADS: "4"
+          TOKENIZERS_PARALLELISM: "false"
+          HF_HUB_DISABLE_TELEMETRY: "1"
+          USE_TF: "0"
+          PYTHONUNBUFFERED: "1"
+        run: |
+          set -euo pipefail
+          OLD_REPORT="$(find .tmp/1440 -type f -name 'laya-1440-finetune-result.json' -print -quit)"
+          BASE_REPORT="$(find .tmp/original -type f -name 'laya-multilingual-real.json' -print -quit)"
+          test -n "$OLD_REPORT"
+          test -n "$BASE_REPORT"
+          python scripts/qa_telepatia_laya_nli_hymns.py \
+            --catalog .tmp/catalog.json \
+            --baseline "$BASE_REPORT" \
+            --old-trained "$OLD_REPORT" \
+            --dev .tmp/audited/dev.jsonl \
+            --dev-meta .tmp/reconstructed/dev.audit.jsonl \
+            --output qa-report/telepatia-laya-pt-es-nli.json
+      - name: Publicar apenas metricas sem letras reais ou arquivos de modelos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telepatia-laya-nli-real-benchmark
+          path: qa-report/telepatia-laya-pt-es-nli.json
+          retention-days: 90
+          if-no-files-found: warn
