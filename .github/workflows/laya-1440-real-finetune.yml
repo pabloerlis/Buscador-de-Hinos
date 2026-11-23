@@ -89,7 +89,7 @@ jobs:
             --manifest .tmp/reviewed/manifest.json \
             --catalog .tmp/catalog.json \
             --baseline .tmp/original/laya-multilingual-real.json \
-            --previous-small .tmp/small/laya-small-finetune.json \
+            --previous-small "$(find .tmp/small -type f -name laya-small-finetune.json -print -quit)" \
             --checkpoint .tmp/laya-1440/checkpoint \
             --output qa-report/laya-1440-finetune-result.json
       - name: Publicar as metricas e status sem letras reais nem pesos
