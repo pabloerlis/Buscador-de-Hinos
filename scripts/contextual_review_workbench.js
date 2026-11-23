@@ -163,10 +163,13 @@ async function main(){
     .find(x=>!completed.has(profiles?x.sample_id:x.task_id));
   if(!row){console.log('Todos os itens desse tipo já foram registrados.');return;}
   const h=byId.get(row.hymn_id);
+  console.log('\nTarefa: '+(profiles?'PERFIL INTEGRAL':'RELEVÂNCIA DA CONSULTA'));
+  if(!profiles)console.log('Consulta: '+row.query+' | posição original: '+(row.baseline_position??'fora do top 10'));
   showLines(h);
   if(action==='inspect')return;
   if(action==='profile-template'){
     const file=localFile+'.profile-'+row.sample_id+'.json';
+    if(fs.existsSync(reviewPath(file)))throw Error('Rascunho existente; revise-o antes de criar outro');
     writeLocal(file,templateProfile(h,row));
     console.log('Perfil local pendente criado: '+reviewPath(file));return;
   }

@@ -73,7 +73,7 @@ invalid.annotation.stanzas[0].evidence_line_ids=['s1:l0'];
 assert.throws(()=>W.validateProfileDraft(invalid,sample,h),/Perfil inválido/);
 assert.throws(()=>W.validateProfileDraft(draft,sample,{
   ...h,lyrics:h.lyrics.replace('concluiu','cancelou')
-}),/edição/);
+}),/edição/i);
 const stats=W.counts(queue,{labels:[label],profiles:[result]});
 assert.equal(stats.labels_done,1);
 assert.equal(stats.profiles_done,1);
