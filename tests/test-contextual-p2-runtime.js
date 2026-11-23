@@ -10,6 +10,7 @@ const songs=Array.from({length:42},(_,i)=>({
       'Ao amanhecer encontramos paz.\nA esperança renova a fé.\n\nA confiança acompanha o coração.\nO amor permanece.':
       'A esperança alcança os que sofrem.\nA fé protege no caminho.\n\nA esperança se renova.\nA alegria continua.'
 }));
+for(let i=0;i<songs.length;i++)songs[i].content+='\n\nMarcador exclusivo do teste '+(i+1)+'.';
 (async()=>{
  const api=makeRuntime();
  const imported=await api.request('/api/import',{data:[{name:'Coletânea 2018',songs}]});
