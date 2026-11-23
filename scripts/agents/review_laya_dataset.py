@@ -27,7 +27,10 @@ def words(s):
     return re.findall(r"[a-zà-ÿ]+",unicodedata.normalize("NFC",s.lower()),re.I)
 
 def norm(s):
-    return " ".join(words(s))
+    # Preserve digits (2018) and strip diacritics for catalog collection names.
+    decomposed=unicodedata.normalize("NFKD",s.lower())
+    simple="".join(c for c in decomposed if not unicodedata.combining(c))
+    return " ".join(re.findall(r"[a-z0-9]+",simple))
 
 def key(s):
     return hashlib.sha256(norm(s).encode()).hexdigest()
