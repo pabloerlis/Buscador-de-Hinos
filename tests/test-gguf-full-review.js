@@ -15,12 +15,18 @@ assert.match(cpp,/cp\.n_ctx=3072/);
 assert.match(cpp,/n_tokens>2500/);
 assert.match(html,/id="gguf-review-model"/);
 assert.match(html,/id="gguf-more-two"/);
+assert.match(html,/id="candidate-pool"/);
+assert.match(html,/id="ai-context-status"/);
 const ai=vm.runInNewContext(aiSource+'\nLocalHymnAI');
 const input='Retorno, arrependimento e acolhimento.';
 const complete='O filho saiu da casa do pai.\n\nDepois decidiu voltar.\nO pai o recebeu com amor.';
 const request=ai.prepareFullReview(input,[],{id:2,title:'Volta',lyrics:complete},{reference:'Lucas 15'});
 assert.match(request.prompt,/O filho saiu da casa do pai/);
 assert.match(request.prompt,/O pai o recebeu com amor/);
+const narrative=ai.prepareFullReview('Uma narrativa de retorno',[],{title:'Qualquer',lyrics:complete},
+  {narratives:[{label:'Exemplo genérico',description:'Afastamento, decisão de voltar e acolhimento.'}]});
+assert.match(narrative.prompt,/SIGNIFICADO DO CONTEXTO: Exemplo genérico/);
+assert.match(narrative.prompt,/Afastamento, decisão de voltar e acolhimento/);
 assert.equal(ai.readFullReview('3').approved,true);
 assert.equal(ai.readFullReview('2').approved,true);
 assert.equal(ai.readFullReview('1').approved,false);
@@ -30,7 +36,7 @@ assert.equal(ai.prepareFullReview(input,[],{lyrics:'x'.repeat(8501)}),null);
 
 const ggufSource=appSource.slice(appSource.indexOf('const GGUF='),appSource.lastIndexOf('refreshStatus().catch'));
 const hymns=[
-  {id:1,title:'Hino A',number:'001',lyrics:'O céu é maravilhoso.'},
+  {id:1,title:'Hino A',number:'001',lyrics:'O pai e o filho se encontraram no céu, onde cantaram belos hinos de alegria.'},
   {id:2,title:'Hino B',number:'002',lyrics:complete},
   {id:3,title:'Hino B duplicado',number:'003',lyrics:complete},
   {id:4,title:'Hino C',number:'004',lyrics:'Saí do caminho.\nMas voltei, e fui perdoado.'},
@@ -86,12 +92,15 @@ const context={
 };
 vm.createContext(context);
 vm.runInContext(aiSource+ggufSource,context);
+const gguf=vm.runInContext('GGUF',context);
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 (async()=>{
-  $('gguf-review-model').click();
+  assert.equal($('candidate-pool').open,false,'Índice bruto fica recolhido com GGUF pronto');
+  gguf.maybeVerifySearch();
   await tick();
   assert.equal(emitted.length,1);
-  assert.match(emitted[0][0],/O céu é maravilhoso/);
+  assert.match(emitted[0][0],/O pai e o filho se encontraram no céu/);
+  assert.match($('candidate-pool-title').textContent,/NÃO avaliados pela IA/);
   const grades=['0','3','2','3','2','3'];
   let cursor=0;
   // O hino duplicado 3 não será enviado ao modelo.
@@ -101,6 +110,8 @@ const tick=()=>new Promise(resolve=>setImmediate(resolve));
     window.__ggufNativeEvent('generate',true,grades[cursor],call[1],{tokens:1});
     cursor++;
     await tick();
+    assert.doesNotMatch($('gguf-comparison-text').textContent,/Hino A/,
+      'Coincidência de pai, filho e céu não obriga aprovação pelo aplicativo');
   }
   assert.equal($('gguf-comparison-actions').children.length,2);
   assert.match($('gguf-comparison-text').textContent,/Hino B/);
