@@ -4,9 +4,9 @@
  * API compatível com @huggingface/tokenizers 0.2.0 (pure JS, sem backend remoto).
  */
 (function(root,make){
-  const module=make();
-  if(typeof exports==='object'&&typeof module!=='undefined'&&module.exports)module.exports=module;
-  if(root)root.TelepatiaSequence=module;
+  const api=make();
+  if(typeof module!=='undefined'&&module.exports)module.exports=api;
+  if(root)root.TelepatiaSequence=api;
 })(typeof window==='object'?window:null,function(){
   const LABELS=Object.freeze(['contradiction','entailment','neutral']);
   const CRITERIA=Object.freeze({
