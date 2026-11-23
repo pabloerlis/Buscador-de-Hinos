@@ -8,7 +8,7 @@
       "cases": [
         [
           "Longe do pai, o filho consumiu os bens, arrependeu-se na miséria, voltou ao lar e foi recebido com abraço.",
-          "Longe do pai, o filho consumiu os bens, mas construiu outra vida e decidiu não procurar o lar.",
+          "Longe do pai, o filho consumiu os bens, mas construiu outra vida e decidiu estabelecer-se definitivamente em outra região.",
           "ausencia_retorno"
         ],
         [
@@ -23,7 +23,7 @@
         ],
         [
           "Depois de cair em pobreza, o filho reconheceu sua culpa, apresentou-se humilde ao pai e foi recebido com misericórdia.",
-          "Depois de cair em pobreza, o filho reconheceu sua culpa e escreveu ao pai, que nunca chegou a encontrá-lo.",
+          "Depois de cair em pobreza, o filho reconheceu sua culpa e escreveu ao pai, mas a carta perdeu-se no trajeto.",
           "encontro_ausente"
         ],
         [
@@ -73,13 +73,13 @@
       "outcome": "A mulher tocou nas vestes de Jesus e recebeu cura de sua enfermidade.",
       "cases": [
         [
-          "Há muitos anos enferma, a mulher atravessou a multidão, tocou o manto de Jesus e recuperou a saúde.",
-          "Há muitos anos enferma, a mulher atravessou a multidão, mas seguiu sem chegar perto de Jesus.",
+          "Há muitos anos enferma, a mulher não desistiu: atravessou a multidão, tocou o manto de Jesus e recuperou a saúde.",
+          "Há muitos anos enferma, a mulher atravessou a multidão, mas desviou-se do caminho antes de encontrar Jesus.",
           "toque_ausente"
         ],
         [
           "Mesmo fraca, ela alcançou a borda da roupa do Mestre com fé; naquele instante o sofrimento cessou.",
-          "Mesmo fraca, ela alcançou a borda da roupa de um viajante, sem qualquer mudança na enfermidade.",
+          "Mesmo fraca, ela alcançou a borda da roupa de um viajante, enquanto a enfermidade continuava.",
           "ator_errado"
         ],
         [
@@ -89,7 +89,7 @@
         ],
         [
           "No caminho, a mulher doente confiou em Jesus, tocou sua capa e recebeu o milagre que tanto procurava.",
-          "No caminho, a mulher doente confiou em Jesus e o ouviu ensinar, sem tocar sua capa nem receber cura.",
+          "No caminho, a mulher doente confiou em Jesus e o ouviu ensinar enquanto sua dor persistia.",
           "episodio_parcial"
         ],
         [
@@ -144,8 +144,8 @@
           "sem_perda"
         ],
         [
-          "Ao perceber que faltava um animal, o pastor saiu pelo vale, achou a ovelhinha e voltou com ela nos braços.",
-          "Ao perceber que faltava um animal, o pastor percorreu o vale e regressou sem localizar a ovelhinha.",
+          "Ao perceber que faltava um animal, o pastor não desistiu: saiu pelo vale, achou a ovelhinha e voltou com ela nos braços.",
+          "Ao perceber que faltava um animal, o pastor percorreu o vale e regressou de mãos vazias.",
           "resgate_falhou"
         ],
         [
@@ -215,7 +215,7 @@
           "causa_natural"
         ],
         [
-          "Uma tempestade surpreendeu a embarcação; os discípulos clamaram, Jesus repreendeu o vento e as águas sossegaram.",
+          "Uma tempestade surpreendeu a embarcação; os discípulos não conseguiam controlá-la, clamaram, e Jesus repreendeu o vento até as águas sossegarem.",
           "Uma tempestade surpreendeu a embarcação; os discípulos clamaram, mas a cena termina enquanto as ondas aumentam.",
           "desfecho_ausente"
         ],
@@ -231,7 +231,7 @@
         ],
         [
           "Quando o vento se ergueu contra a travessia, o Senhor pronunciou sua ordem e a tempestade cedeu.",
-          "Quando o vento se ergueu contra a travessia, o Senhor ensinou sobre esperança, sem ordenar nada às águas.",
+          "Quando o vento se ergueu contra a travessia, o Senhor ensinou sobre esperança enquanto a tormenta continuava.",
           "falta_acao"
         ],
         [
@@ -272,7 +272,7 @@
       "cases": [
         [
           "Após o roubo na estrada, o ferido foi acolhido por um samaritano que cuidou das feridas e pagou sua hospedagem.",
-          "Após o roubo na estrada, o ferido foi visto por vários viajantes, mas permaneceu caído sem receber socorro.",
+          "Após o roubo na estrada, o ferido foi visto por vários viajantes, mas permaneceu caído e abandonado no caminho.",
           "ausencia_socorro"
         ],
         [
@@ -291,7 +291,7 @@
           "agente_alternativo"
         ],
         [
-          "Quando encontrou o peregrino machucado, o samaritano aproximou-se, fez curativos e providenciou descanso protegido.",
+          "Quando encontrou o peregrino machucado, o samaritano não passou adiante: aproximou-se, fez curativos e providenciou descanso protegido.",
           "Quando encontrou o peregrino machucado, o samaritano apenas o aconselhou a continuar pela estrada.",
           "apoio_insuficiente"
         ],
@@ -353,7 +353,7 @@
         ],
         [
           "Jesus chamou pelo nome o homem que subira à árvore, visitou seu lar e presenciou sua mudança de vida.",
-          "Jesus chamou pelo nome um homem no mercado e recebeu dele uma oferta, sem visitar a casa de Zaqueu.",
+          "Jesus chamou pelo nome um homem no mercado e recebeu dele uma oferta; a casa de Zaqueu permaneceu vazia.",
           "personagem_diferente"
         ],
         [
@@ -362,7 +362,7 @@
           "desfecho_invertido"
         ],
         [
-          "O publicano que buscava ver o Mestre foi convidado a recebê-lo em casa e reconheceu o dever de reparar seus erros.",
+          "O publicano que buscava ver o Mestre não ignorou o convite: recebeu-o em casa e reconheceu o dever de reparar seus erros.",
           "O publicano que buscava ver o Mestre escutou uma parábola, mas sua reação não passou de curiosidade.",
           "historia_parcial"
         ],
@@ -413,7 +413,7 @@
           "escala_errada"
         ],
         [
-          "Mesmo com escassez, o Mestre fez render os pães e os peixes e ninguém voltou da reunião com fome.",
+          "Mesmo com a escassez que não permitiria alimentar a todos, o Mestre fez render os pães e peixes e ninguém voltou com fome.",
           "Mesmo com escassez, o Mestre ensinou sobre confiança e pediu à multidão que procurasse comida na cidade.",
           "resultado_alternativo"
         ],
@@ -672,7 +672,7 @@
           "pedido_diferente"
         ],
         [
-          "A rainha decidiu enfrentar o perigo, apresentou-se ao soberano e intercedeu pelos que estavam ameaçados.",
+          "A rainha não recuou diante do perigo: apresentou-se ao soberano e intercedeu pelos que estavam ameaçados.",
           "A rainha decidiu enfrentar o perigo, mas enviou apenas uma carta e a narrativa não relata proteção ao povo.",
           "resultado_ausente"
         ],
@@ -738,7 +738,7 @@
           "reencontro_ausente"
         ],
         [
-          "Após anos de separação, José, agora governante, reconheceu os irmãos que o venderam e escolheu perdoá-los.",
+          "Após anos de separação, José, agora governante, reconheceu os irmãos que o venderam e não os castigou; escolheu perdoá-los.",
           "Após anos de separação, José, agora governante, reconheceu os irmãos e ordenou que fossem presos para sempre.",
           "perdao_negado"
         ],
