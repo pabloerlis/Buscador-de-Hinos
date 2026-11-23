@@ -132,6 +132,15 @@ jobs:
             --output .tmp/catalog-2018.json
       - name: "Tres agentes independentes: texto integral, casos negativos e ranking"
         run: node tests/agents/run-validation.js .tmp/catalog-2018.json
+      - name: Preparar fila de revisão P1 com catálogo real, sem letras no artefato
+        run: node scripts/qa_contextual_review.js .tmp/catalog-2018.json reports/validation/resultado-agentes.json qa-report/contextual-review-queue.json
+      - name: Preservar somente IDs, hashes e tarefas para revisão humana
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-review-p1-qa
+          path: qa-report/contextual-review-queue.json
+          retention-days: 90
+          if-no-files-found: error
       - name: Guardar laudos tecnico e resumido sem publicar letras
         if: always()
         uses: actions/upload-artifact@v4
