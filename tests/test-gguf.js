@@ -41,7 +41,7 @@ assert.match(cpp,/params\.load_mode=LLAMA_LOAD_MODE_MMAP/);
 assert.doesNotMatch(cpp,/params\.use_mmap|params\.use_mlock|params\.use_direct_io/);
 assert.match(cpp,/llama_log_set/);
 assert.match(cpp,/progress_callback=modelProgress/);
-assert.match(cpp,/cp\.n_ctx=1280/);
+assert.match(cpp,/cp\.n_ctx=3072/);
 assert.match(cpp,/cp\.n_batch=96/);
 assert.match(cpp,/llama_chat_apply_template/);
 assert.match(cpp,/llama_decode/);
@@ -139,7 +139,7 @@ assert.equal(merged.hymns.at(-1).id,6);
 
 const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
-function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true}={}){
+function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true,prepareReviews=false}={}){
   const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];
   let now=0;
   const $=id=>{
@@ -158,8 +158,12 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
   const {gguf,search}=vm.runInNewContext(aiSource+searchSource+ggufSource+'\n({gguf:GGUF,search:performSearch})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>messages.push(text),showResults(){},
     document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
     OfflineAPI:{normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
+    searchRestrictions:()=>({exclude:state.exclude||[],deprioritize:state.deprioritize||[],require:state.requiredTerms||[]}),
     jsonRequest:async(url,payload)=>{
+      if(prepareReviews&&url==='/api/repertoire')return {not_learned:[]};
+      if(prepareReviews&&url.startsWith('/api/hymns/'))return {...hymns.find(h=>h.id===Number(url.split('/').at(-1))),lyrics:'O filho saiu e voltou arrependido. O pai o recebeu em casa.'};
       requests.push(payload);
+      if(prepareReviews&&payload?._forRecommendations)return {_fullRanked:hymns};
       if(additionalSearch&&payload.settings.pageSize===10)return additionalSearch();
       return {results:hymns,effective_query:payload.query,excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
     },
@@ -297,6 +301,19 @@ async function checkBridge(){
   await offline.search('com esperança',{refine:true});
   assert.deepEqual(offline.requests.at(-1).deprioritize,['tristeza']);
   assert.equal(offline.calls.length+offline.embeddings.length,0);
+  const verified=setup({ready:true,auto:false,nativeModel:true,prepareReviews:true});
+  assert.equal(await verified.search('História de alguém que voltou para casa'),true);
+  await tick();
+  assert.equal(verified.$('candidate-pool').open,false,
+    'O índice determinístico não deve ser apresentado automaticamente como recomendação da IA');
+  assert.match(verified.$('candidate-pool-title').textContent,/NÃO avaliados pela IA/);
+  assert.equal(verified.calls.length,1,'A leitura integral deve começar automaticamente');
+  assert.match(verified.calls[0][0],/LETRA INTEGRAL/);
+  const reviewId=verified.calls[0][1];
+  verified.complete(reviewId,'0');
+  await tick();
+  assert.equal(verified.$('gguf-comparison-actions').children.length,0,
+    'Rejeição genérica da IA não pode exibir candidato só por semelhança lexical');
   console.log('GGUF: diagnóstico, consulta complementar, filtragem, validação, cancelamento e temas estruturados aprovados.');
 }
 

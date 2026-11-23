@@ -63,5 +63,30 @@ const filter=(id)=>({collections:{principal:id==='principal',avulsos:id==='avuls
  const stored=cache.get('hymns');assert.equal(stored.hymns.length,5);assert.equal(stored.hymns[0].collectionRefs.length,2);
  assert.match(read('index.html'),/id="collection-cia"/);assert.match(read('index.html'),/data-collection="avulsos"/);
  assert.match(read('app.js'),/settings-collection-counts/);
+ // Mesma canção em duas coletâneas, com pequena diferença de escrita.
+ // O índice interno preserva os dois IDs, mas a busca mostra um só hino
+ // e informa todas as origens. Um verso negado NÃO pode ser agrupado.
+ const longLyric=Array.from({length:160},(_,i)=>'palavra'+String(i).padStart(3,'0')).join(' ');
+ const lyricVariant=longLyric.replace('palavra071','palavraM071');
+ const negativeVariant=longLyric.replace('palavra071','nao palavra071');
+ const variants=await api.request('/api/import',{data:[
+   {name:'Coletânea 2018',songs:[{title:'081 - Canção das Etapas',content:longLyric}]},
+   {name:'Avulsos 2018',songs:[{title:'082 - Canção das Etapas',content:lyricVariant}]},
+   {name:'CIA 2018',songs:[{title:'083 - Canção das Etapas',content:negativeVariant}]}
+ ]});
+ assert.equal(variants.added,3,'Variantes continuam com IDs internos próprios para o E5');
+ const joined=await api.request('/api/search',{query:'Canção das Etapas'});
+ const family=joined.results.filter(h=>h.title==='Canção das Etapas');
+ assert.equal(family.length,2,'Duas edições equivalentes viram um resultado; versão negada continua distinta');
+ assert.equal(family.filter(h=>h.collection_refs.length===2).length,1);
+ const mergedCard=family.find(h=>h.collection_refs.length===2);
+ assert.deepEqual([...mergedCard.collection_refs.map(ref=>ref.id)].sort(),['avulsos','principal']);
+ const mergedDetail=await api.request('/api/hymns/'+mergedCard.id);
+ assert.equal(mergedDetail.collectionRefs.length,2,'Detalhe conserva a numeração em cada coletânea');
+ const rawRank=await api.request('/api/search',{query:'Canção das Etapas',_forRecommendations:true});
+ assert.equal(rawRank._fullRanked.filter(h=>h.title==='Canção das Etapas').length,3,'O ranking bruto continua íntegro');
+ assert.equal((await api.request('/api/search',{query:'Hino 081'})).results.length,1);
+ assert.equal((await api.request('/api/search',{query:'Hino 082'})).results.length,1);
+ assert.equal((await api.request('/api/search',{query:'Hino 083'})).results.length,1);
  console.log('v1.9: múltiplas coleções, filtros, numeração, deduplicação, reimportação e recomendações aprovados.');
 })().catch(e=>{console.error(e);process.exitCode=1;});

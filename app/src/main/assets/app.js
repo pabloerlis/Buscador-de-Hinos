@@ -48,7 +48,10 @@ function busySearch(value){
 }
 function resultCard(hymn,{unlearned=false}={}){
   const number=hymn.number?`HINO ${escapeHTML(hymn.number)}`:'HINO SEM NÚMERO';
-  const collection=`<span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>`;
+  const sources=Array.isArray(hymn.collection_refs)?hymn.collection_refs:[];
+  const collection=sources.length>1
+    ?sources.map(ref=>`<span class="library-tag">${escapeHTML(ref.name||ref.id)}${ref.number?' nº '+escapeHTML(ref.number):''}</span>`).join(' ')
+    :`<span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>`;
   const tags=(hymn.topics||[]).slice(0,3).map(t=>`<span class="small-tag">${escapeHTML(t)}</span>`).join('');
   const klass=hymn.relevance==='Muito relevante'?'':hymn.relevance==='Relevante'?'mid':'low';
   const scoreLabel=hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
@@ -129,8 +132,9 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     toast(error.message);
   }finally{busySearch(false);}
   if(succeeded&&page===1&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
-  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
+  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && !semanticHints.length && !GGUF.verificationEnabled()) GGUF.maybeAuto(state.effectiveQuery);
   GGUF.info?.();
+  if(succeeded && page===1 && !state.exactNumber) GGUF.maybeVerifySearch?.();
   return succeeded;
 }
 function searchRestrictions(){
@@ -569,13 +573,55 @@ const GGUF=(()=>{
   const selectedState={ready:false,busy:false,task:null};
   let nextRequest=0,queuedAuto=null;
   const aiCache=new Map();
+  const reviewedByContext=new Map();
+  let lyricSession=null,reviewPreparing=false;
+  const REVIEW_BATCH_TARGET=2,REVIEW_MAX_SCANNED=12;
   const MAX_AI_MS=12000;
+  let autoStartedEpoch=-1,queuedVerificationEpoch=null,lastVerifiedView=null;
   const canUseTopics=()=>!state.exactNumber&&state.searchSettings.mode!=='literal';
   const phases={none:'Sem modelo',selected:'Arquivo selecionado',copying:'Copiando GGUF',loading:'Carregando modelo',ready:'GGUF carregado',generating:'IA em execução',error:'Falha ao carregar',unavailable:'Motor indisponível'};
   const generationStages=['Aguardando o motor…','Preparando contexto…','Processando entrada…','Gerando resposta…'];
   function nativeStatus(){try{return JSON.parse(native()?.status?.()||'{}');}catch(e){return {};}}
   function setActivity(active,text){$('ai-activity').classList.toggle('hidden',!active);$('ai-progress').textContent=text||'';}
   function showTask(title,detail){$('ai-task').textContent=title;$('ai-detail').textContent=detail;}
+  function verificationEnabled(){
+    return !!(selectedState.ready&&state.ready&&state.effectiveQuery&&!state.exactNumber&&
+      state.searchSettings.mode!=='literal');
+  }
+  function syncCandidateDisplay(){
+    const verified=verificationEnabled(),pool=$('candidate-pool');
+    if(lastVerifiedView!==verified){
+      // Com o GGUF, não apresentar a recuperação lexical como recomendação já conferida.
+      pool.open=!verified;
+      lastVerifiedView=verified;
+    }
+    $('candidate-pool-title').textContent=verified
+      ?'Candidatos do índice (NÃO avaliados pela IA; toque para inspecionar)'
+      :'Resultados do índice local (SEM verificação contextual de letra)';
+    const live=$('ai-context-status');
+    live.classList.toggle('hidden',!verified);
+    if(!verified)return;
+    const session=lyricSession?.epoch===state.searchEpoch?lyricSession:null;
+    const approved=session?.queue.approved.length||0;
+    if(selectedState.task?.type==='lyric-review')
+      live.textContent='Verificando a letra inteira antes de recomendar. Aprovados: '+approved+'.';
+    else if(session)
+      live.textContent=approved
+        ?'A IA aprovou '+approved+' hino(s) após ler a letra. Consulte as recomendações acima ou solicite mais 2.'
+        :'Nenhum hino aprovado neste lote. Você pode solicitar uma nova avaliação de candidatos.';
+    else live.textContent='Preparando a avaliação das letras completas. Nenhum candidato é considerado aprovado apenas por conter palavras da busca.';
+  }
+  function maybeVerifySearch(){
+    if(!verificationEnabled())return;
+    const epoch=state.searchEpoch;
+    if(autoStartedEpoch===epoch)return;
+    if(selectedState.task||reviewPreparing||state.busy){
+      queuedVerificationEpoch=epoch;return;
+    }
+    queuedVerificationEpoch=null;
+    autoStartedEpoch=epoch;
+    void requestTwoReviewedHymns();
+  }
   function updateIndicator(status){
     const phase=status.phase||(status.loaded?'ready':status.selected?'selected':'none');
     const active=phase==='copying'||phase==='loading'||phase==='generating';
@@ -604,7 +650,9 @@ const GGUF=(()=>{
     $('gguf-improve').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||!canUseTopics();
     $('gguf-compare').disabled=!state.lastResults.length;
     $('gguf-compare-model').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
-    $('gguf-compare-model').textContent=state.lastResults.length<2?'Buscar hinos com IA':'Comparar com IA';
+    $('gguf-review-model').disabled=!selectedState.ready||selectedState.busy||reviewPreparing||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
+    $('gguf-more-two').disabled=!selectedState.ready||selectedState.busy||reviewPreparing||state.busy||state.repertoirePending;
+    $('gguf-compare-model').textContent='Comparar trechos (exploratório)';
     $('gguf-test').disabled=!selectedState.ready||selectedState.busy;
     $('gguf-cancel').disabled=!selectedState.task; if($('ai-cancel'))$('ai-cancel').classList.toggle('hidden',!selectedState.task);
     $('modal-ai-ask').disabled=!state.currentHymn;
@@ -623,6 +671,7 @@ const GGUF=(()=>{
     $('ai-workspace').classList.toggle('hidden',!selectedState.ready&&!selectedState.busy);
     $('gguf-banner-text').textContent=selectedState.ready?'IA local disponível':'Carregue um GGUF em Configurações para usar a IA.';
     updateIndicator(status);
+    syncCandidateDisplay();
     return status;
   }
   function resetTask(message,failed=false){
@@ -634,6 +683,7 @@ const GGUF=(()=>{
     const next=queuedAuto;
     queuedAuto=null;
     if(next?.epoch===state.searchEpoch)maybeAuto(next.query);
+    if(queuedVerificationEpoch===state.searchEpoch){queuedVerificationEpoch=null;maybeVerifySearch();}
   }
   function cancelIfBusy(){
     const task=selectedState.task;
@@ -644,7 +694,7 @@ const GGUF=(()=>{
     showTask('Interrompendo IA','A busca local continua disponível, sem aguardar o GGUF.');
   }
   function cancelSearchTask(){
-    queuedAuto=null;
+    queuedAuto=null;queuedVerificationEpoch=null;
     if(selectedState.task?.type!=='diagnostic')cancelIfBusy();
   }
   function sendTask(task,{prompt,grammar,maxTokens,timeoutMs,candidates,canLookup,lookupRequired,themeLabels}){
@@ -706,9 +756,127 @@ const GGUF=(()=>{
       showTask('Testando geração local','O teste envia uma consulta curta ao GGUF.');
     }
   }
+
+  // Cada contexto mantém o conjunto de hinos já exibidos. Refinamentos não
+  // repetem sugestões anteriores; mudança real de tema abre uma nova sessão.
+  function reviewRootKey(){
+    return JSON.stringify([OfflineAPI.normalize(state.searchRootQuery||state.originalQuery||state.effectiveQuery),
+      state.status?.hymn_count||0]);
+  }
+  function reviewedFor(root){
+    if(!reviewedByContext.has(root)){
+      if(reviewedByContext.size>=12)reviewedByContext.delete(reviewedByContext.keys().next().value);
+      reviewedByContext.set(root,new Set());
+    }
+    return reviewedByContext.get(root);
+  }
+  function reviewQueryKey(root){
+    return JSON.stringify([root,state.effectiveQuery,state.exclude,state.deprioritize,
+      state.requiredTerms,state.semanticHints,state.searchSettings]);
+  }
+  function renderLyricReviews(session){
+    if(!session || lyricSession!==session)return;
+    const rows=session.queue.approved;
+    const summary=rows.length?rows.map((hit,i)=>[
+      (i+1)+'. '+(hit.hymn.number?'Hino '+hit.hymn.number+' — ':'')+hit.hymn.title,
+      hit.grade===3?'Mensagem diretamente adequada ao contexto.':'Analogia central apropriada ao contexto.'
+    ].join('\n')).join('\n\n'):'Nenhuma letra foi aprovada pela IA até agora.';
+    $('gguf-comparison-text').textContent='Recomendações após análise integral da letra (IA local)\n\n'+summary+
+      '\n\nAnalisados: '+session.queue.attempted.size+' · Rejeitados por falta de adequação: '+
+      session.queue.rejected+' · Não verificados: '+session.queue.unverified+
+      '. A classificação é automática e pode falhar.';
+    const actions=$('gguf-comparison-actions');
+    actions.replaceChildren();
+    for(const item of rows){
+      const b=document.createElement('button');
+      b.className='secondary-btn';b.type='button';
+      b.textContent='Ver '+item.hymn.title;
+      b.addEventListener('click',()=>openHymn(item.hymn.id));
+      actions.appendChild(b);
+    }
+    $('gguf-comparison').classList.remove('hidden');
+    $('gguf-more-two').classList.toggle('hidden',session.queue.cursor>=session.queue.items.length);
+    info();
+  }
+  async function getReviewSession(){
+    const root=reviewRootKey(),key=reviewQueryKey(root),epoch=state.searchEpoch;
+    if(lyricSession?.key===key && lyricSession.epoch===epoch)return lyricSession;
+    const request={query:state.effectiveQuery,parsed_query:true,
+      ...searchRestrictions(),semantic_hints:state.semanticHints,
+      vector_query:state.vectorQuery,settings:{...state.searchSettings,minAffinity:0},
+      _forRecommendations:true};
+    const [result,repertoire]=await Promise.all([
+      jsonRequest('/api/search',request),
+      jsonRequest('/api/repertoire')
+    ]);
+    if(epoch!==state.searchEpoch)throw Error('A busca mudou durante a seleção dos candidatos.');
+    const blocked=new Set([...reviewedFor(root),
+      ...(repertoire.not_learned||[]).map(h=>Number(h.id))]);
+    const queue=LocalHymnAI.createReviewQueue(result._fullRanked||[],blocked);
+    lyricSession={root,key,epoch,queue,query:state.effectiveQuery,
+      exclusions:state.exclude.slice(),context:state.aiContext};
+    return lyricSession;
+  }
+  function finishReview(task,detail){
+    if(selectedState.task!==task)return;
+    const message=detail||('Análise do lote concluída: '+task.accepted+
+      ' novo(s) hino(s) aprovado(s) após '+task.scanned+' avaliação(ões).');
+    const session=task.session;
+    resetTask(message);
+    renderLyricReviews(session);
+  }
+  async function advanceReview(task){
+    if(selectedState.task!==task||task.cancelled)return;
+    const session=task.session;
+    while(selectedState.task===task&&!task.cancelled){
+      if(task.accepted>=REVIEW_BATCH_TARGET || task.scanned>=REVIEW_MAX_SCANNED){
+        finishReview(task);return;
+      }
+      const candidate=LocalHymnAI.nextReviewCandidate(session.queue);
+      if(!candidate){finishReview(task,'Todos os candidatos disponíveis já foram examinados ou excluídos.');return;}
+      task.scanned++;
+      let hymn;
+      try{
+        hymn=await jsonRequest('/api/hymns/'+candidate.id);
+      }catch(error){
+        session.queue.unverified++;continue;
+      }
+      if(selectedState.task!==task||task.cancelled||session.epoch!==state.searchEpoch)return;
+      if(!LocalHymnAI.registerReviewLyrics(session.queue,hymn.lyrics))continue;
+      const request=LocalHymnAI.prepareFullReview(session.query,session.exclusions,hymn,session.context);
+      if(!request){session.queue.unverified++;continue;}
+      task.hymn=hymn;task.candidate=candidate;
+      showTask('Analisando letra integral', 'Hino '+(hymn.number||hymn.id)+
+        ' · '+task.accepted+'/'+REVIEW_BATCH_TARGET+' novos aprovados');
+      if(!sendTask(task,request))return;
+      renderLyricReviews(session);
+      return; // Aguarda resposta nativa antes de consultar o próximo hino.
+    }
+  }
+  async function requestTwoReviewedHymns(){
+    if(reviewPreparing||state.busy||selectedState.busy||selectedState.task||
+      !selectedState.ready||!state.effectiveQuery||state.exactNumber)return;
+    reviewPreparing=true;info();
+    try{
+      const session=await getReviewSession();
+      if(!session.queue.items.length||session.queue.cursor>=session.queue.items.length){
+        renderLyricReviews(session);
+        toast('Não restam outros candidatos para analisar neste contexto.');return;
+      }
+      const task={type:'lyric-review',epoch:state.searchEpoch,startedAt:performance.now(),
+        session,accepted:0,scanned:0};
+      selectedState.task=task;
+      $('ai-last').textContent='';
+      renderLyricReviews(session);
+      await advanceReview(task);
+    }catch(error){toast('Falha ao preparar a revisão: '+error.message);}
+    finally{reviewPreparing=false;info();}
+  }
+
   function compareWithModel(){
     if(state.busy||selectedState.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber)return;
     const search={query:state.effectiveQuery,exclusions:state.exclude.slice(),deprioritized:state.deprioritize?.slice(),context:state.aiContext,settings:state.searchSettings};
+    $('gguf-more-two').classList.add('hidden');
     const request=LocalHymnAI.prepareComparison(search.query,search.exclusions,state.lastResults,search.context);
     if(startTask('compare',request,{search,deadline:performance.now()+request.timeoutMs})){
       if(state.lastResults.length)compare();
@@ -741,6 +909,7 @@ const GGUF=(()=>{
     sendTask(task,{...request,timeoutMs:remaining});
   }
   function displayComparison(picks,lookup){
+    $('gguf-more-two').classList.add('hidden');
     const format = hymn => [
       (hymn.number?'Hino '+hymn.number+' — ':'')+hymn.title,
       'Trecho da coletânea: “'+hymn.excerpt+'”'
@@ -748,7 +917,7 @@ const GGUF=(()=>{
     const parts = [];
     if(state.lastResults.length)parts.push(indexComparison());
     if(lookup)parts.push('Busca complementar por “'+lookup.term+'” · '+lookup.added+' novo(s) candidato(s)');
-    parts.push(picks.length?'Sugestões da IA\n\n'+picks.map(format).join('\n\n'):
+    parts.push(picks.length?'Sugestões da IA por trechos (NÃO verificadas pela letra inteira)\n\n'+picks.map(format).join('\n\n'):
       'A IA não destacou nenhum trecho.');
     $('gguf-comparison-text').textContent=parts.join('\n\n');
     const actions=$('gguf-comparison-actions');
@@ -770,6 +939,7 @@ const GGUF=(()=>{
     return ['Comparação do índice local',...rows].join('\n\n');
   }
   function compare(){
+    $('gguf-more-two').classList.add('hidden');
     if(!state.lastResults.length){toast('Primeiro faça uma pesquisa.');return;}
     $('gguf-comparison-text').textContent=indexComparison();
     $('gguf-comparison-actions').replaceChildren();
@@ -786,7 +956,9 @@ const GGUF=(()=>{
     if(event==='selection'){if(ok){aiCache.clear();toast('Modelo selecionado: '+value);$('gguf-test-result').textContent='Carregue o GGUF para testar a geração no aparelho.';}else if(value!=='Seleção cancelada.')toast(value);info();return;}
     if(event==='load'){
       $('gguf-test-result').textContent=ok?'GGUF carregado. Toque em Testar modelo para verificar a geração.':'Carregamento falhou: '+value;
-      toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();return;
+      toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();
+      if(ok)maybeVerifySearch();
+      return;
     }
     if(event!=='generate')return;
     const task=selectedState.task;
@@ -803,6 +975,25 @@ const GGUF=(()=>{
         'Teste falhou: '+(ok?'a resposta esperada era OK.':value);
       $('gguf-test-result').textContent=message;
       resetTask(message,!passed);return;
+    }
+    if(task.type==='lyric-review'){
+      if(!ok){
+        task.session.queue.unverified++;
+        finishReview(task,'Análise interrompida: '+value+'. É possível solicitar mais hinos.');
+        return;
+      }
+      try{
+        const decision=LocalHymnAI.readFullReview(answer);
+        if(decision.approved && !reviewedFor(task.session.root).has(task.hymn.id)){
+          for(const id of (task.hymn.family_ids||task.candidate?.family_ids||[task.hymn.id])) reviewedFor(task.session.root).add(Number(id));
+          task.session.queue.approved.push({hymn:task.hymn,grade:decision.grade});
+          task.accepted++;
+        }else if(!decision.approved)task.session.queue.rejected++;
+      }catch(error){task.session.queue.unverified++;}
+      task.id=null;
+      renderLyricReviews(task.session);
+      void advanceReview(task);
+      return;
     }
     if(!ok){resetTask('IA falhou: '+value,true);return;}
     if(task.type==='compare'){
@@ -826,12 +1017,14 @@ const GGUF=(()=>{
   $('gguf-test').addEventListener('click',testModel);
   $('gguf-improve').addEventListener('click',()=>interpret(state.effectiveQuery||state.originalQuery));
   $('gguf-cancel').addEventListener('click',cancelIfBusy);if($('ai-cancel'))$('ai-cancel').addEventListener('click',cancelIfBusy);
+  $('gguf-review-model').addEventListener('click',requestTwoReviewedHymns);
+  $('gguf-more-two').addEventListener('click',requestTwoReviewedHymns);
   $('gguf-compare-model').addEventListener('click',compareWithModel);
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
   const savedAuto=localStorage.getItem('hinos-gguf-auto-v15');$('gguf-auto').checked=savedAuto==='1';
   $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-gguf-auto-v15',$('gguf-auto').checked?'1':'0'));
   if(native())setInterval(info,1250);
-  info();return {info,maybeAuto,cancelSearchTask};
+  info();return {info,maybeAuto,maybeVerifySearch,verificationEnabled,cancelSearchTask};
 })();
 refreshStatus().catch(e=>toast('Não foi possível acessar a base local: '+e.message));

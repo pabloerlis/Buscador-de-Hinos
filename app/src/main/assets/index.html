@@ -125,10 +125,13 @@
                 <p id="ai-last" class="ai-last"></p>
               </div>
               <div id="gguf-banner" data-gguf-ui class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
-                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar com IA</button></div></div>
-              <div id="gguf-comparison" class="ai-interpretation hidden"><div id="gguf-comparison-text" role="status" aria-live="polite"></div><div id="gguf-comparison-actions" class="ai-buttons"></div></div>
-              <div id="results-list" class="results-list" aria-live="polite"></div>
-              <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-review-model" class="secondary-btn" type="button">Analisar letras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar trechos (exploratório)</button></div></div>
+              <div id="ai-context-status" class="ai-context-status hidden" role="status" aria-live="polite"></div>
+              <div id="gguf-comparison" class="ai-interpretation hidden"><div id="gguf-comparison-text" role="status" aria-live="polite"></div><div id="gguf-comparison-actions" class="ai-buttons"></div><button id="gguf-more-two" class="secondary-btn hidden" type="button">Mais 2 hinos analisados</button></div>
+              <details id="candidate-pool" class="candidate-pool" open><summary id="candidate-pool-title">Resultados do índice local (sem julgamento integral da IA)</summary>
+                <div id="results-list" class="results-list" aria-live="polite"></div>
+                <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+              </details>
               <details id="not-learned-search" class="unlearned-drawer hidden">
                 <summary><span>Não aprendidos nesta pesquisa</span><strong id="not-learned-search-count">0</strong></summary>
                 <p class="subtle-note">Ficam fora das sugestões principais, mas continuam acessíveis e mantêm seus percentuais.</p>
