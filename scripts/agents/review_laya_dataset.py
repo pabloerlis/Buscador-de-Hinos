@@ -14,6 +14,13 @@ from pathlib import Path
 STOP=set("""a o as os de da do das dos um uma uns umas em para por com no na nos nas que e ao aos à às 
 se seu sua seus suas ele ela eles elas este esta isto foi está era mas entre depois mais até já então""".split())
 NEGATION=re.compile(r"\b(?:não|nunca|jamais|sem|nenhum|nenhuma|tampouco)\b",flags=re.I)
+# Hymn training texts should not read like descriptions of a document or review.
+META_ARTIFACT=re.compile(
+    r"\b(?:a narrativa|o relato|os ouvintes|o cântico|a canção|o poema|a cena|o texto|"
+    r"o trecho|a mensagem|a história termina|a reflexão final|os personagens)\b",
+    flags=re.I
+)
+
 SIGNALS={
     "contrast":re.compile(r"\b(?:mas|porém|contudo|entretanto|em vez|enquanto|antes)\b",re.I),
     "counterfactual":re.compile(r"\b(?:teria|poderia|planejou|pensou em|prometeu|pretendeu)\b",re.I),
@@ -175,6 +182,19 @@ def main():
             issue("error","negation_label_shortcut_"+field,f"Overt negation predicts the negative label (gap {delta:.3f})")
         elif delta>0.20:
             issue("warning","negation_imbalance_"+field,f"Negation usage differs by {delta:.3f}; risk of shortcut learning")
+    # Domain-shift review: these should resemble original devotional stanzas
+    # rather than metadata about what "the story", "the audience" or "the hymn" does.
+    meta=[r["id"] for r in allmeta if META_ARTIFACT.search(r["text"])]
+    newline_count=sum("\n" in r["text"] for r in allmeta)
+    checks["meta_documentary_text_count"]=len(meta)
+    checks["meta_documentary_text_rate"]=round(len(meta)/len(allmeta),4)
+    checks["stanza_format_rate"]=round(newline_count/len(allmeta),4)
+    if len(meta)>max(2,int(0.01*len(allmeta))):
+        issue("error","documentary_style_in_lyrics",
+              "Too many dataset examples narrate the document itself rather than presenting the event",meta[:12])
+    if newline_count/len(allmeta)<0.75:
+        issue("warning","prose_domain_shift",
+              "Less than 75% of examples contain verse-like line breaks; domain shift from actual hymn lyrics.")
     # Sentence family overlap is expected, but unrelated scenario cores shouldn't be almost identical.
     cores={fam:{label:next(iter(set(r["core"] for r in rs)))
                 for label,rs in labs.items()} for fam,labs in byfamily.items() if 0 in labs and 1 in labs}
