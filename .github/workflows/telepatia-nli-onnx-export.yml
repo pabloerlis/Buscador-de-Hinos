@@ -49,6 +49,24 @@ jobs:
           python -m py_compile .tmp/upstream/export_onnx.py
           echo "Pinned exporter 54c72865e4781233396a56c2db013e29ced3b43c"
           sha256sum .tmp/upstream/export_onnx.py
+          # PyTorch 2.9.1 exige dominios dinamicos compativeis com os guards:
+          # batch e comprimento de sequencia >1 durante tracing (batch=2).
+          # A verificacao ORT tambem executa com batch=1.
+          python - <<'PY'
+          from pathlib import Path
+          file=Path(".tmp/upstream/export_onnx.py")
+          text=file.read_text()
+          for before,after in [
+              ('batch = Dim("batch", min=1, max=1024)', 'batch = Dim("batch", min=2, max=1024)'),
+              ('seq = Dim("seq", min=1, max=8192)', 'seq = Dim("seq", min=2, max=8192)'),
+          ]:
+              assert text.count(before)==1,(before,text.count(before))
+              text=text.replace(before,after)
+          file.write_text(text)
+          print("Applied explicit, validated PyTorch symbolic dimension guard fix",flush=True)
+          PY
+          python -m py_compile .tmp/upstream/export_onnx.py
+          sha256sum .tmp/upstream/export_onnx.py
       - name: Baixar pesos externos do Telepatia sob revisao imutavel
         run: |
           set -euo pipefail
