@@ -92,7 +92,7 @@ const api=async(url,payload)=>{
   }
   assert.ok(index.includes('local-hymn-chat.js'));
   assert.ok(app.includes("window.__hymnChatNativeEvent?.(ok,value,requestId,metrics)"));
-  assert.ok(app.includes("HymnChatTools.execute(plan,userText,session,jsonRequest,state.searchSettings)"));
+  assert.ok(app.includes("HymnChatTools.execute(plan,userText,session,jsonRequest,state.searchSettings,{vector})"));
   assert.ok(read('offline-api.js').includes("url==='/api/bible/context'"));
   assert.ok(read('style.css').includes('.chat-screen'));
   console.log('CHAT P4 PILOT PASS: grammar allowlist, session, local search/Bible/lyrics, evidence, UI wiring and no arbitrary tools.');
