@@ -277,3 +277,45 @@ html:not(.with-gguf) [data-gguf-ui],html:not(.with-vector) [data-vector-ui]{disp
   .settings-tabs button { font-size: 12px; }
   .settings-content .setting-check { min-height: 38px; }
 }
+
+
+/* Painel de pesos de evidência — sem inferência em cada movimento. */
+.semantic-tuner { background:#fff;border:1px solid #dae7dd;border-radius:16px;padding:17px 15px;margin-bottom:14px;box-shadow:0 8px 20px rgba(18,61,47,.045); }
+.tuner-title-row,.tuner-history-head {display:flex;align-items:center;justify-content:space-between;gap:10px}
+.tuner-title-row h3 {font-size:16px;line-height:1.3;margin:0;color:#173b30}
+.tuner-title-row p {font-size:12px;color:var(--muted);margin:4px 0 0}
+.tuner-switch {display:flex;align-items:center;gap:10px;margin-top:17px;padding:10px 9px;border-radius:10px;background:#f3f8f4;font-size:13px;font-weight:700}
+.tuner-switch input {width:19px;height:19px;accent-color:var(--green);flex:none}
+.tuner-info {font-size:12px;line-height:1.55;color:var(--muted);margin:12px 0}
+.tuner-presets {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:15px 0}
+.tuner-presets button {min-height:37px;border:1px solid #d8e5d9;border-radius:9px;background:#f7f9f6;color:#315244;font-weight:700;font-size:11px;padding:5px 3px}
+.tuner-presets button[aria-pressed="true"] {border-color:#26714f;background:#e6f3e6;color:#155c36}
+.tuner-slider {margin:15px 0 12px}
+.tuner-slider label {display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:13px;font-weight:660;line-height:1.5}
+.tuner-slider output {font-variant-numeric:tabular-nums;color:#206349}
+.tuner-slider input[type=range] {width:100%;height:28px;margin:4px 0;accent-color:#28745a;touch-action:pan-y}
+.tuner-slider small {display:block;color:var(--muted);font-size:11px}
+.tuner-status {font-size:12px;line-height:1.5;color:#356452;padding:10px 11px;border-radius:9px;background:#f4f8f3;min-height:36px;margin:10px 0}
+.tuner-footer {display:flex;justify-content:flex-start}
+.tuner-footer button {min-height:38px;font-size:12px;padding:7px 13px}
+.tuner-history {border-top:1px solid var(--line);margin-top:21px;padding-top:14px}
+.tuner-history h3 {font-size:14px;margin:0;color:var(--ink)}
+.tuner-history-head .text-action {font-size:12px}
+.tuner-history-list {display:flex;flex-wrap:wrap;gap:7px;padding-top:10px}
+.tuner-history-list button {border:1px solid #d5e4d9;border-radius:999px;padding:7px 11px;background:#f8faf8;font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#24513b}
+.tuner-history-list .tuner-history-empty {font-size:12px;color:var(--muted)}
+.tuner-history-tools {font-size:12px;color:#345646;margin-top:15px;border-top:1px solid #ebf0eb;padding-top:12px}
+.tuner-history-tools summary {cursor:pointer;font-weight:700}
+.semantic-tuner:has(#tuner-enabled:not(:checked)) .tuner-presets,
+.semantic-tuner:has(#tuner-enabled:not(:checked)) .tuner-slider {opacity:.42}
+.semantic-direct-mode .results-actions,.semantic-direct-mode #refine-panel,
+.semantic-direct-mode #ai-workspace,.semantic-direct-mode #gguf-banner,
+.semantic-direct-mode #gguf-comparison {display:none!important}
+@media(max-width:820px){
+  .semantic-tuner {padding:13px 13px 9px}
+  .tuner-presets {margin:10px 0}
+  .tuner-slider {margin:11px 0}
+}
+@media(min-width:821px){
+  .results-tools {align-self:start}
+}
