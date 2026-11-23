@@ -886,6 +886,15 @@ const OfflineAPI = (() => {
     if(url==='/api/import-remote')return downloadRemote();
     if(url==='/api/search')return search(payload);
     if(url==='/api/contextual/candidates')return contextualCandidates(payload);
+    if(url==='/api/bible/context'){
+      const reference=String(payload?.reference||'');
+      if(reference.length>140||!scriptureIndex)return null;
+      const count=Math.max(1,Math.min(12,Number(payload?.limit)||8));
+      const entry=scriptureIndex.lookup(reference,count);
+      if(!entry)return null;
+      return {reference:entry.reference,source:entry.source,partial:entry.partial,
+        verses:entry.verses.slice(0,count).map(v=>({number:v.number,text:v.text}))};
+    }
     if(url==='/api/recommend')return recommendRelated(payload);
     const match=url.match(/^\/api\/hymns\/(\d+)$/);
     if(match)return hymnDetail(Number(match[1]));

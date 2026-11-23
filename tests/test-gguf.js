@@ -152,7 +152,7 @@ assert.match(evidence,/Início: Começo.*Meio: A luta.*Fim: Ao final/);
 assert.ok(evidence.length<=130);
 assert.equal(ai.excerptFromWholeLyrics(''), '');
 const retrieval=require('../app/src/main/assets/contextual-retrieval.js');
-const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
+const ggufSource=js.slice(js.indexOf('const GGUF='),js.indexOf('const HymnChatUI='));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
 function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true}={}){
   const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];

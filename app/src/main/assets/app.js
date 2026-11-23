@@ -838,6 +838,7 @@ const GGUF=(()=>{
       toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();return;
     }
     if(event!=='generate')return;
+    if(window.__hymnChatNativeEvent?.(ok,value,requestId,metrics))return;
     const task=selectedState.task;
     if(!task||task.id!==requestId)return;
     if(task.cancelled){
@@ -884,4 +885,178 @@ const GGUF=(()=>{
   if(native())setInterval(info,1250);
   info();return {info,maybeAuto,cancelSearchTask};
 })();
+
+// v2.6.30 — chat local em aba isolada, com orquestrador de ferramentas allowlisted.
+// A IA seleciona a ferramenta; o aplicativo valida os argumentos e executa
+// apenas endpoints offline. Nenhuma alteração no ranking padrão de busca.
+const HymnChatUI=(()=>{
+  const session={topic:'',preferences:[],turns:[],candidates:[],bibleReference:null};
+  const native=()=>window.NativeGGUF||null;
+  let active=false,sequence=0,callSequence=0,pending=null;
+  const messages=$('chat-messages'),sources=$('chat-sources'),events=$('chat-events');
+  const initialMessage='Descreva o assunto, uma anotação espiritual ou a passagem bíblica. Vou conversar e consultar a biblioteca quando necessário.';
+  function trace(text){
+    const item=document.createElement('li');
+    item.textContent=String(text).slice(0,230);
+    events.appendChild(item);
+    while(events.children.length>14)events.firstElementChild.remove();
+  }
+  function bubble(role,content){
+    const el=document.createElement('div');
+    el.className='chat-bubble '+(role==='user'?'user':'assistant');
+    el.textContent=String(content);
+    messages.appendChild(el);
+    messages.scrollTop=messages.scrollHeight;
+    return el;
+  }
+  function setBusy(busy){
+    active=busy;$('chat-send').disabled=busy;
+    $('chat-stop').disabled=!busy;
+    $('chat-reset').disabled=false;
+    $('chat-input').disabled=busy;
+  }
+  function modelStatus(){
+    try{return JSON.parse(native()?.status?.()||'{}');}catch{return {};}
+  }
+  function updateModelLabel(){
+    const status=modelStatus();
+    const text=status.loaded?'GGUF carregado no aparelho · '+(status.name||'modelo local'):
+      'GGUF não carregado. Escolha e carregue o modelo em Configurações → IA.';
+    $('chat-engine-state').textContent=text;
+  }
+  function setTab(name){
+    const chat=name==='chat';
+    $('main-tab-chat').classList.toggle('active',chat);
+    $('main-tab-search').classList.toggle('active',!chat);
+    $('main-tab-chat').setAttribute('aria-selected',String(chat));
+    $('main-tab-search').setAttribute('aria-selected',String(!chat));
+    $('chat-screen').classList.toggle('hidden',!chat);
+    $('search-screen').classList.toggle('hidden',chat);
+    if(chat){updateModelLabel();$('chat-input').focus({preventScroll:true});}
+  }
+  function cancelGeneration(){
+    sequence++;
+    if(pending){
+      const old=pending;
+      pending=null;
+      try{native()?.cancel?.(old.id);}catch{}
+      old.reject(Error('Geração interrompida.'));
+    }
+  }
+  function generate(request){
+    return new Promise((resolve,reject)=>{
+      if(pending)return reject(Error('A IA ainda está processando outra mensagem.'));
+      if(!native()?.generate)return reject(Error('Motor GGUF indisponível.'));
+      const id='chat-local-'+(++callSequence);
+      pending={id,resolve,reject};
+      try{native().generate(request.prompt,id,request.grammar,
+        request.maxTokens,request.timeoutMs);}
+      catch(e){pending=null;reject(e);}
+    });
+  }
+  // Intercepta somente os IDs originados deste chat, sem misturar com os
+  // fluxos legados de temas e comparação de hinos.
+  window.__hymnChatNativeEvent=(ok,value,requestId,metrics)=>{
+    if(!String(requestId).startsWith('chat-local-'))return false;
+    if(!pending||pending.id!==requestId)return true;
+    const task=pending;pending=null;
+    if(ok)task.resolve({text:String(value),metrics:metrics||{}});
+    else task.reject(Error(String(value).slice(0,180)));
+    return true;
+  };
+  function showCandidates(rows){
+    sources.replaceChildren();
+    for(const item of rows.slice(0,5)){
+      if(!Number.isSafeInteger(item.hymn_id))continue;
+      const btn=document.createElement('button');
+      btn.type='button';btn.className='chat-source';
+      btn.textContent='Ver hino '+(item.number||'—')+' · '+String(item.title||'').slice(0,50);
+      btn.addEventListener('click',()=>openHymn(item.hymn_id));
+      sources.appendChild(btn);
+    }
+  }
+  async function submit(message){
+    if(active)return;
+    const userText=String(message||'').trim().slice(0,480);
+    if(!userText)return;
+    bubble('user',userText);
+    $('chat-input').value='';
+    if(!state.ready){
+      bubble('assistant','Importe a coletânea antes de consultar hinos. A pesquisa e a Bíblia funcionam localmente após a importação.');
+      return;
+    }
+    const status=modelStatus();
+    if(!status.loaded){
+      bubble('assistant','O modelo GGUF ainda não está carregado. Abra Configurações → IA, escolha o arquivo e toque em Carregar modelo.');
+      return;
+    }
+    if(status.busy){
+      bubble('assistant','O modelo está ocupado com outra geração. Interrompa a tarefa anterior ou tente novamente.');
+      return;
+    }
+    const epoch=++sequence,start=performance.now();
+    setBusy(true);
+    const statusLine=bubble('assistant','Interpretando o pedido…');
+    try{
+      const routing=HymnChatTools.planPrompt(userText,session);
+      const decision=await generate(routing);
+      if(epoch!==sequence)return;
+      const plan=HymnChatTools.readPlan(decision.text);
+      trace('Decisão LFM3: '+plan+' · '+Math.round(performance.now()-start)+' ms');
+      statusLine.textContent=plan==='CONVERSAR'?'Preparando resposta…':
+        'Executando consulta '+{BUSCAR:'ao catálogo',LER:'à letra original',BIBLIA:'à Bíblia local'}[plan]+'…';
+      const toolStart=performance.now();
+      const result=await HymnChatTools.execute(plan,userText,session,jsonRequest,state.searchSettings);
+      if(epoch!==sequence)return;
+      trace('Ferramenta: '+result.tool+' · '+Math.round(performance.now()-toolStart)+' ms · '+result.display);
+      if(result.tool==='search_hymns')showCandidates(result.candidates||[]);
+      statusLine.textContent='Construindo resposta a partir do contexto…';
+      const draft=HymnChatTools.answerPrompt(userText,session,result);
+      const generated=await generate(draft);
+      if(epoch!==sequence)return;
+      const reply=HymnChatTools.sanitizeAnswer(generated.text);
+      statusLine.textContent=reply;
+      HymnChatTools.remember(session,userText);
+      session.turns.push({role:'user',text:userText},{role:'assistant',text:reply});
+      session.turns=session.turns.slice(-HymnChatTools.MAX_TURNS);
+      trace('Resposta: '+(generated.metrics.tokens||0)+' tokens · '+Math.round(performance.now()-start)+' ms (duas etapas)');
+    }catch(error){
+      if(epoch===sequence){
+        statusLine.textContent='Não consegui concluir esta mensagem: '+error.message+
+          '. A conversa foi preservada; você pode tentar novamente.';
+        trace('Falha: '+String(error.message).slice(0,130));
+      }
+    }finally{if(epoch===sequence){setBusy(false);updateModelLabel();}}
+  }
+  $('main-tab-search').addEventListener('click',()=>setTab('search'));
+  $('main-tab-chat').addEventListener('click',()=>setTab('chat'));
+  $('chat-configure').addEventListener('click',()=>{
+    selectSettingsTab($('settings-tab-ai'));openLayer('settings');
+  });
+  $('chat-form').addEventListener('submit',e=>{
+    e.preventDefault();submit($('chat-input').value);
+  });
+  $('chat-input').addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit($('chat-input').value);}
+  });
+  $('chat-stop').addEventListener('click',()=>{
+    cancelGeneration();
+    bubble('assistant','Execução interrompida. O histórico anterior foi mantido.');
+    trace('Geração cancelada pelo usuário.');
+    setBusy(false);
+  });
+  $('chat-reset').addEventListener('click',()=>{
+    cancelGeneration();
+    session.topic='';session.preferences=[];session.turns=[];session.candidates=[];session.bibleReference=null;
+    messages.replaceChildren();sources.replaceChildren();events.replaceChildren();
+    bubble('assistant',initialMessage);
+    setBusy(false);
+    $('chat-input').value='';
+    $('chat-input').focus();
+  });
+  setBusy(false);
+  updateModelLabel();
+  return {setTab,submit};
+})();
+
 refreshStatus().catch(e=>toast('Não foi possível acessar a base local: '+e.message));
