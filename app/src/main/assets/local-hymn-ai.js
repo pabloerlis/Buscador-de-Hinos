@@ -163,8 +163,11 @@ const LocalHymnAI = (() => {
     const items = [];
     for (const candidate of candidates || []) {
       const id = Number(candidate?.id);
-      if (!Number.isSafeInteger(id) || id < 1 || blocked.has(id) || ids.has(id)) continue;
-      ids.add(id);items.push(candidate);
+      const family = Number(candidate?._familyId || id);
+      const members = Array.isArray(candidate?.family_ids) ? candidate.family_ids : [id];
+      if (!Number.isSafeInteger(id) || id < 1 || blocked.has(id) ||
+          members.some(member => blocked.has(Number(member))) || ids.has(family)) continue;
+      ids.add(family);items.push(candidate);
     }
     return {items,cursor:0,attempted:new Set(),fingerprints:new Set(),approved:[],
       rejected:0,unverified:0};
