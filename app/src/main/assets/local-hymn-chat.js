@@ -69,15 +69,17 @@ const HymnChatTools=(()=>{
     text=text.slice(0,630);
     return {text,truncated:full.length>text.length,characters:full.length,stanza_count:parts.length};
   }
-  async function execute(plan,message,session,api,options){
+  async function execute(plan,message,session,api,options,context={}){
     if(!ACTIONS.includes(plan))throw Error('Ferramenta não autorizada');
     if(typeof api!=='function')throw Error('Backend local ausente');
     if(plan==='CONVERSAR')return {tool:'none',display:'Somente conversa; nenhuma consulta realizada.',
       modelContext:'Nenhuma fonte foi consultada neste turno.',candidates:[]};
     if(plan==='BUSCAR'){
       const query=queryFor(session,message);
+      const vector=Array.isArray(context.vector)&&context.vector.length===384&&
+        context.vector.every(x=>typeof x==='number'&&Number.isFinite(x))?context.vector:null;
       const response=await api('/api/contextual/candidates',{
-        query,settings:options,limit:40
+        query,settings:options,vector_query:vector,limit:40
       });
       if(response?.semantic_judgment!=='NOT_VERIFIED'||response.default_ranking_changed!==false||
         !Array.isArray(response.candidates))throw Error('Recuperação não verificada rejeitada.');

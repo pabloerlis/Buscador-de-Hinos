@@ -561,7 +561,7 @@ const EmbeddingSearch=(()=>{
       status('E5 Small: ranking vetorial atualizado em '+(answer.ms/1000).toFixed(1)+'s. Sem internet.');
     }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · modelo E5: '+error.message);}
   }
-  return {maybeUpdate};
+  return {maybeUpdate,encode:request};
 })();
 
 const GGUF=(()=>{
@@ -1006,7 +1006,22 @@ const HymnChatUI=(()=>{
       statusLine.textContent=plan==='CONVERSAR'?'Preparando resposta…':
         'Executando consulta '+{BUSCAR:'ao catálogo',LER:'à letra original',BIBLIA:'à Bíblia local'}[plan]+'…';
       const toolStart=performance.now();
-      const result=await HymnChatTools.execute(plan,userText,session,jsonRequest,state.searchSettings);
+      let vector=null;
+      if(plan==='BUSCAR'&&window.NativeVector&&state.status?.vector_count&&
+        state.searchSettings.vectorMode!=='off'){
+        try{
+          const query=HymnChatTools.queryFor(session,userText);
+          const encoded=await Promise.race([
+            EmbeddingSearch.encode(query),
+            new Promise((_,reject)=>setTimeout(()=>reject(Error('Prazo de codificação E5 excedido')),12000))
+          ]);
+          if(epoch!==sequence)return;
+          vector=encoded.vector;
+          trace('E5 local: vetor 384D gerado · '+Math.round(performance.now()-toolStart)+' ms.');
+        }catch(e){trace('E5 indisponível, mantendo busca textual local: '+String(e.message).slice(0,95));}
+      }
+      if(epoch!==sequence)return;
+      const result=await HymnChatTools.execute(plan,userText,session,jsonRequest,state.searchSettings,{vector});
       if(epoch!==sequence)return;
       trace('Ferramenta: '+result.tool+' · '+Math.round(performance.now()-toolStart)+' ms · '+result.display);
       if(result.tool==='search_hymns')showCandidates(result.candidates||[]);

@@ -60,11 +60,15 @@ const api=async(url,payload)=>{
   assert.equal(session.candidates.length,2);
   assert.equal(calls[0].url,'/api/contextual/candidates');
   assert.equal(calls[0].payload.settings.collections.avulsos,false);
+  assert.equal(calls[0].payload.vector_query,null);
   assert.doesNotMatch(search.modelContext,/O meio fala de mudança/);
+  const probe=Array.from({length:384},(_,i)=>i===0?1:0);
+  const withVector=await tool.execute('BUSCAR','Quero uma paráfrase da reconciliação',session,api,options,{vector:probe});
+  assert.deepEqual(calls.at(-1).payload.vector_query,probe);
   const bible=await tool.execute('BIBLIA','O que diz Lucas 15:20?',session,api,options);
   assert.equal(bible.tool,'get_bible_context');
   assert.equal(session.bibleReference,'Lucas 15:20');
-  assert.equal(calls[1].url,'/api/bible/context');
+  assert.equal(calls.at(-1).url,'/api/bible/context');
   const lyrics=await tool.execute('LER','Analise o hino 20',session,api,options);
   assert.equal(lyrics.tool,'get_hymn_full_lyrics');
   assert.match(lyrics.modelContext,/Início:.*Meio:.*Fim:/s);
