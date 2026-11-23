@@ -24,8 +24,8 @@ assert.deepEqual(tool.availableActions('Procure hinos sobre esperança',session)
 assert.throws(()=>tool.readPlan('"LER"',plan.allowed),/fora da lista/);
 assert.ok(tool.planPrompt('Leia hino 20',session).grammar.includes('LER'));
 assert.ok(tool.planPrompt('Consulte Lucas 15:20',session).grammar.includes('BIBLIA'));
-assert.ok(plan.prompt.length<1701);
-assert.equal(plan.timeoutMs,25000);
+assert.ok(plan.prompt.length<=1050,'Roteador offline precisa respeitar orçamento curto');
+assert.equal(plan.timeoutMs,40000);
 tool.remember(session,'Quero hinos sobre o filho pródigo.');
 session.turns.push({role:'user',text:'Quero hinos sobre o filho pródigo.'},
  {role:'assistant',text:'Vou procurar na coletânea.'});
