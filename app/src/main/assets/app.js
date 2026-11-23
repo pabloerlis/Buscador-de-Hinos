@@ -917,7 +917,7 @@ const GGUF=(()=>{
     const parts = [];
     if(state.lastResults.length)parts.push(indexComparison());
     if(lookup)parts.push('Busca complementar por “'+lookup.term+'” · '+lookup.added+' novo(s) candidato(s)');
-    parts.push(picks.length?'Seleção exploratória por trechos (NÃO verificada pela letra inteira)\n\n'+picks.map(format).join('\n\n'):
+    parts.push(picks.length?'Sugestões da IA por trechos (NÃO verificadas pela letra inteira)\n\n'+picks.map(format).join('\n\n'):
       'A IA não destacou nenhum trecho.');
     $('gguf-comparison-text').textContent=parts.join('\n\n');
     const actions=$('gguf-comparison-actions');
