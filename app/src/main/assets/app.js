@@ -755,7 +755,7 @@ const GGUF=(()=>{
   }
   async function getReviewSession(){
     const root=reviewRootKey(),key=reviewQueryKey(root),epoch=state.searchEpoch;
-    if(lyricSession?.key===key)return lyricSession;
+    if(lyricSession?.key===key && lyricSession.epoch===epoch)return lyricSession;
     const request={query:state.effectiveQuery,parsed_query:true,
       ...searchRestrictions(),semantic_hints:state.semanticHints,
       vector_query:state.vectorQuery,settings:{...state.searchSettings,minAffinity:0},
