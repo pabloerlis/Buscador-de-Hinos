@@ -1,0 +1,82 @@
+name: Auditor independente da base Laya 1440 (sem APK)
+on:
+  push:
+    branches: [experiment/laya-1440-audited-dataset-20261123]
+    paths:
+      - tests/data/laya_curated_scenarios_v2.json
+      - scripts/qa_laya_1440_generator.py
+      - scripts/agents/review_laya_dataset.py
+      - .github/workflows/laya-1440-dataset-audit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build_and_audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    name: "Agente auditor independente | 1440 train + 288 dev"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Baixar corpus real temporario apenas para verificar vazamento de holdout
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output .tmp/catalog.json
+          test "$(wc -c < .tmp/catalog.json)" -gt 100000
+      - name: Verificar sintaxe dos dois programas independentes
+        run: |
+          python -m py_compile scripts/qa_laya_1440_generator.py scripts/agents/review_laya_dataset.py
+      - name: Gerar corpus (1440 exemplos de treino, 288 dev de outros plots)
+        run: |
+          set -euo pipefail
+          python scripts/qa_laya_1440_generator.py --out qa-report/laya-1440
+      - name: Agente auditor verifica qualidade, vazamento, pares e atalhos de rótulo
+        run: |
+          set -euo pipefail
+          python scripts/agents/review_laya_dataset.py \
+            --data qa-report/laya-1440 \
+            --historical-catalog .tmp/catalog.json \
+            --report qa-report/laya-1440/audit.json \
+            --strict
+      - name: Testar se o auditor realmente rejeita alterações nos rótulos
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib, shutil, subprocess, sys
+          src=pathlib.Path("qa-report/laya-1440")
+          dst=pathlib.Path(".tmp/sabotage")
+          dst.mkdir(parents=True,exist_ok=True)
+          for kind in ("train","dev"):
+              for suffix in (".jsonl",".audit.jsonl"):
+                  shutil.copy(src/(kind+suffix),dst/(kind+suffix))
+          f=dst/"train.jsonl"
+          lines=f.read_text(encoding="utf-8").splitlines()
+          sample=json.loads(lines[0]);sample["expected"]["central"]=not sample["expected"]["central"]
+          lines[0]=json.dumps(sample,ensure_ascii=False,sort_keys=True)
+          f.write_text("\n".join(lines)+"\n",encoding="utf-8")
+          proc=subprocess.run([sys.executable,"scripts/agents/review_laya_dataset.py",
+              "--data",str(dst),"--historical-catalog",".tmp/catalog.json",
+              "--report",".tmp/sabotage/report.json","--strict"],
+              capture_output=True,text=True)
+          assert proc.returncode!=0,"Reviewer failed to detect intentionally corrupted label"
+          report=json.loads((dst/"report.json").read_text(encoding="utf-8"))
+          assert any(e["check"]=="schema_vs_metadata" for e in report["errors"]),report["errors"]
+          print("PASS: corrupted label was independently rejected.")
+          PY
+      - name: Publicar base sintética e relatório de auditoria (sem hinos reais nem pesos)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laya-1440-dataset-reviewed
+          path: |
+            qa-report/laya-1440/train.jsonl
+            qa-report/laya-1440/dev.jsonl
+            qa-report/laya-1440/manifest.json
+            qa-report/laya-1440/audit.json
+          retention-days: 90
+          if-no-files-found: warn
