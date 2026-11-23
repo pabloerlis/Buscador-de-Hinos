@@ -87,6 +87,62 @@ const OfflineAPI = (() => {
   // Índices residentes em memória: calculados uma vez na importação/abertura.
   // A IA jamais percorre hinos nem altera a coletânea: apenas produz termos de consulta.
   let numberIndex=new Map(),titleIndex=new Map(),wordIndex=new Map(),topicIndex=new Map(),storyIndex=new Map(),searchTexts=new Map();
+  // Variantes com a mesma letra permanecem como registros distintos no índice
+  // E5 para preservar os IDs/assinaturas. A interface agrupa versões equivalentes.
+  let familyById=new Map(),familyMembers=new Map();
+  function lyricTokenShingles(text){
+    const terms=text.split(' ').filter(Boolean), grams=new Set();
+    for(let i=0;i+2<terms.length;i++)grams.add(terms.slice(i,i+3).join(' '));
+    return grams;
+  }
+  function countNegations(text){
+    return (text.match(/(?:^| )(?:nao|nem|nunca|jamais|sem)(?= |$)/g)||[]).length;
+  }
+  function equivalentVersions(a,b){
+    const x=normalizeLyrics(a.lyrics),y=normalizeLyrics(b.lyrics);
+    if(x===y)return x.length>=28 && normalizeLyrics(a.title)===normalizeLyrics(b.title);
+    if(x.length<95||y.length<95||normalizeLyrics(a.title)!==normalizeLyrics(b.title))return false;
+    if(Math.min(x.length,y.length)/Math.max(x.length,y.length)<0.96)return false;
+    if(countNegations(x)!==countNegations(y))return false;
+    const first=lyricTokenShingles(x),second=lyricTokenShingles(y);
+    let common=0;for(const term of first)if(second.has(term))common++;
+    // Alto limiar: não agrupar só por título, tema ou sinônimos.
+    return first.size>=10&&second.size>=10&&common/(first.size+second.size-common)>=0.97;
+  }
+  function buildFamilies(){
+    familyById=new Map();familyMembers=new Map();
+    const byTitle=new Map();
+    for(const song of hymns){
+      const title=normalizeLyrics(song.title);
+      if(!byTitle.has(title))byTitle.set(title,[]);
+      const representatives=byTitle.get(title);
+      const representative=representatives.find(x=>equivalentVersions(x,song));
+      if(!representative){representatives.push(song);familyById.set(song.id,song.id);familyMembers.set(song.id,[song]);}
+      else{
+        const family=familyById.get(representative.id);
+        familyById.set(song.id,family);familyMembers.get(family).push(song);
+      }
+    }
+  }
+  function familyOf(id){return familyMembers.get(familyById.get(id))||[];}
+  function collapseVersions(ranked,numberMatch){
+    if(numberMatch)return ranked; // Consultas por número preservam todas as referências exatas.
+    const seen=new Set();
+    return ranked.filter(hit=>{
+      const family=familyById.get(hit.id)||hit.id;
+      if(seen.has(family))return false;
+      seen.add(family);return true;
+    });
+  }
+  function familySources(id){
+    const refs=[],seen=new Set();
+    for(const song of familyOf(id))for(const ref of (song.collectionRefs||[])){
+      const key=ref.id+':'+String(ref.number||'');
+      if(seen.has(key))continue;
+      seen.add(key);refs.push({...ref});
+    }
+    return refs;
+  }
   function rebuildIndexes(){
     numberIndex=new Map();titleIndex=new Map();wordIndex=new Map();topicIndex=new Map();storyIndex=new Map();searchTexts=new Map();
     for(const song of hymns){
@@ -117,6 +173,7 @@ const OfflineAPI = (() => {
         storyIndex.get(item.id).add(song.id);
       }
     }
+    buildFamilies();
     if(bibleGraph&&typeof bibleGraph.setCorpus==='function')bibleGraph.setCorpus(hymns);
     if(eventFrames&&typeof eventFrames.setCorpus==='function')eventFrames.setCorpus(hymns);
     recommender=typeof RecommendationEngine!=='undefined'?RecommendationEngine.create(hymns):null;
@@ -687,10 +744,11 @@ const OfflineAPI = (() => {
       const other=ranked.filter(h=>!protectedIds.has(h.id));
       ranked.splice(0,ranked.length,...held,...other);
     }
-    // O hino não aprendido continua no ranking e mantém sua afinidade.
-    // Apenas a paginação principal fica reservada aos hinos disponíveis.
-    const available=ranked.filter(h=>!RepertoireStore.isNotLearned(hymns[h.id-1]));
-    const notLearned=ranked.filter(h=>RepertoireStore.isNotLearned(hymns[h.id-1]));
+    // Agrupa edições textualmente equivalentes somente na apresentação, sem
+    // mexer nos IDs internos, índice E5 ou nas referências de cada coletânea.
+    const displayRanked=collapseVersions(ranked,numberMatch);
+    const available=displayRanked.filter(h=>!RepertoireStore.isNotLearned(hymns[h.id-1]));
+    const notLearned=displayRanked.filter(h=>RepertoireStore.isNotLearned(hymns[h.id-1]));
     const hiddenPage=Math.max(1,Math.min(100,Number(payload?.not_learned_page)||1));
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
@@ -700,7 +758,7 @@ const OfflineAPI = (() => {
       const vectorText=vectorEnabled&&hit.vector_similarity>=76&&!sharedPassage&&!numberMatch&&
         !quoted.length&&!required.length&&typeof VectorIndex.passageForSong==='function'?
         VectorIndex.passageForSong(hymn,_vectorRange):'';
-      return {...hit,snippet:sharedPassage?.text||_eventSnippet||vectorText||
+      return {...hit,collection_refs:familySources(hit.id),snippet:sharedPassage?.text||_eventSnippet||vectorText||
         makeSnippet(hymn,[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)};
     };
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
@@ -792,7 +850,7 @@ const OfflineAPI = (() => {
   function hymnDetail(id){
     const song=hymns.find(s=>s.id===id);if(!song)throw Error('Hino não encontrado.');
     const refs=Array.from(new Set(song.lyrics.match(REFERENCE)||[])).slice(0,15);
-    return {...song,topics:[...new Set([...(song.story_profile||[]).map(x=>x.label),...song.topics])].slice(0,12),references:refs};
+    return {...song,collectionRefs:familySources(song.id),topics:[...new Set([...(song.story_profile||[]).map(x=>x.label),...song.topics])].slice(0,12),references:refs};
   }
   async function downloadRemote(){
     if(window.NativeHinos && typeof window.NativeHinos.downloadCollection==='function'){
