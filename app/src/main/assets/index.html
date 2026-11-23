@@ -26,6 +26,8 @@
   <script src="semantic-tuner.js" defer></script>
   <script src="semantic-tuner-ui.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="telepatia-nli-sequence.js" defer></script>
+  <script src="telepatia-nli-client.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -113,6 +115,15 @@
                 <div class="tuner-title-row"><div><h3 id="tuner-title">Ajuste contextual</h3><p>Reordenação instantânea, offline</p></div><span class="local-badge">Local</span></div>
                 <label class="tuner-switch"><input type="checkbox" id="tuner-enabled" checked><span>Busca direta, sem conversa</span></label>
                 <p class="tuner-info">Os ajustes usam evidências já calculadas. Não executam Laya NLI nem outro modelo a cada alteração.</p>
+                <div class="nli-controls" aria-label="Modelo de inferência textual">
+                  <div class="nli-controls-title"><strong>Telepatia Laya PT/ES NLI</strong><span class="local-badge">Modelo externo</span></div>
+                  <p id="nli-status" class="tuner-info" role="status" aria-live="polite">Verificando modelo selecionado…</p>
+                  <div class="nli-control-actions">
+                    <button type="button" id="nli-select" class="secondary-btn">Escolher ZIP do modelo</button>
+                    <button type="button" id="nli-load" class="secondary-btn" disabled>Carregar</button>
+                  </div>
+                  <p class="tuner-info">Analisa a mensagem central dos primeiros candidatos quando o modelo é carregado. Implicação, neutro e contradição não são probabilidades.</p>
+                </div>
                 <div class="tuner-presets" role="group" aria-label="Perfis de classificação">
                   <button type="button" data-tuner-preset="narrative">Narrativa</button>
                   <button type="button" data-tuner-preset="balanced">Equilibrada</button>
