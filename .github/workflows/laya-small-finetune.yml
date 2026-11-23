@@ -1,0 +1,92 @@
+name: Laya treinamento pequeno — experimento real sem APK
+on:
+  push:
+    branches: [experiment/laya-small-finetune-20261123]
+    paths:
+      - scripts/qa_laya_small_dataset.py
+      - scripts/qa_laya_small_finetune.py
+      - .github/workflows/laya-small-finetune.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  small_finetune:
+    name: "Laya multilingual: 144 exemplos supervisionados, validacao 31 holdout"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Preparar ambiente fixado e isolado
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.5.1" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "laya==0.4.20" "transformers==4.57.3" "huggingface-hub>=0.34,<1.0"
+          python -c "import laya; from laya.train import TrainConfig,finetune; print(laya.__version__)"
+      - name: Importar dados de base anteriores imutaveis (apenas para avaliacao)
+        uses: actions/download-artifact@v4
+        with:
+          name: laya-multilingual-real-benchmark
+          run-id: 45247089241
+          github-token: ${{ github.token }}
+          path: .tmp/laya-baseline
+      - name: Baixar catalogo historico temporario sem incorpora-lo ao checkpoint
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' \
+            --output .tmp/catalog.json
+          test "$(wc -c < .tmp/catalog.json)" -gt 100000
+      - name: Montar 144 textos rotulados, excluir explicitamente todas as letras reais do treino
+        run: |
+          set -euo pipefail
+          python scripts/qa_laya_small_dataset.py .tmp/catalog.json --output-dir .tmp/laya-ft
+      - name: Treinamento supervisionado verdadeiro do Laya e avaliacao independente
+        env:
+          TOKENIZERS_PARALLELISM: 'false'
+          HF_HUB_DISABLE_TELEMETRY: '1'
+          OMP_NUM_THREADS: '4'
+        run: |
+          set -euo pipefail
+          python scripts/qa_laya_small_finetune.py .tmp/catalog.json \
+            --train .tmp/laya-ft/train.jsonl \
+            --eval-data .tmp/laya-ft/eval.jsonl \
+            --baseline .tmp/laya-baseline/laya-multilingual-real.json \
+            --checkpoint .tmp/laya-ft/checkpoint \
+            --output qa-report/laya-small-finetune.json
+      - name: Publicar apenas metricas e provas de separacao (nunca letras)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laya-small-finetune-metrics
+          path: |
+            qa-report/laya-small-finetune.json
+            qa-report/checkpoint-decision.txt
+            .tmp/laya-ft/manifest.json
+          retention-days: 90
+          if-no-files-found: warn
+      - name: Exportar checkpoint como arquivo EXTERNO somente se melhorou sem perder positivos
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -qx approved qa-report/checkpoint-decision.txt; then
+            mkdir -p external-model
+            cp -r .tmp/laya-ft/checkpoint external-model/laya-hinos-experimental
+            echo approved > external-model/checkpoint-status.txt
+          else
+            echo "Modelo nao aprovado no holdout; checkpoints nao serao distribuidos."
+          fi
+      - name: Checkpoint externo de pesquisa, nunca embutido no APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: laya-hinos-experimental-modelo-externo
+          path: external-model/
+          retention-days: 30
+          if-no-files-found: ignore
