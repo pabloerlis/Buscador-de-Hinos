@@ -190,6 +190,7 @@ public final class MainActivity extends Activity {
                 .put("phase",nliPhase).put("busy",nliBusy)
                 .put("installed",nliEngine!=null && nliEngine.isInstalled())
                 .put("loaded",nliEngine!=null && nliEngine.isLoaded())
+                .put("model_sha",nliEngine==null?"":nliEngine.modelSha())
                 .put("model","telepatia-ai/laya-pt-es-nli")
                 .put("revision",TelepatiaNliEngine.REV).put("error",nliError).toString();
             }catch(Exception e){return "{}";}
