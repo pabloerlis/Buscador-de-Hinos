@@ -1,0 +1,107 @@
+name: Telepatia NLI ONNX externo - exportacao e paridade
+on:
+  push:
+    branches: [feat/semantic-sliders-live-20261123]
+    paths:
+      - scripts/qa_telepatia_onnx_export.py
+      - .github/workflows/telepatia-nli-onnx-export.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export_and_parity:
+    name: Agente NLI | Exportar checkpoint Telepatia e verificar PyTorch ONNX
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUNBUFFERED: "1"
+      TOKENIZERS_PARALLELISM: "false"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      OMP_NUM_THREADS: "4"
+      USE_TF: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Confirmar recursos e ambiente
+        run: |
+          set -euo pipefail
+          free -h
+          df -h .
+          python -m py_compile scripts/qa_telepatia_onnx_export.py
+      - name: Instalar CPU PyTorch, Laya, exportador ONNX e auditoria
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.9.1" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "laya==0.4.20" "transformers==4.57.3" \
+            "huggingface-hub==0.36.0" "safetensors==0.6.2" \
+            "onnx==1.19.1" "onnxruntime==1.23.2" "onnxscript==0.5.4"
+      - name: Baixar exportador upstream fixado por commit e auditar integridade
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/upstream
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/NandhaKishorM/laya/54c72865e4781233396a56c2db013e29ced3b43c/laya-dotnet/tools/export_onnx.py' \
+            -o .tmp/upstream/export_onnx.py
+          test "$(wc -c < .tmp/upstream/export_onnx.py)" -gt 20000
+          python -m py_compile .tmp/upstream/export_onnx.py
+          echo "Pinned exporter 54c72865e4781233396a56c2db013e29ced3b43c"
+          sha256sum .tmp/upstream/export_onnx.py
+      - name: Baixar pesos externos do Telepatia sob revisao imutavel
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from huggingface_hub import snapshot_download, model_info
+          from pathlib import Path
+          rev="71459abd38f4e439b2f4e3a2dae87573ae40c77e"
+          info=model_info("telepatia-ai/laya-pt-es-nli",revision=rev)
+          assert info.sha==rev, (info.sha,rev)
+          files=snapshot_download(
+              "telepatia-ai/laya-pt-es-nli", revision=rev,
+              local_dir=".tmp/checkpoint/telepatia-pt-es-nli",
+              allow_patterns=["rl_agent_config.json","model.safetensors",
+                  "encoder/*","tokenizer/*","SHA256SUMS","ATTRIBUTIONS.md","provenance.json"],
+          )
+          root=Path(files)
+          for name in ["model.safetensors","rl_agent_config.json","tokenizer/tokenizer.json"]:
+              f=root/name
+              assert f.exists() and f.stat().st_size>0,name
+          assert (root/"model.safetensors").stat().st_size>400_000_000
+          print("Checkpoint revision",rev,"bytes", (root/"model.safetensors").stat().st_size,flush=True)
+          PY
+      - name: Exportar o modelo original para ONNX - sem APK
+        run: |
+          set -euo pipefail
+          python .tmp/upstream/export_onnx.py \
+            .tmp/checkpoint/telepatia-pt-es-nli \
+            --out .tmp/exports --verify
+      - name: Verificar paridade de respostas NLI portuguesas e hashes
+        run: |
+          set -euo pipefail
+          python scripts/qa_telepatia_onnx_export.py \
+            --checkpoint .tmp/checkpoint/telepatia-pt-es-nli \
+            --bundle .tmp/exports/telepatia-pt-es-nli \
+            --report qa-report/telepatia-onnx-export-manifest.json
+      - name: Publicar relatorio somente se a comparacao passar
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telepatia-nli-onnx-parity-manifest
+          path: qa-report/telepatia-onnx-export-manifest.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Publicar pesos convertidos SOMENTE como modelo externo verificado
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telepatia-nli-onnx-external-fp32
+          path: |
+            .tmp/exports/telepatia-pt-es-nli/model.onnx
+            .tmp/exports/telepatia-pt-es-nli/model.onnx.data
+            .tmp/exports/telepatia-pt-es-nli/rl_agent_config.json
+            .tmp/exports/telepatia-pt-es-nli/tokenizer/
+          compression-level: 0
+          retention-days: 30
+          if-no-files-found: error
