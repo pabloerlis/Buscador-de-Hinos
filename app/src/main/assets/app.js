@@ -48,7 +48,10 @@ function busySearch(value){
 }
 function resultCard(hymn,{unlearned=false}={}){
   const number=hymn.number?`HINO ${escapeHTML(hymn.number)}`:'HINO SEM NÚMERO';
-  const collection=`<span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>`;
+  const sources=Array.isArray(hymn.collection_refs)?hymn.collection_refs:[];
+  const collection=sources.length>1
+    ?sources.map(ref=>`<span class="library-tag">${escapeHTML(ref.name||ref.id)}${ref.number?' nº '+escapeHTML(ref.number):''}</span>`).join(' ')
+    :`<span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>`;
   const tags=(hymn.topics||[]).slice(0,3).map(t=>`<span class="small-tag">${escapeHTML(t)}</span>`).join('');
   const klass=hymn.relevance==='Muito relevante'?'':hymn.relevance==='Relevante'?'mid':'low';
   const scoreLabel=hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
