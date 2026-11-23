@@ -81,10 +81,10 @@ jobs:
           onnx_anchor="        proto = onnx.load(tmp_path)"
           assert text.count(onnx_anchor)==1
           text=text.replace(onnx_anchor,onnx_anchor+'''
-            for imp in proto.opset_import:
-                if imp.domain == "":
-                    print("UPGRADE_GRAPH_OPSET_FROM",imp.version,"TO",23,flush=True)
-                    imp.version=23
+                  for imp in proto.opset_import:
+                      if imp.domain == "":
+                          print("UPGRADE_GRAPH_OPSET_FROM",imp.version,"TO",23,flush=True)
+                          imp.version=23
           ''')
           file.write_text(text)
           print("Applied guarded native graph version fix; ONNX Runtime parity remains required",flush=True)
