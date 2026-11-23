@@ -141,6 +141,15 @@ jobs:
           path: qa-report/contextual-review-queue.json
           retention-days: 90
           if-no-files-found: error
+      - name: Medir recuperação ampla P2 somente em modo shadow, sem alterar o ranking
+        run: node scripts/qa_contextual_wide_pool.js .tmp/catalog-2018.json reports/validation/resultado-agentes.json qa-report/contextual-wide-pool.json
+      - name: Arquivar IDs e posições experimentais sem letras nem julgamentos inventados
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-wide-pool-shadow-qa
+          path: qa-report/contextual-wide-pool.json
+          retention-days: 90
+          if-no-files-found: error
       - name: Guardar laudos tecnico e resumido sem publicar letras
         if: always()
         uses: actions/upload-artifact@v4
