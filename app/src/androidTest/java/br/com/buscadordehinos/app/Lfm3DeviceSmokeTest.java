@@ -88,6 +88,36 @@ public class Lfm3DeviceSmokeTest {
             assertEquals("A resposta deve referenciar o hino permitido",fixture.getInt("expected"),resultJson.getInt(0));
             assertTrue("Não houve geração real",compareMetrics[3]>0);
 
+            if (!"baseline".equals(InstrumentationRegistry.getArguments().getString("benchmarkMode"))) {
+                JSONObject chatFixture;
+                try (java.io.InputStream input=InstrumentationRegistry.getInstrumentation()
+                        .getContext().getAssets().open("lfm3-chat-decision.json")) {
+                    ByteArrayOutputStream data=new ByteArrayOutputStream();
+                    byte[] chunk=new byte[4096];
+                    for (int size; (size=input.read(chunk))!=-1;) data.write(chunk,0,size);
+                    chatFixture=new JSONObject(new String(data.toByteArray(),StandardCharsets.UTF_8));
+                }
+                long[] chatMetrics=new long[4];
+                long chatStart=SystemClock.elapsedRealtime();
+                byte[] decision=(byte[])generate.invoke(null,new Object[]{
+                    chatFixture.getString("prompt").getBytes(StandardCharsets.UTF_8),
+                    chatFixture.getString("grammar").getBytes(StandardCharsets.UTF_8),
+                    chatFixture.getInt("maxTokens"),chatFixture.getInt("timeoutMs"),chatMetrics
+                });
+                assertNotNull("LFM3 não respondeu ao roteador P4",decision);
+                String generated=new String(decision,StandardCharsets.UTF_8).trim();
+                JSONArray parsed=new JSONArray("["+generated+"]");
+                assertEquals("Roteador deveria emitir apenas uma ação",1,parsed.length());
+                String action=parsed.getString(0);
+                assertEquals("LFM3 não pediu a busca explícita por hinos",
+                    chatFixture.getString("expected"),action);
+                assertTrue("Sem tokens do roteador de chat",chatMetrics[3]>0);
+                android.util.Log.i("LFM3_BENCH","BENCHMARK_RESULT case=chat-router total_ms="
+                    +(SystemClock.elapsedRealtime()-chatStart)+" setup_ms="+chatMetrics[0]
+                    +" prefill_ms="+chatMetrics[1]+" first_token_ms="+chatMetrics[2]
+                    +" generated="+chatMetrics[3]+" action="+action);
+            }
+
             android.util.Log.i("LFM3_SMOKE_SUCCESS","official QAD Q4_0, tokens="
                 +metrics[3]+", prefill_ms="+metrics[1]+", first_token_ms="+metrics[2]);
         } finally {
