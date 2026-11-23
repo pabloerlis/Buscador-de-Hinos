@@ -892,7 +892,11 @@ const GGUF=(()=>{
 const HymnChatUI=(()=>{
   const session={topic:'',preferences:[],turns:[],candidates:[],bibleReference:null};
   const native=()=>window.NativeGGUF||null;
-  let active=false,sequence=0,callSequence=0,pending=null;
+  let active=false,sequence=0,callSequence=0,pending=null,currentStatusLine=null;
+  // O Android ModelBridge.generate aceita exclusivamente IDs numéricos de 1–12 dígitos.
+  // A faixa 8xxxxxxxxxx evita colisão com os IDs curtos dos fluxos legados.
+  const chatRequestId=()=> '8'+String(++callSequence).padStart(10,'0');
+  const generationStages=['Aguardando o motor','Preparando contexto','Processando entrada','Gerando resposta'];
   const messages=$('chat-messages'),sources=$('chat-sources'),events=$('chat-events');
   const initialMessage='Descreva o assunto, uma anotação espiritual ou a passagem bíblica. Vou conversar e consultar a biblioteca quando necessário.';
   function trace(text){
@@ -936,32 +940,46 @@ const HymnChatUI=(()=>{
   }
   function cancelGeneration(){
     sequence++;
+    if(currentStatusLine){
+      currentStatusLine.textContent='Processamento interrompido.';
+      currentStatusLine=null;
+    }
     if(pending){
       const old=pending;
       pending=null;
+      clearTimeout(old.watchdog);
       try{native()?.cancel?.(old.id);}catch{}
       old.reject(Error('Geração interrompida.'));
     }
   }
-  function generate(request){
+  function generate(request,stage){
     return new Promise((resolve,reject)=>{
       if(pending)return reject(Error('A IA ainda está processando outra mensagem.'));
       if(!native()?.generate)return reject(Error('Motor GGUF indisponível.'));
-      const id='chat-local-'+(++callSequence);
-      pending={id,resolve,reject};
+      const id=chatRequestId();
+      const budget=Math.min(120000,Math.max(1000,Number(request.timeoutMs)||25000));
+      // Defesa independente do JNI: uma solicitação perdida não deixa o chat bloqueado.
+      const watchdog=setTimeout(()=>{
+        if(pending?.id!==id)return;
+        pending=null;
+        try{native()?.cancel?.(id);}catch{}
+        reject(Error('O motor não retornou em '+Math.ceil((budget+6000)/1000)+
+          ' s. Verifique a atividade da IA ou recarregue o modelo.'));
+      },budget+6000);
+      pending={id,resolve,reject,watchdog,stage};
       try{native().generate(request.prompt,id,request.grammar,
         request.maxTokens,request.timeoutMs);}
-      catch(e){pending=null;reject(e);}
+      catch(e){clearTimeout(watchdog);pending=null;reject(e);}
     });
   }
-  // Intercepta somente os IDs originados deste chat, sem misturar com os
-  // fluxos legados de temas e comparação de hinos.
+  // Roteia somente o ID exato da requisição pendente do chat.
+  // Todos os demais eventos continuam no fluxo GGUF convencional.
   window.__hymnChatNativeEvent=(ok,value,requestId,metrics)=>{
-    if(!String(requestId).startsWith('chat-local-'))return false;
-    if(!pending||pending.id!==requestId)return true;
+    if(!pending||pending.id!==String(requestId))return false;
     const task=pending;pending=null;
+    clearTimeout(task.watchdog);
     if(ok)task.resolve({text:String(value),metrics:metrics||{}});
-    else task.reject(Error(String(value).slice(0,180)));
+    else task.reject(Error(String(value).slice(0,240)));
     return true;
   };
   function showCandidates(rows){
@@ -997,13 +1015,29 @@ const HymnChatUI=(()=>{
     const epoch=++sequence,start=performance.now();
     setBusy(true);
     const statusLine=bubble('assistant','Interpretando o pedido…');
+    currentStatusLine=statusLine;
+    let lastStage='';
+    // O dispositivo expõe progresso real do GGUF (prefill / geração).
+    const progressTimer=setInterval(()=>{
+      if(epoch!==sequence||!pending||!active)return;
+      const info=modelStatus();
+      const label=generationStages[info.generationStage]||generationStages[0];
+      const seconds=Math.max(0,Math.floor(Number(info.elapsedMs)||0)/1000);
+      const step=pending.stage==='routing'?'Interpretando pedido':'Elaborando resposta';
+      statusLine.textContent=step+' · '+label+' · '+seconds+' s';
+      const signature=pending.stage+':'+label;
+      if(signature!==lastStage){
+        trace(step+': '+label+(Number.isFinite(info.promptTokens)?' · entrada '+info.promptTokens+' tokens':''));
+        lastStage=signature;
+      }
+    },1200);
     try{
       let plan=HymnChatTools.quickPlan(userText);
       if(plan){
         trace('Pedido explícito: '+plan+' · roteador local, sem geração desnecessária.');
       }else{
         const routing=HymnChatTools.planPrompt(userText,session);
-        const decision=await generate(routing);
+        const decision=await generate(routing,'routing');
         if(epoch!==sequence)return;
         plan=HymnChatTools.readPlan(decision.text,routing.allowed);
         trace('Decisão LFM3: '+plan+' · '+Math.round(performance.now()-start)+' ms');
@@ -1030,9 +1064,9 @@ const HymnChatUI=(()=>{
       if(epoch!==sequence)return;
       trace('Ferramenta: '+result.tool+' · '+Math.round(performance.now()-toolStart)+' ms · '+result.display);
       if(result.tool==='search_hymns')showCandidates(result.candidates||[]);
-      statusLine.textContent='Construindo resposta a partir do contexto…';
+      statusLine.textContent='Consulta concluída: '+result.display+' Elaborando resposta…';
       const draft=HymnChatTools.answerPrompt(userText,session,result);
-      const generated=await generate(draft);
+      const generated=await generate(draft,'answer');
       if(epoch!==sequence)return;
       const reply=HymnChatTools.sanitizeAnswer(generated.text);
       statusLine.textContent=reply;
@@ -1046,7 +1080,11 @@ const HymnChatUI=(()=>{
           '. A conversa foi preservada; você pode tentar novamente.';
         trace('Falha: '+String(error.message).slice(0,130));
       }
-    }finally{if(epoch===sequence){setBusy(false);updateModelLabel();}}
+    }finally{
+      clearInterval(progressTimer);
+      if(currentStatusLine===statusLine)currentStatusLine=null;
+      if(epoch===sequence){setBusy(false);updateModelLabel();}
+    }
   }
   $('main-tab-search').addEventListener('click',()=>setTab('search'));
   $('main-tab-chat').addEventListener('click',()=>setTab('chat'));

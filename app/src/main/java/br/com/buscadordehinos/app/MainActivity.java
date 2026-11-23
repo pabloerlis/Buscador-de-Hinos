@@ -434,7 +434,11 @@ public final class MainActivity extends Activity {
             }
         }
         @JavascriptInterface public synchronized void generate(String prompt,String requestId,String grammar,int maxTokens,int timeoutMs){
-            if(requestId==null||!requestId.matches("[0-9]{1,12}"))return;
+            if(requestId==null||!requestId.matches("[0-9]{1,12}")){
+                ggufEvent("generate",false,"Identificador de geração inválido: use de 1 a 12 dígitos.",
+                    requestId==null?"":requestId,null);
+                return;
+            }
             if(llmBusy){ggufEvent("generate",false,"O modelo já está em uso.",requestId,null);return;}
             if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um GGUF primeiro.",requestId,null);return;}
             if(prompt==null||prompt.trim().isEmpty()||prompt.length()>2400||grammar==null||grammar.length()>2400

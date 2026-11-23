@@ -246,7 +246,7 @@ async function checkBridge(){
   assert.equal(extra.state.effectiveQuery,'Voltar para Deus');
   assert.equal(extra.state.lastResults,hymns);
   assert.equal(extra.calls.length,2);
-  assert.equal(extra.calls[1][4],18000);
+  assert.equal(extra.calls[1][4],extra.calls[0][4]-2000);
   assert.notEqual(extra.calls[1][1],extra.calls[0][1]);
   assert.doesNotMatch(extra.calls[1][2],/\bbuscar_hinos\b/);
   extra.complete(extra.calls[1][1],'[6]');
