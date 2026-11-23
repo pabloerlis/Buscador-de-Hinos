@@ -69,12 +69,12 @@ jobs:
           anchor='    from torch.export.dynamic_shapes import Dim'
           assert text.count(anchor)==1
           text=text.replace(anchor,anchor+'''
-    from onnxscript._framework_apis import torch_2_9 as _api
-    def _native_version(model, target_version):
-        print("NATIVE_GRAPH_OPSETS",str(getattr(model,"opset_imports",{})),flush=True)
-        return model
-    _api.convert_version = _native_version
-''')
+              from onnxscript._framework_apis import torch_2_9 as _api
+              def _native_version(model, target_version):
+                  print("NATIVE_GRAPH_OPSETS",str(getattr(model,"opset_imports",{})),flush=True)
+                  return model
+              _api.convert_version = _native_version
+          ''')
           file.write_text(text)
           print("Applied PyTorch symbolic guard fix and guarded ONNX native-version experiment",flush=True)
           PY
