@@ -5,6 +5,7 @@ const path=require('node:path');
 const seq=require('../app/src/main/assets/telepatia-nli-sequence.js');
 
 const mock={
+  config:{cls_token:'[CLS]',sep_token:'[SEP]',mask_token:'[MASK]'},
   token_to_id(x){return ({'[CLS]':1,'[SEP]':2,'[MASK]':3})[x];},
   encode(text,opt={}){
     assert.equal(opt.add_special_tokens,false);
