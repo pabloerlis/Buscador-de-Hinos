@@ -724,32 +724,43 @@ const GGUF=(()=>{
       deprioritized:state.deprioritize?.slice(),context:state.aiContext,settings:state.searchSettings};
     expandedPending=true;
     $('gguf-compare-expanded').disabled=true;
-    showTask('Explorando mais resultados','Recuperando até 30 candidatos para amostrar cinco trechos curtos.');
+    showTask('Recuperação contextual','Consultando o catálogo completo por estratégias independentes da página…');
     try{
-      const pages=[];
-      for(let page=1;page<=3;page++){
-        const response=await jsonRequest('/api/search',{
-          query,page,parsed_query:true,...searchRestrictions(),
-          semantic_hints:state.semanticHints,vector_query:state.vectorQuery,
-          settings:{...search.settings,pageSize:10}
-        });
+      const response=await jsonRequest('/api/contextual/candidates',{
+        query,parsed_query:true,...searchRestrictions(),
+        semantic_hints:state.semanticHints,vector_query:state.vectorQuery,
+        settings:search.settings,limit:50
+      });
+      if(epoch!==state.searchEpoch||selectedState.task)return;
+      if(response.semantic_judgment!=='NOT_VERIFIED'||response.default_ranking_changed!==false||
+        !Array.isArray(response.candidates))throw Error('Resposta de recuperação incompatível.');
+      const selected=ContextualRetrieval.selectForInspection(response.candidates);
+      const candidates=[];
+      for(const item of selected){
         if(epoch!==state.searchEpoch||selectedState.task)return;
-        pages.push(response.results);
-        if(!response.has_more)break;
+        if(!Number.isSafeInteger(item.hymn_id)||item.hymn_id<1)continue;
+        const hymn=await jsonRequest('/api/hymns/'+item.hymn_id);
+        if(epoch!==state.searchEpoch||selectedState.task)return;
+        if(hymn.id!==item.hymn_id)throw Error('O hino consultado não corresponde ao candidato.');
+        const snippet=LocalHymnAI.excerptFromWholeLyrics(hymn.lyrics);
+        if(snippet)candidates.push({
+          id:hymn.id,number:hymn.number,title:hymn.title,
+          collection:hymn.collection,snippet
+        });
       }
-      const candidates=LocalHymnAI.selectExpandedCandidates(pages);
       const request=LocalHymnAI.prepareComparison(query,search.exclusions,candidates,search.context);
-      if(!request.candidates.size){toast('Não há hinos para comparar.');return;}
+      if(!request.candidates.size){toast('Não há candidatos disponíveis para comparação.');return;}
       if(startTask('compare',request,{
         search,deadline:performance.now()+request.timeoutMs,
-        expanded:true,expandedPages:pages.length
+        expanded:true,expandedPoolCount:response.count
       })){
-        $('gguf-comparison-text').textContent='Comparação ampliada: cinco trechos selecionados de até 30 resultados; a IA não examinou todas as letras.';
+        $('gguf-comparison-text').textContent='Recuperação em toda a coletânea: '+response.count+' candidatos. A IA recebe apenas amostras do início, meio e fim de até cinco letras; a mensagem integral ainda NÃO foi verificada pelo modelo.';
         $('gguf-comparison-actions').replaceChildren();
         $('gguf-comparison').classList.remove('hidden');
-        showTask('Comparação ampliada','Comparando '+request.candidates.size+' hinos selecionados de '+pages.reduce((n,p)=>n+p.length,0)+' resultados. Verifique a letra completa.');
+        showTask('Comparação contextual experimental',
+          request.candidates.size+' letras consultadas localmente; só três partes de cada uma foram enviadas à IA. Nenhuma mudança no ranking padrão.');
       }
-    }catch(error){if(epoch===state.searchEpoch)toast('Pesquisa ampliada falhou: '+error.message);}
+    }catch(error){if(epoch===state.searchEpoch)toast('Recuperação contextual falhou: '+error.message);}
     finally{expandedPending=false;info();}
   }
   async function completeLookup(task,term){
@@ -783,7 +794,7 @@ const GGUF=(()=>{
       'Trecho da coletânea: “'+hymn.excerpt+'”'
     ].join('\n');
     const parts = [];
-    if(task?.expanded)parts.push('Amostra ampliada de resultados fora da primeira página. A recomendação usa apenas trechos.');
+    if(task?.expanded)parts.push('Amostra do início, meio e fim de letras recuperadas de toda a coletânea. A IA NÃO verificou a letra integral.');
     else if(state.lastResults.length)parts.push(indexComparison());
     if(lookup)parts.push('Busca complementar por “'+lookup.term+'” · '+lookup.added+' novo(s) candidato(s)');
     parts.push(picks.length?'Sugestões da IA\n\n'+picks.map(format).join('\n\n'):

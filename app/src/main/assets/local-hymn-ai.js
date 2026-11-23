@@ -16,11 +16,30 @@ const LocalHymnAI = (() => {
     timeoutMs: 20000
   };
 
+  // Só o texto original local é fonte de evidência, nunca um resumo inventado.
+  // Esta amostra NÃO substitui verificação integral; apenas distribui as
+  // partes de início, meio e fim dentro do orçamento atual de 1280 tokens.
+  function excerptFromWholeLyrics(lyrics){
+    const source=String(lyrics||'').trim();
+    if(!source)return '';
+    let parts=source.split(/\n\s*\n/).map(x=>x.split(/\n/).map(l=>l.trim()).filter(Boolean))
+      .filter(x=>x.length);
+    if(parts.length===1&&parts[0].length>=3){
+      const lines=parts[0];
+      parts=lines.map(line=>[line]);
+    }
+    const one=p=>clip(p?.[0]||'',30);
+    const first=one(parts[0]);
+    const middle=one(parts[Math.floor((parts.length-1)/2)]);
+    const last=one(parts[parts.length-1]);
+    if(parts.length===1)return 'Letra: '+clip(first,110);
+    return 'Início: '+first+' | Meio: '+middle+' | Fim: '+last;
+  }
   function prepareComparison(query, exclusions, hymns, context, lookup = null) {
     const candidates = new Map();
     for (const hymn of hymns) {
       const { id } = hymn;
-      const excerpt = clip(hymn.snippet, 72);
+      const excerpt = clip(hymn.snippet, 130);
       if (!Number.isSafeInteger(id) || id < 1 || candidates.has(id) || !excerpt || excerpt === 'Nenhum trecho disponível') continue;
       candidates.set(id, {
         id,
@@ -52,7 +71,7 @@ const LocalHymnAI = (() => {
       context?.reference && 'Ref.: '+promptText(context.reference, 30),
       context?.reference && context?.passage && promptText(context.passage, 54),
       candidates.size && 'ID | trecho',
-      ...[...candidates.values()].map(hymn=>hymn.id+' | '+promptText(hymn.excerpt, 72))
+      ...[...candidates.values()].map(hymn=>hymn.id+' | '+promptText(hymn.excerpt, 130))
     ].filter(Boolean).join('\n');
     const grammar = [
       'root ::= '+(lookupRequired?'lookup':canLookup?'picks | lookup':'picks'),
@@ -146,5 +165,5 @@ const LocalHymnAI = (() => {
     };
   }
 
-  return { diagnostic, prepareComparison, readComparison, mergeCandidates, selectExpandedCandidates, prepareThemes };
+  return { diagnostic, prepareComparison, readComparison, mergeCandidates, selectExpandedCandidates, excerptFromWholeLyrics, prepareThemes };
 })();
