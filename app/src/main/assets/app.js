@@ -800,7 +800,7 @@ const GGUF=(()=>{
       if(!LocalHymnAI.registerReviewLyrics(session.queue,hymn.lyrics))continue;
       const request=LocalHymnAI.prepareFullReview(session.query,session.exclusions,hymn,session.context);
       if(!request){session.queue.unverified++;continue;}
-      task.hymn=hymn;
+      task.hymn=hymn;task.candidate=candidate;
       showTask('Analisando letra integral', 'Hino '+(hymn.number||hymn.id)+
         ' · '+task.accepted+'/'+REVIEW_BATCH_TARGET+' novos aprovados');
       if(!sendTask(task,request))return;
@@ -938,7 +938,7 @@ const GGUF=(()=>{
       try{
         const decision=LocalHymnAI.readFullReview(answer);
         if(decision.approved && !reviewedFor(task.session.root).has(task.hymn.id)){
-          reviewedFor(task.session.root).add(task.hymn.id);
+          for(const id of (task.hymn.family_ids||task.candidate?.family_ids||[task.hymn.id])) reviewedFor(task.session.root).add(Number(id));
           task.session.queue.approved.push({hymn:task.hymn,grade:decision.grade});
           task.accepted++;
         }else if(!decision.approved)task.session.queue.rejected++;
