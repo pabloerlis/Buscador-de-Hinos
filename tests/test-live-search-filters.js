@@ -92,7 +92,10 @@ function start(){
   const savePair=pair=>api.request('/api/dictionary/synonyms/save',{pair});
   await savePair(['paz','esperança']);
   assert.deepEqual(numbers(await search([peace])),['001','003','007']);
-  assert.deepEqual(numbers(await search([{...peace,synonyms:true}])),['001','002','003','005','007']);
+  const expanded=await search([{...peace,synonyms:true}]);
+  assert.equal(expanded.total,6);
+  assert.deepEqual(numbers(expanded),['001','002','003','004','005']);
+  assert.deepEqual(numbers(await search([{...peace,synonyms:true}],'',{page:2})),['007']);
   assert.ok(api.filterSynonyms('esperança').includes('paz'));
   await savePair(['esperança','caminho']);
   assert.ok(!api.filterSynonyms('paz').includes('caminho'));
