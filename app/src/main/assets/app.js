@@ -224,6 +224,7 @@ function hideLayer(el){clearTimeout(layerTimers.get(el));layerTimers.delete(el);
 function openLayer(name){
   const el=$(name+'-layer');if(!el)return;
   if(state.activeModal===name)return;
+  for(const closing of [...layerTimers.keys()])if(closing!==el)hideLayer(closing);
   if(state.activeModal)hideLayer($(state.activeModal+'-layer'));
   else layerReturnFocus=document.activeElement;
   clearTimeout(layerTimers.get(el));layerTimers.delete(el);el.classList.remove('is-closing','hidden');el.inert=false;

@@ -6,7 +6,7 @@ const document={documentElement:root,querySelector:()=>null,getElementById:()=>n
 const media={matches:false,addEventListener(){}};
 const env={document,window:{},matchMedia:()=>media,localStorage:{getItem:k=>values.get(k),setItem:(k,v)=>values.set(k,v)}};
 const src=fs.readFileSync(path.join(__dirname,'../app/src/main/assets/appearance.js'),'utf8');
-const make=()=>vm.runInNewContext(src+'\nAppearance',env);
+const make=()=>vm.runInNewContext(src+'\nAppearance',{...env});
 let api=make();
 assert.equal(root.dataset.palette,'emerald');
 api.update({palette:'ocean',mode:'dark',motion:'zoom',speed:'slow'});

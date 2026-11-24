@@ -79,7 +79,7 @@ input[type="checkbox"],input[type="range"]{accent-color:var(--action)}
 [data-motion="slide"] .modal-layer.is-closing>section{animation-name:hinos-slide-out}
 [data-motion="zoom"] .modal-layer:not(.hidden):not(.is-closing)>section,[data-motion="zoom"] .animate-demo{animation-name:hinos-zoom-in}
 [data-motion="zoom"] .modal-layer.is-closing>section{animation-name:hinos-zoom-out}
-[role="tabpanel"].tab-enter{animation:hinos-fade-in var(--motion-ms) ease both}
+[role="tabpanel"].tab-enter{animation:hinos-fade-in var(--motion-ms) ease}
 [data-motion="slide"] [role="tabpanel"].tab-enter{animation-name:hinos-slide-in}
 [data-motion="zoom"] [role="tabpanel"].tab-enter{animation-name:hinos-zoom-in}
 @media(prefers-reduced-motion:reduce){.modal-layer>section,.modal-layer .modal-scrim,.animate-demo,.tab-enter{animation:none!important}}

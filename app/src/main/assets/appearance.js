@@ -12,10 +12,10 @@ const Appearance=(()=>{
   const defaults={palette:'emerald',mode:'system',motion:'slide',speed:'normal'};
   const speeds={fast:150,normal:250,slow:390};
   function sanitize(raw){
-    return {palette:Object.hasOwn(palettes,raw?.palette)?raw.palette:defaults.palette,
+    return {palette:Object.prototype.hasOwnProperty.call(palettes,raw?.palette)?raw.palette:defaults.palette,
       mode:['light','dark','system'].includes(raw?.mode)?raw.mode:defaults.mode,
       motion:['slide','zoom','fade','none'].includes(raw?.motion)?raw.motion:defaults.motion,
-      speed:Object.hasOwn(speeds,raw?.speed)?raw.speed:defaults.speed};
+      speed:Object.prototype.hasOwnProperty.call(speeds,raw?.speed)?raw.speed:defaults.speed};
   }
   let prefs=defaults;
   try{prefs=sanitize(JSON.parse(localStorage.getItem(key)||'{}'));}catch(_){}
