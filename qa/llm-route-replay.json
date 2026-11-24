@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "source_run": 45387239783,
+  "source_commit": "21f6b310daca2de4bbbe11de2b7908e593c8e6cb",
+  "model_sha256": "2fde00ce69dd4899c70d020845e2638353015bba0fdf161b3eb965f2bca4464e",
+  "kind": "actual_model_output_replay",
+  "rows": [
+    {
+      "query": "Marcos 5:25-34",
+      "scene": "Marcos 5:25-34",
+      "meaning": "Uma mulher com fluxo de sangue há doze anos, que havia sofrido muito e gastado tudo sem cura, ouve falar de Jesus e se aproxima por trás, tocando suas roupas. Instantaneamente, seu fluxo para. Jesus percebe o poder que saiu e, ao descobrir quem tocou, cura-a e diz: 'Filha, a tua fé te salvou.'"
+    },
+    {
+      "query": "Mulher do fluxo de sangue",
+      "scene": "Marcos 5:25-34",
+      "meaning": "Uma mulher com fluxo de sangue por doze anos, que havia sofrido muito e gastado tudo sem cura, ouve falar de Jesus e se aproxima por trás, tocando suas roupas. Instantaneamente, seu fluxo para. Jesus percebe o poder e, ao perguntar quem tocou, a mulher se revela, agradecendo por sua fé, que é reconhecida como a causa da cura."
+    },
+    {
+      "query": "Uma mulher sofria havia doze anos; no meio da multidão tocou a roupa de Jesus confiando que seria curada",
+      "scene": "Marcos 5:25-34",
+      "meaning": "Uma mulher que sofria há doze anos, por meio da multidão, toca a roupa de Jesus com fé, acreditando que será curada; o ato é interpretado como um sinal de fé e cura, com o desfecho de sua cura imediata conforme anunciado por Jesus."
+    },
+    {
+      "query": "Depois de anos de doença, alguém se aproximou do Mestre por trás e recuperou a saúde ao tocar seu manto",
+      "scene": "Marcos 5:25-34",
+      "meaning": "Uma mulher com fluxo de sangue, por anos doente, se aproxima de Jesus por trás e toca seu manto, recebendo imediatamente a cura. A ação é súbita e eficaz, demonstrando a graça e o poder de cura de Jesus."
+    },
+    {
+      "query": "Lucas 15:11-32",
+      "scene": "Lucas 15:11-32",
+      "meaning": "Um filho mais jovem pede sua herança, sai e vive irresponsavelmente, caindo na pobreza e se alimentando de grãos dos porcos. Ao perceber sua situação, volta ao pai, que o recebe com compaixão, celebrando sua volta. O irmão mais velho, que sempre obedeceu, se irrita com a festa, mas o pai o convida a entrar, ensinando que o amor e a misericórdia superam a justiça e a repreensão."
+    },
+    {
+      "query": "Filho pródigo",
+      "scene": "Lucas 15:11-32",
+      "meaning": "Um homem tem dois filhos: o mais jovem pede sua herança, sai e vive irresponsavelmente, gastando todos os bens e caindo em necessidade. Ele volta ao pai, que o recebe com compaixão, celebrando sua volta. O filho mais velho, que sempre obedeceu, se irrita com a festa, mas o pai o convida a entrar, reafirmando que o filho está sempre com ele e que a celebração é por sua volta e redenção."
+    },
+    {
+      "query": "Um jovem deixou a casa de seu pai, perdeu tudo, arrependeu-se e voltou; foi recebido com misericórdia",
+      "scene": "Lucas 15:11-32",
+      "meaning": "Um jovem sai de casa, vive na miséria, arrepende-se e retorna; é recebido com misericórdia e perdão pelo pai, que o abraça e o restaura como filho."
+    },
+    {
+      "query": "Depois de viver longe de casa e desperdiçar sua herança, decidiu regressar e pedir perdão ao pai",
+      "scene": "Lucas 15:11-32",
+      "meaning": "Um filho que viveu longe, desperdiçou sua herança e, após um tempo de distância, decide retornar para pedir perdão ao pai, retratando o momento de arrependimento e reconciliação, como descrito na parábola do filho pródigo."
+    },
+    {
+      "query": "Marcos 10:46-52",
+      "scene": "Marcos 10:46-52",
+      "meaning": "Um cego chamado Bartimeu, filho de Timeu, ao ouvir que Jesus é o Filho de Davi, clama por misericórdia. Jesus o chama, ele se levanta e, por fé, vê. Jesus lhe diz que sua fé o salvou, e ele segue com ele pelo caminho."
+    },
+    {
+      "query": "Bartimeu",
+      "scene": "Marcos 10:46-52",
+      "meaning": "Um cego que caminhava na estrada foi curado por Jesus, que o chamou pelo nome e o instruiu a seguir. Ao fazer isso, ele se levantou e foi curado, podendo ver. A ação demonstra a graça e a intervenção direta de Jesus em situações de sofrimento físico."
+    },
+    {
+      "query": "Um mendigo cego gritou pelo Filho de Davi à beira do caminho, apesar de mandarem que se calasse, e recuperou a visão",
+      "scene": "João 9:1-41",
+      "meaning": "Um homem cego desde o nascimento grita pelo Filho de Davi ao longo do caminho, apesar de ser ordenado a se calar; Jesus o cura e ele recupera a visão, demonstrando misericórdia e poder de cura."
+    },
+    {
+      "query": "João 11:1-44",
+      "scene": "João 11:1-44",
+      "meaning": "Jesus ressuscita Lázaro de Betânia após quatro dias de morte, demonstrando sua poder sobre a morte. Marta e Maria expressam tristeza e fé, e Jesus, commovedo, chora e ordena a ressurreição do irmão, que sai da sepultura com mãos e pés atados, sendo então libertado para voltar a viver."
+    },
+    {
+      "query": "Ressurreição de Lázaro",
+      "scene": "João 11:1-44",
+      "meaning": "Jesus visita Betânia para ressuscitar seu amigo Lázaro, que havia morrido há quatro dias. Após Marta e Maria chorarem, Jesus se move à sepultura, remove a pedra e, com uma voz forte, ordena que Lázaro saia. O homem ressuscita com mãos e pés atados, e Jesus ordena que sejam desatados e ele seja libertado. O evento demonstra a poderosa intervenção divina e a fé de Jesus em sua missão de glória."
+    },
+    {
+      "query": "Jesus chamou para fora do sepulcro um amigo que já havia morrido",
+      "scene": "João 11:1-44",
+      "meaning": "Jesus ressuscita Lázaro, um amigo que havia morrido, demonstrando sua poder sobre a morte; Lázaro sai do sepulcro e volta a viver, evidenciando a vitória do amor e da fé sobre a morte."
+    },
+    {
+      "query": "Marcos 4:35-41",
+      "scene": "Marcos 4:35-41",
+      "meaning": "Jesus acalma uma tempestade enquanto dormia no barco com os discípulos; o vento e as ondas se calam por sua palavra, demonstrando seu poder sobre a natureza e a fé dos discípulos, que ficam atemorizados diante da sua autoridade."
+    },
+    {
+      "query": "Jesus acalma a tempestade",
+      "scene": "Marcos 4:35-41",
+      "meaning": "Jesus acalma uma tempestade enquanto dorme na popa do barco, despertado pelos discípulos que se assustam com o vento e as ondas. Ele repreende o vento e o mar, ordenando que se calem, e a tempestade se acalma. Os discípulos ficam atemorizados e reconhecem sua soberania sobre a natureza."
+    },
+    {
+      "query": "Durante uma travessia os discípulos temeram morrer; Cristo ordenou ao vento e ao mar que se aquietassem",
+      "scene": "Marcos 4:35-41",
+      "meaning": "Durante uma travessia, os discípulos temiam morrer por causa da tempestade. Jesus, ao ver a situação, ordenou ao vento e ao mar que se acalmassem, demonstrando seu poder sobre a natureza e restaurando a paz e a fé dos discípulos."
+    },
+    {
+      "query": "Lucas 15:3-7",
+      "scene": "Lucas 15:3-7",
+      "meaning": "Jesus conta a parábola da ovelha perdida para ilustrar que há grande alegria no céu quando um pecador se arrepende, destacando o valor do perdido e a busca incessante por quem está distante, com ações de busca, alegria e convocação de outros para celebrar o retorno."
+    },
+    {
+      "query": "Ovelha perdida",
+      "scene": "Lucas 15:3-7",
+      "meaning": "Jesus usa a parábola da ovelha perdida para ilustrar o valor do arrependimento do pecador. Um pastor de cem ovelhas busca uma perdida com alegria, e a recompensa é maior no céu do que a felicidade de noventa e nove justos, destacando a importância do perdido que se volta para Deus."
+    },
+    {
+      "query": "O pastor deixou o rebanho para procurar uma única ovelha que havia se extraviado e voltou alegre com ela",
+      "scene": "Lucas 15:3-7",
+      "meaning": "Um pastor abandona o rebanho para encontrar uma ovelha perdida, demonstrando dedicação e amor por cada membro do rebanho. Ao encontrá-la, retorna alegre, simbolizando o cuidado divino e a busca incessante por quem está sozinho ou perdido."
+    },
+    {
+      "query": "Estou angustiado e quero confiar em Deus sem saber o que acontecerá amanhã",
+      "scene": null,
+      "meaning": "Um indivíduo expressa angústia diante do desconhecido do futuro e busca confiar em Deus, buscando paz e esperança em meio à incerteza, sem pedir uma cena específica da Bíblia."
+    },
+    {
+      "query": "Um louvor de gratidão pela recuperação da minha saúde",
+      "scene": null,
+      "meaning": "Um louvor de gratidão pela recuperação da saúde expressa alegria e reconhecimento por um processo de cura, sem referência a uma cena bíblica específica."
+    },
+    {
+      "query": "Um hino para consolar uma família que perdeu um ente querido",
+      "scene": null,
+      "meaning": "A consulta busca um hino de consolo para uma família em luto por uma perda de ente querido. A intenção é oferecer esperança, fé e apoio emocional, sem referência a uma cena bíblica específica."
+    },
+    {
+      "query": "Quero cantar sobre a certeza da volta de Jesus",
+      "scene": null,
+      "meaning": "A intenção é expressar fé e esperança na certeza da volta de Jesus, buscando conforto e fortalecimento espiritual. Não há referência específica a uma cena bíblica, mas sim uma aplicação de fé e esperança no futuro do reino de Deus."
+    },
+    {
+      "query": "Precisamos de comunhão e unidade entre os irmãos",
+      "scene": null,
+      "meaning": "A busca expressa a necessidade de conexão, solidariedade e unidade entre os membros da igreja, refletindo um desejo de comunhão espiritual e fortalecimento dos laços de irmãos, sem referência a uma cena específica da Bíblia."
+    },
+    {
+      "query": "Uma mensagem sobre servir com humildade sem esperar reconhecimento",
+      "scene": null,
+      "meaning": "A consulta busca um hino que reflita o valor de servir com humildade e dedicação, sem buscar reconhecimento. A intenção é expressar gratidão, fé e compromisso com o serviço ao próximo, sem exigência de retorno ou elogio, alinhando-se ao espírito de obediência e amor cristão."
+    },
+    {
+      "query": "Gostaria de um hino de oração antes de começar o dia",
+      "scene": null,
+      "meaning": "A intenção é buscar um hino de oração para iniciar o dia, expressando gratidão, fé e esperança. Não há referência a uma cena bíblica específica, portanto, a aplicação é geral e voltada ao fortalecimento espiritual no início do dia."
+    },
+    {
+      "query": "Esperança e paz para quem está passando por dificuldades financeiras",
+      "scene": null,
+      "meaning": "A consulta expressa uma busca por esperança e paz em meio às dificuldades financeiras, sem referência a um episódio bíblico específico. A intenção é de conforto e fortalecimento espiritual, indicando necessidade de fé e confiança em Deus durante tempos de adversidade."
+    }
+  ]
+}
