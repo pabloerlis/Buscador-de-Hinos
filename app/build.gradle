@@ -35,3 +35,14 @@ android {
 }
 
 dependencies { implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0' }
+
+// A build from the local workstation must not silently omit the lexical database.
+tasks.register('verifyLexicalAsset') {
+    doLast {
+        def lexical = file('src/main/assets/lexical-pt.json')
+        if (!lexical.isFile() || lexical.length() < 100000) {
+            throw new GradleException('Base lexical ausente. Execute python3 scripts/build_lexical_pt.py na raiz do projeto.')
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn('verifyLexicalAsset') }

@@ -31,9 +31,9 @@ function start(){
   const ctx = vm.createContext({
     window, indexedDB, document, setTimeout, console,
     localStorage:{getItem:key=>saved.get(key)??null,setItem:(key,value)=>saved.set(key,value)},
-    fetch:async name=>({ok:true,json:async()=>JSON.parse(fs.readFileSync(path.join(assets,name),'utf8'))})
+    fetch:async name=>({ok:true,json:async()=>name==='lexical-pt.json'?{schema_version:1,source:'OpenWordnet-PT 1.0.0',groups:[['paz','quietacao'],['quietacao','sossego'],['alegria','jubilo']]}:JSON.parse(fs.readFileSync(path.join(assets,name),'utf8'))})
   });
-  for (const file of ['semantic-engine.js','story-engine.js','scripture-index.js','bible-graph-engine.js','bible-context.js','repertoire-store.js','context-ranker.js','offline-api.js']){
+  for (const file of ['semantic-engine.js','story-engine.js','scripture-index.js','bible-graph-engine.js','bible-context.js','repertoire-store.js','context-ranker.js','lexical-pt.js','offline-api.js']){
     vm.runInContext(fs.readFileSync(path.join(assets,file),'utf8'),ctx,{filename:file});
   }
   return vm.runInContext('OfflineAPI', ctx);
@@ -46,7 +46,7 @@ function start(){
     {title:'002 - Canto da tarde',content:'Serenidade e alegria neste dia.'},
     {title:'003 - Canto da noite',content:'Paz com júbilo e felicidade.'},
     {title:'004 - Paz anunciada',content:'Dia de alegria e esperança.'},
-    {title:'005 - Canto de esperança',content:'Ansiedade e alegria neste dia de esperança.'},
+    {title:'005 - Canto de esperança',content:'Ansiedade e alegria neste dia de esperança. Quietação.'},
     {title:'006 - Canto de viagem',content:'Rapaz toma o caminho com alegria.'},
     {title:'007 - Canto ao longe',content:'Paz, alegria e gratidão a Deus.'}
   ]}]});
@@ -111,5 +111,12 @@ function start(){
   assert.ok(!api.filterSynonyms('paz').includes('esperanca'));
   await api.request('/api/dictionary/restore',backup);
   assert.ok(api.filterSynonyms('paz').includes('esperanca'));
+  await api.request('/api/dictionary/synonyms/save',{pair:['paz','esperança'],remove:true});
+  assert.ok(api.filterSynonyms('paz',{lexical:true}).includes('quietacao'));
+  assert.ok(!api.filterSynonyms('paz',{lexical:true}).includes('sossego'));
+  assert.ok(!api.filterSynonyms('paz').includes('quietacao'));
+  assert.equal((await api.request('/api/status')).lexical_ready,true);
+  assert.deepEqual(numbers(await search([{...peace,synonyms:true,lexical:true}])),['001','002','003','005','007']);
+  assert.deepEqual(numbers(await search([{...peace,synonyms:false,lexical:true}])),['001','003','007']);
   console.log('Filtros ao vivo: termo exato, sinônimos independentes, escopo, exclusão, preferência, número e paginação aprovados.');
 })().catch(error=>{console.error(error);process.exitCode=1;});
