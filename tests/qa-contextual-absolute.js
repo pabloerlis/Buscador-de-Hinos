@@ -11,6 +11,7 @@ const groups=[
  {id:'storm',queries:['Marcos 4:35-41','Jesus acalma a tempestade','Durante uma travessia os discípulos temeram morrer; Cristo ordenou ao vento e ao mar que se aquietassem'],targets:[['principal','310']]},
  {id:'sheep',queries:['Lucas 15:3-7','Ovelha perdida','O pastor deixou o rebanho para procurar uma única ovelha que havia se extraviado e voltou alegre com ela'],targets:[['principal','259'],['avulsos','ERAM CEM OVELHAS']]}
 ];
+if(process.argv[2]==='--manifest'){console.log(JSON.stringify(groups));process.exit(0);}
 if(process.argv[2]==='--queries'){console.log(JSON.stringify(groups.flatMap(g=>g.queries)));process.exit(0);}
 const [catalogPath,vectorPath]=process.argv.slice(2);
 const root=path.resolve(__dirname,'..'),assets=path.join(root,'app/src/main/assets');
