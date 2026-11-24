@@ -55,13 +55,17 @@ function matches(hit,[collection,value]){
   const vector=vectors[query];assert.ok(Array.isArray(vector)&&vector.length===384&&vector.every(Number.isFinite));
   assert.ok(Math.abs(Math.hypot(...vector)-1)<.03);
   const payload={query,vector_query:vector,_forRecommendations:true,settings:{bibleGraph:true,scripture:true,narratives:true,eventEvidence:true,mode:'balanced',strength:75,vectorMode:'balanced',fusionMode:'rrf',pageSize:10}};
-  const result=await api.request('/api/search',payload);
+  // Reproduce the Android route: the app does not embed an already resolved Bible reference.
+  const {vector_query,...withoutVector}=payload;
+  const initial=await api.request('/api/search',withoutVector);
+  const used_e5=!initial.bible_reference&&!initial.exact_number;
+  const result=used_e5?await api.request('/api/search',payload):initial;
   assert.ok(Array.isArray(result._fullRanked));
   const ranked=result._fullRanked;
   const first=ranked.findIndex(h=>g.targets.some(t=>matches(h,t)))+1;
   const weak=ranked.findIndex(h=>(g.weak||[]).some(t=>matches(h,t)))+1;
   const top=ranked.slice(0,10).map(h=>({collection:h.collection,number:h.number,title:h.title,score:h.relevance_score,review:g.targets.some(t=>matches(h,t))?'provisional_positive':(g.weak||[]).some(t=>matches(h,t))?'user_contested':'unreviewed'}));
-  const row={episode:g.id,query,first_known_positive:first||null,user_contested_rank:weak||null,top10:top,pass:first>0&&first<=3&&(!weak||weak>3)};
+  const row={episode:g.id,query,used_e5,bible_reference:result.bible_reference||null,first_known_positive:first||null,user_contested_rank:weak||null,top10:top,pass:first>0&&first<=3&&(!weak||weak>3)};
   rows.push(row);console.log(JSON.stringify(row));
  }
  const report={schema_version:1,catalog_count:imported.count,vector_count:status.vector_count,criteria:'At least one provisional positive in top 3 for every formulation; user-contested hymn 264 outside top 3 for explicit prodigal episode; other hymns unreviewed, not negatives.',human_review_status:'pending',nli_inference:false,rows,known_positive_top1:rows.filter(r=>r.first_known_positive===1).length/rows.length,known_positive_top3:rows.filter(r=>r.first_known_positive&&r.first_known_positive<=3).length/rows.length,failed:rows.filter(r=>!r.pass).length};
