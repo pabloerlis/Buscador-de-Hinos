@@ -1,0 +1,66 @@
+name: Harrier - publicar indice auditado existente
+on:
+  push:
+    branches: [feat/harrier-embeddings]
+    paths:
+      - '.github/workflows/harrier-publish-index.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: harrier-index-publish-v1
+  cancel-in-progress: false
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/feat/harrier-embeddings'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: harrier-index-v1
+          run-id: 45477581426
+          github-token: ${{ github.token }}
+          path: data/embeddings/harrier-600m-q4f16
+      - name: Conferir artefato original sem regenerar
+        run: |
+          cd data/embeddings/harrier-600m-q4f16
+          echo 'faa0adcaa299f9657e524d3f39a6617c4a46f632f49b1699a7b80c54c17ad664  index.json' | sha256sum -c -
+          echo '1f27860f1c7c7a83c03f98125f17343b2964fd382ea7388712c8f1a36070c22b  manifest.json' | sha256sum -c -
+      - name: Auditar estrutura
+        run: python3 scripts/build_harrier_index.py --audit-only --out data/embeddings/harrier-600m-q4f16
+      - name: Publicar por API Git sem force push
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          branch=data/harrier-600m-v1
+          dir=data/embeddings/harrier-600m-q4f16
+          parent=$(gh api "repos/$repo/git/ref/heads/$branch" --jq .object.sha)
+          base=$(gh api "repos/$repo/git/commits/$parent" --jq .tree.sha)
+          existing=$(gh api "repos/$repo/git/trees/$base?recursive=1" --jq '.tree[] | select(.path == "data/embeddings/harrier-600m-q4f16/index.json") | .sha')
+          if [ -n "$existing" ]; then
+            test "$existing" = dd21c77cbe1181451a77fe2b4647c3330eb54d21
+            echo "Base ja publicada: $parent"
+            exit 0
+          fi
+          test "$parent" = c557dc2caa9b969b60d015c93172a437d7419b70
+          for file in index.json manifest.json; do
+            jq -Rs '{content: ., encoding:"utf-8"}' "$dir/$file" > /tmp/blob.json
+            gh api --method POST "repos/$repo/git/blobs" --input /tmp/blob.json --jq .sha > "/tmp/$file.sha"
+          done
+          index=$(cat /tmp/index.json.sha)
+          manifest=$(cat /tmp/manifest.json.sha)
+          test "$index" = dd21c77cbe1181451a77fe2b4647c3330eb54d21
+          test "$manifest" = e892eda87670d6e821bd051f9fc773e8ce958980
+          jq -n --arg base "$base" --arg index "$index" --arg manifest "$manifest" --arg dir "$dir" '{base_tree:$base,tree:[{path:($dir+"/index.json"),mode:"100644",type:"blob",sha:$index},{path:($dir+"/manifest.json"),mode:"100644",type:"blob",sha:$manifest}]}' > /tmp/tree.json
+          tree=$(gh api --method POST "repos/$repo/git/trees" --input /tmp/tree.json --jq .sha)
+          jq -n --arg tree "$tree" --arg parent "$parent" '{message:"data: indice Harrier 600M Q4F16 v1 auditado",tree:$tree,parents:[$parent]}' > /tmp/commit.json
+          commit=$(gh api --method POST "repos/$repo/git/commits" --input /tmp/commit.json --jq .sha)
+          gh api --method PATCH "repos/$repo/git/refs/heads/$branch" -f sha="$commit" -F force=false
+          test "$(gh api "repos/$repo/git/ref/heads/$branch" --jq .object.sha)" = "$commit"
+          echo "DATA_COMMIT=$commit"
