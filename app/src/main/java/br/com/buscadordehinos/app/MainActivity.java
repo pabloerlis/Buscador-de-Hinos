@@ -551,8 +551,8 @@ public final class MainActivity extends Activity {
             if(requestId==null||!requestId.matches("[0-9]{1,12}"))return;
             if(llmBusy){ggufEvent("generate",false,"O modelo já está em uso.",requestId,null);return;}
             if(!NATIVE_AVAILABLE||!modelLoaded){ggufEvent("generate",false,"Carregue um GGUF primeiro.",requestId,null);return;}
-            if(prompt==null||prompt.trim().isEmpty()||prompt.length()>2400||grammar==null||grammar.length()>2400
-                    ||maxTokens<1||maxTokens>120||timeoutMs<1000||timeoutMs>120000){
+            if(prompt==null||prompt.trim().isEmpty()||prompt.length()>12000||grammar==null||grammar.length()>12000
+                    ||maxTokens<1||maxTokens>256||timeoutMs<1000||timeoutMs>300000){
                 ggufEvent("generate",false,"Parâmetros de geração inválidos.",requestId,null);
                 return;
             }
