@@ -3,7 +3,15 @@ on:
   push:
     branches: [feat/semantic-sliders-live-20261123]
     paths:
+      - app/src/main/assets/index.html
+      - app/src/main/assets/style.css
+      - app/src/main/assets/telepatia-nli-client.js
+      - app/src/main/java/br/com/buscadordehinos/app/MainActivity.java
       - app/src/androidTest/java/br/com/buscadordehinos/app/TelepatiaDeviceSmokeTest.java
+      - app/build.gradle
+      - tests/test-semantic-tuner.js
+      - scripts/qa_telepatia_android_review.py
+      - scripts/qa_telepatia_emulator.sh
       - .github/workflows/telepatia-android-device.yml
   workflow_dispatch:
 permissions:
@@ -167,7 +175,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Buscador-Hinos-v2.6.21-Telepatia-NLI-Android-QA
+          name: Buscador-Hinos-v2.6.22-Telepatia-NLI-Android-QA
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
           if-no-files-found: error
