@@ -55,7 +55,6 @@ function resultCard(hymn,{unlearned=false}={}){
   const score=Number.isFinite(hymn.tuner_score)?hymn.tuner_score:Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
   return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Índice heurístico de ordenação, não probabilidade, certeza nem avaliação NLI"><strong>${score}%</strong> ${scoreLabel}</span></div>
   <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
-  ${hymn.nli_label?`<div class="nli-result-label" title="Classificação real do Telepatia PT/ES, não probabilidade">Telepatia: ${hymn.nli_label==='entailment'?'implicação':hymn.nli_label==='contradiction'?'contradição':'neutro'}</div>`:''}
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
@@ -124,7 +123,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     if(page===1&&typeof SearchTuner!=='undefined'){
       SearchTuner.accept(data);
       if(!refine&&!preserveContext)SearchTuner.record(query);
-      if(window.TelepatiaUI)window.TelepatiaUI.onResults(data,state.effectiveQuery,state.searchEpoch);
+
     }
     succeeded=true;
   }catch(error){
@@ -136,7 +135,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     toast(error.message);
   }finally{busySearch(false);}
   if(succeeded&&page===1&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
-  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && (typeof SearchTuner==='undefined'||!SearchTuner.isDirect()) && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
+  if(succeeded && page===1 && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
   GGUF.info?.();
   return succeeded;
 }
@@ -264,7 +263,7 @@ $('refine-form').addEventListener('submit',async ev=>{
 });
 $('load-more').addEventListener('click',()=>{if(!SearchTuner.more())performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false});});
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;SearchTuner.clearPool();window.TelepatiaUI?.reset();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;SearchTuner.clearPool();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
 
 const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
@@ -566,7 +565,7 @@ const EmbeddingSearch=(()=>{
       $('load-more').textContent='Carregar mais '+result.page_size+' hinos';
       $('results-subtitle').textContent=`${result.total} resultados · busca híbrida com E5 Small`;
       SearchTuner.accept(result);
-      if(window.TelepatiaUI)window.TelepatiaUI.onResults(result,state.effectiveQuery,epoch);
+
       status('E5 Small: ranking vetorial atualizado em '+(answer.ms/1000).toFixed(1)+'s. Sem internet.');
     }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · modelo E5: '+error.message);}
   }
@@ -609,7 +608,9 @@ const GGUF=(()=>{
   function info(){
     const status=nativeStatus();selectedState.ready=Boolean(status.loaded);selectedState.busy=Boolean(status.busy||selectedState.task);
     const available=Boolean(status.available); const phase=status.phase||(status.loaded?'ready':status.selected?'selected':'none');
-    $('gguf-select').disabled=!available||selectedState.busy;$('gguf-load').disabled=!available||!status.selected||selectedState.busy;
+    $('gguf-select').disabled=!available||selectedState.busy;$('gguf-load').disabled=!available||!status.selected||selectedState.busy||selectedState.ready;
+    $('gguf-select-home').disabled=$('gguf-select').disabled;$('gguf-load-home').disabled=$('gguf-load').disabled;
+    $('gguf-home-status').textContent=available?(status.loaded?'Qwen3 carregado e pronto.':status.busy?'Modelo em preparação…':status.selected?'Selecionado: '+status.name:'Selecione o arquivo GGUF do Qwen3.'):'Motor GGUF indisponível: verifique a instalação.';
     $('gguf-improve').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||!canUseTopics();
     $('gguf-compare').disabled=!state.lastResults.length;
     $('gguf-compare-model').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
@@ -690,7 +691,7 @@ const GGUF=(()=>{
   function maybeAuto(query){
     if(!selectedState.ready||!$('gguf-auto').checked||!state.ready||!canUseTopics())return;
     if(selectedState.task){queuedAuto={query,epoch:state.searchEpoch};return;}
-    interpret(query,MAX_AI_MS);
+    curate();
   }
   function interpret(query,timeoutMs=MAX_AI_MS){
     if(!query?.trim()||state.busy||state.repertoirePending||!canUseTopics())return;
@@ -864,7 +865,7 @@ const GGUF=(()=>{
   }
   window.__ggufNativeEvent=(event,ok,value,requestId,metrics)=>{
     if(event==='phase'){info();return;}
-    if(event==='selection'){if(ok){aiCache.clear();toast('Modelo selecionado: '+value);$('gguf-test-result').textContent='Carregue o GGUF para testar a geração no aparelho.';}else if(value!=='Seleção cancelada.')toast(value);info();return;}
+    if(event==='selection'){if(ok){aiCache.clear();toast('Modelo selecionado: '+value);$('gguf-test-result').textContent='Carregando GGUF selecionado…';info();native()?.loadModel?.();}else {if(value!=='Seleção cancelada.')toast(value);info();}return;}
     if(event==='load'){
       $('gguf-test-result').textContent=ok?'GGUF carregado. Toque em Testar modelo para verificar a geração.':'Carregamento falhou: '+value;
       toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();return;
@@ -908,15 +909,19 @@ const GGUF=(()=>{
   };
   $('gguf-select').addEventListener('click',()=>{if(native()?.selectModel)native().selectModel();});
   $('gguf-load').addEventListener('click',()=>{if(native()?.loadModel){$('gguf-test-result').textContent='Aguardando carregamento do GGUF…';native().loadModel();}});
+  $('gguf-select-home').addEventListener('click',()=>$('gguf-select').click());
+  $('gguf-load-home').addEventListener('click',()=>$('gguf-load').click());
   $('gguf-test').addEventListener('click',testModel);
   $('gguf-improve').addEventListener('click',()=>interpret(state.effectiveQuery||state.originalQuery));
   $('gguf-cancel').addEventListener('click',cancelIfBusy);if($('ai-cancel'))$('ai-cancel').addEventListener('click',cancelIfBusy);
   $('gguf-compare-model').addEventListener('click',curate);
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
-  const savedAuto=localStorage.getItem('hinos-gguf-auto-v15');$('gguf-auto').checked=savedAuto==='1';
-  $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-gguf-auto-v15',$('gguf-auto').checked?'1':'0'));
+  const savedAuto=localStorage.getItem('hinos-qwen3-auto-v1');$('gguf-auto').checked=savedAuto==='1';
+  $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-qwen3-auto-v1',$('gguf-auto').checked?'1':'0'));
   if(native())setInterval(info,1250);
-  info();return {info,maybeAuto,cancelSearchTask};
+  const initial=info();
+  if(initial.available&&initial.selected&&!initial.loaded&&!initial.busy)native().loadModel();
+  return {info,maybeAuto,cancelSearchTask};
 })();
 refreshStatus().catch(e=>toast('Não foi possível acessar a base local: '+e.message));
