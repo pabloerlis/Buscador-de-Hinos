@@ -62,26 +62,11 @@ assert.ok(js.includes('SearchTuner.accept(data)')&&js.includes('SearchTuner.acce
 assert.ok(js.includes('tuner_pool:true'),'Candidatos recuperados apenas em consulta, nunca na movimentacao');
 assert.ok(offline.includes('tuner_candidates:payload?.tuner_pool===true'),'Rota opt-in deve expor conjunto fixo');
 assert.ok(css.includes('.semantic-tuner'),'Sem interface visual');
-// Entrada do modelo deve estar disponível ANTES de executar uma busca.
-assert.ok(html.indexOf('id="nli-home-card"')>html.indexOf('id="welcome-panel"'));
-assert.ok(html.indexOf('id="nli-home-card"')<html.indexOf('id="results-panel"'),
-  'O seletor deve aparecer na tela inicial; antes estava escondido nos resultados');
-assert.ok(html.includes('id="nli-settings-card"')&&html.indexOf('id="nli-settings-card"')>html.indexOf('id="settings-panel-search"'),
-  'O seletor deve existir em Configurações > Busca');
-for(const id of ['nli-select-home','nli-select-settings','nli-select',
-  'nli-load-home','nli-load-settings','nli-load',
-  'nli-status-home','nli-status-settings','nli-status']){
-  assert.equal((html.match(new RegExp('id="'+id+'"','g'))||[]).length,1,
-    'Estado/controle Telepatia ausente ou duplicado: '+id);
-}
-assert.equal((html.match(/data-nli-select/g)||[]).length,3);
-assert.equal((html.match(/data-nli-load/g)||[]).length,3);
-const nliController=asset('telepatia-nli-client.js');
-assert.ok(nliController.includes("document.querySelectorAll('[data-nli-select]')"),
-  'Todos os botões devem abrir o seletor de ZIP');
-assert.ok(nliController.includes("document.querySelectorAll('[data-nli-load]')"),
-  'Todos os botões devem carregar o mesmo modelo');
-assert.ok(nliController.includes("'nli-status-home','nli-status-settings','nli-status'"),
-  'Status deve ser sincronizado nos três pontos de entrada');
+// A entrada GGUF fica visível antes da busca e na aba exclusiva de IA.
+assert.ok(html.indexOf('id="gguf-home-card"')>html.indexOf('id="welcome-panel"'));
+assert.ok(html.indexOf('id="gguf-home-card"')<html.indexOf('id="results-panel"'));
+assert.ok(html.indexOf('id="gguf-select"')>html.indexOf('id="settings-panel-ai"'));
+assert.ok(html.indexOf('id="gguf-load"')>html.indexOf('id="settings-panel-ai"'));
 assert.ok(css.includes('.nli-setup-card'),'Seletor na tela inicial precisa de layout próprio');
+require('./qa-qwen3-interface.js');
 console.log('PASS semantic tuner: ranking, presets, limites, historico, integracao API/E5, HTML e CSS');
