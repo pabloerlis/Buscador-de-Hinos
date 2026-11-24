@@ -2,7 +2,7 @@
 const $ = id => document.getElementById(id);
 const q = (s,root=document) => root.querySelector(s);
 const collectionIds = ['principal', 'avulsos', 'cia', 'pessoal'];
-const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
+const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,curated:null,
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
@@ -51,10 +51,11 @@ function resultCard(hymn,{unlearned=false}={}){
   const collection=`<span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>`;
   const tags=(hymn.topics||[]).slice(0,3).map(t=>`<span class="small-tag">${escapeHTML(t)}</span>`).join('');
   const klass=hymn.relevance==='Muito relevante'?'':hymn.relevance==='Relevante'?'mid':'low';
+  const curated=Number.isInteger(hymn.llm_grade);
   const scoreLabel=Number.isFinite(hymn.tuner_score)?'índice personalizado':hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
   const score=Number.isFinite(hymn.tuner_score)?hymn.tuner_score:Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
-  return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Índice heurístico de ordenação, não probabilidade, certeza nem avaliação NLI"><strong>${score}%</strong> ${scoreLabel}</span></div>
-  <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
+  return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${curated?'':klass}" title="${curated?'Nota ordinal do Qwen3, não probabilidade':'Índice heurístico de ordenação, não probabilidade'}"><strong>${curated?hymn.llm_grade+'/4':score+'%'}</strong> ${curated?'Qwen3 · letra integral':scoreLabel}</span></div>
+  <h3>${escapeHTML(hymn.title)}</h3>${collection}${curated?'':`<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>`}
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
@@ -76,6 +77,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   if(!String(query).trim())return false;
   if(page===1){
     state.searchEpoch++;
+    state.curated=null;
     GGUF.cancelSearchTask();
     $('gguf-comparison').classList.add('hidden');
     if(!preserveContext){
@@ -134,8 +136,8 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     }
     toast(error.message);
   }finally{busySearch(false);}
-  if(succeeded&&page===1&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
   if(succeeded && page===1 && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
+  if(succeeded&&page===1&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off'&&!SearchTuner.hasAuthority())EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
   GGUF.info?.();
   return succeeded;
 }
@@ -261,9 +263,9 @@ $('refine-form').addEventListener('submit',async ev=>{
     $('results-title').focus({preventScroll:true});
   }
 });
-$('load-more').addEventListener('click',()=>{if(!SearchTuner.more())performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false});});
+$('load-more').addEventListener('click',()=>{if(!SearchTuner.hasAuthority()&&!SearchTuner.more())performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false});});
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;SearchTuner.clearPool();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.curated=null;SearchTuner.clearPool();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
 
 const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
@@ -371,7 +373,7 @@ const SearchPreferences=(()=>{
     fill();
   }
   function refreshSearch(){
-    if(state.ready&&state.effectiveQuery)performSearch(state.effectiveQuery,{semanticHints:state.semanticHints,autoAI:false,preserveContext:true});
+    if(state.ready&&state.effectiveQuery)performSearch(state.effectiveQuery,{semanticHints:state.semanticHints,autoAI:true,preserveContext:true});
   }
   function syncCollections() {
     const selected = collectionIds.filter(id=>state.searchSettings.collections[id]!==false);
@@ -462,6 +464,7 @@ const RepertoireUI=(()=>{
     if(operation)return;
     operation=true;
     state.repertoirePending=true;
+    state.curated=null;
     state.searchEpoch++;
     GGUF.cancelSearchTask();
     $('gguf-comparison').classList.add('hidden');
@@ -471,7 +474,7 @@ const RepertoireUI=(()=>{
       if(state.ready&&state.effectiveQuery){
         const epoch=state.searchEpoch;
         const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
-          semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+          semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings,tuner_pool:true});
         if(epoch===state.searchEpoch){
           state.page=1;state.total=response.total;state.hasMore=response.has_more;state.lastResults=response.results.slice();
           state.aiContext=response.ai_context;
@@ -480,6 +483,7 @@ const RepertoireUI=(()=>{
           $('load-more').classList.toggle('hidden',!response.has_more);
           $('results-subtitle').textContent=`${response.total} hinos disponíveis para indicação · ${response.not_learned_total} não aprendidos relacionados`;
           renderSearch(response);
+          SearchTuner.accept(response);
         }
       }
       if(state.currentHymn){
@@ -489,7 +493,7 @@ const RepertoireUI=(()=>{
       await renderManagement();
       return result;
     }catch(error){toast('Não foi possível salvar a classificação: '+error.message);}
-    finally{operation=false;state.repertoirePending=false;}
+    finally{operation=false;state.repertoirePending=false;if(state.effectiveQuery)GGUF.maybeAuto(state.effectiveQuery);}
   }
   // Delegação também atende cartões inseridos depois de novas pesquisas.
   document.addEventListener('click',event=>{
@@ -551,11 +555,11 @@ const EmbeddingSearch=(()=>{
     status('E5 Small: interpretando a consulta no aparelho…');
     try{
       const answer=await request(query);
-      if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off')return;
+      if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off'||SearchTuner.hasAuthority())return;
       state.vectorQuery=answer.vector;
       const result=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
         semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings,tuner_pool:true});
-      if(epoch!==state.searchEpoch)return;
+      if(epoch!==state.searchEpoch||SearchTuner.hasAuthority())return;
       state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
       state.aiContext=result.ai_context;
       $('results-list').innerHTML=result.results.length?result.results.map(resultCard).join(''):
@@ -631,11 +635,13 @@ const GGUF=(()=>{
     else if(status.lastDurationMs>0){$('gguf-last').textContent=`Última execução: ${Math.round(status.lastDurationMs/1000)} s`;}
     $('gguf-banner').classList.toggle('hidden',!state.ready||!selectedState.ready);
     $('ai-workspace').classList.toggle('hidden',!selectedState.ready&&!selectedState.busy);
-    $('gguf-banner-text').textContent=selectedState.ready?'IA local disponível':'Carregue um GGUF em Configurações para usar a IA.';
+    $('gguf-banner-text').textContent=selectedState.ready?'Qwen3 define o ranking final quando a curadoria está ativa':'Carregue um GGUF em Configurações para usar a IA.';
     updateIndicator(status);
     return status;
   }
   function resetTask(message,failed=false){
+    const previous=selectedState.task;
+    if(previous?.type==='curate'&&previous.epoch===state.searchEpoch&&state.curated?.status==='pending')SearchTuner.setAuthority({epoch:previous.epoch,status:'fallback',message:'Qwen3 não concluiu: '+message});
     selectedState.task=null;setActivity(false);
     $('ai-timer').textContent='';$('ai-last').textContent=message;
     if(failed){toast(message);showTask('IA encontrou um erro','A pesquisa local permanece disponível. Veja o erro nas configurações.');}
@@ -689,9 +695,12 @@ const GGUF=(()=>{
     return [];
   }
   function maybeAuto(query){
-    if(!selectedState.ready||!$('gguf-auto').checked||!state.ready||!canUseTopics())return;
-    if(selectedState.task){queuedAuto={query,epoch:state.searchEpoch};return;}
-    curate();
+    if(!$('gguf-auto').checked||!state.ready||!canUseTopics())return false;
+    const s=info();
+    if(!s.loaded){SearchTuner.setAuthority({epoch:state.searchEpoch,status:'fallback',message:s.busy?'Qwen3 carregando; resultados provisórios sem LLM.':'Qwen3 não carregado; resultados sem LLM.'});return false;}
+    SearchTuner.setAuthority({epoch:state.searchEpoch,status:'pending',message:'Qwen3: interpretando a consulta e avaliando letras.'});
+    if(selectedState.busy){queuedAuto={query,epoch:state.searchEpoch};return true;}
+    curate();return true;
   }
   function interpret(query,timeoutMs=MAX_AI_MS){
     if(!query?.trim()||state.busy||state.repertoirePending||!canUseTopics())return;
@@ -721,7 +730,8 @@ const GGUF=(()=>{
   // output can inject hymns. Only twice-reviewed candidates are recommended.
   async function curate(){
     const query=state.effectiveQuery;
-    if(!query||state.busy||state.exactNumber||state.searchSettings.mode==='literal'||selectedState.busy||!selectedState.ready)return;
+    if(!query||state.busy||state.repertoirePending||state.exactNumber||state.searchSettings.mode==='literal'||selectedState.busy||!selectedState.ready)return;
+    SearchTuner.setAuthority({epoch:state.searchEpoch,status:'pending',message:'Qwen3: interpretando o contexto…'});
     const task={type:'curate',epoch:state.searchEpoch,startedAt:performance.now(),id:null};
     selectedState.task=task;
     const alive=()=>selectedState.task===task&&!task.cancelled&&task.epoch===state.searchEpoch;
@@ -734,7 +744,7 @@ const GGUF=(()=>{
     const output=$('gguf-comparison-text'),actions=$('gguf-comparison-actions');
     actions.replaceChildren();comparison.classList.remove('hidden');
     output.textContent='Qwen3: interpretando o contexto…';
-    const progress=(s)=>{output.textContent=s;showTask('Curadoria Qwen3 experimental',s);};
+    const progress=(s)=>{output.textContent=s;showTask('Curadoria Qwen3 experimental',s);SearchTuner.setAuthority({epoch:task.epoch,status:'pending',message:s});};
     try{
       const reading=state.aiContext||{};
       const interpretation=await infer(
@@ -784,6 +794,9 @@ const GGUF=(()=>{
       check();
       const picks=verified.map(h=>({...h,grade:Math.min(h.grade,reviewed.find(x=>x.id===h.id).grade)})).filter(h=>h.grade>=3).sort((a,b)=>b.grade-a.grade||ids.indexOf(a.id)-ids.indexOf(b.id));
       output.textContent='Contexto: '+meaning+'\n\n'+(picks.length?picks.map(h=>(h.number?'Hino '+h.number+' — ':'')+h.title+' · Nota '+h.grade+'/4\nEvidência: '+h.lines[h.evidence-1]).join('\n\n'):'Nenhum hino aprovado nas duas avaliações.')+'\n\n'+reviewed.length+'/'+docs.length+' letras avaliadas. '+failed+' falhas de avaliação. Notas experimentais, não probabilidades.';
+      const finalRows=picks.map(h=>({...h,llm_grade:h.grade,snippet:h.lines[h.evidence-1],reason:'Qwen3 aprovou a mensagem central em duas avaliações da letra integral.'}));
+      if(failed&&reviewed.length===0&&docs.length>0)throw Error('Nenhuma letra pôde ser avaliada pelo Qwen3.');
+      SearchTuner.setAuthority({epoch:task.epoch,status:'final',rows:finalRows,reviewed:reviewed.length,candidates:docs.length,failed,meaning,seconds:Math.round((performance.now()-task.startedAt)/1000)});
       for(const h of picks){const button=document.createElement('button');button.className='secondary-btn';button.type='button';button.textContent='Ver '+h.title;button.addEventListener('click',()=>openHymn(h.id));actions.appendChild(button);}
       resetTask('Curadoria concluída: '+picks.length+' sugestões; '+failed+' falhas.');
     }catch(error){if(alive()){output.textContent='Curadoria não concluída: '+error.message;resetTask(error.message,true);}}
@@ -868,7 +881,7 @@ const GGUF=(()=>{
     if(event==='selection'){if(ok){aiCache.clear();toast('Modelo selecionado: '+value);$('gguf-test-result').textContent='Carregando GGUF selecionado…';info();native()?.loadModel?.();}else {if(value!=='Seleção cancelada.')toast(value);info();}return;}
     if(event==='load'){
       $('gguf-test-result').textContent=ok?'GGUF carregado. Toque em Testar modelo para verificar a geração.':'Carregamento falhou: '+value;
-      toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();return;
+      toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();if(ok&&state.effectiveQuery&&!state.busy)maybeAuto(state.effectiveQuery);return;
     }
     if(event!=='generate')return;
     const task=selectedState.task;
@@ -912,13 +925,13 @@ const GGUF=(()=>{
   $('gguf-select-home').addEventListener('click',()=>$('gguf-select').click());
   $('gguf-load-home').addEventListener('click',()=>$('gguf-load').click());
   $('gguf-test').addEventListener('click',testModel);
-  $('gguf-improve').addEventListener('click',()=>interpret(state.effectiveQuery||state.originalQuery));
+  $('gguf-improve').addEventListener('click',curate);
   $('gguf-cancel').addEventListener('click',cancelIfBusy);if($('ai-cancel'))$('ai-cancel').addEventListener('click',cancelIfBusy);
   $('gguf-compare-model').addEventListener('click',curate);
-  $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
+  $('gguf-compare').addEventListener('click',()=>{if(!SearchTuner.hasAuthority())compare();else toast('Ranking principal controlado pelo Qwen3.');});$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
-  const savedAuto=localStorage.getItem('hinos-qwen3-auto-v1');$('gguf-auto').checked=savedAuto==='1';
-  $('gguf-auto').addEventListener('change',()=>localStorage.setItem('hinos-qwen3-auto-v1',$('gguf-auto').checked?'1':'0'));
+  const savedAuto=localStorage.getItem('hinos-qwen3-authority-v2');$('gguf-auto').checked=savedAuto!=='0';
+  $('gguf-auto').addEventListener('change',()=>{localStorage.setItem('hinos-qwen3-authority-v2',$('gguf-auto').checked?'1':'0');if(state.effectiveQuery){if($('gguf-auto').checked)maybeAuto(state.effectiveQuery);else{cancelSearchTask();SearchTuner.setAuthority({epoch:state.searchEpoch,status:'fallback',message:'Qwen3 desativado pelo usuário; classificação sem LLM.'});}}});
   if(native())setInterval(info,1250);
   const initial=info();
   if(initial.available&&initial.selected&&!initial.loaded&&!initial.busy)native().loadModel();
