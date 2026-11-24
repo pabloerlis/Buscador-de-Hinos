@@ -23,13 +23,13 @@ SYSTEM='Você é um curador criterioso de hinos cristãos em português. Use ape
 calls=0
 tokens=0
 
-def chat(prompt,max_tokens,validate):
+def chat(prompt,max_tokens,validate,schema=None):
     global calls,tokens
     for attempt in range(3):
         response=requests.post(BASE+'/v1/chat/completions',json={
             'model':'local','messages':[{'role':'system','content':SYSTEM},{'role':'user','content':prompt}],
             'temperature':0 if attempt==0 else .1,'seed':204+attempt,
-            'max_tokens':max_tokens,'response_format':{'type':'json_object'}},timeout=300)
+            'max_tokens':max_tokens,'response_format':{'type':'json_object',**({'schema':schema} if schema else {})}},timeout=300)
         if not response.ok:
             # Avoid logging model inputs and copyrighted lyrics from server errors.
             raise RuntimeError('Local model HTTP '+str(response.status_code))
@@ -39,7 +39,9 @@ def chat(prompt,max_tokens,validate):
         try:
             data=json.loads(payload['choices'][0]['message']['content'])
             if validate(data):return data
-        except (ValueError,KeyError,TypeError):pass
+            print('STRUCTURE_RETRY validation',attempt+1, 'finish',payload['choices'][0].get('finish_reason'),flush=True)
+        except (ValueError,KeyError,TypeError,AttributeError):
+            print('STRUCTURE_RETRY parse',attempt+1, 'finish',payload.get('choices',[{}])[0].get('finish_reason'),flush=True)
     raise RuntimeError('LLM returned invalid structured data after three attempts')
 
 def grade(interpretation, candidates):
@@ -56,21 +58,31 @@ Escala absoluta:
 4 = o episódio específico é claramente narrado ou a mensagem central pedida é integralmente desenvolvida.
 Não confunda episódios que têm palavras ou personagens parecidos. Para narrativa bíblica, considere situação inicial, ação, agente, objeto, desfecho e sentido espiritual. Um detalhe semelhante sozinho não basta.
 Para tema livre, não exija uma narrativa bíblica. Não atribua notas altas por mera presença de palavras religiosas. A nota deve refletir a intenção solicitada, inclusive quando a letra utiliza metáforas ou primeira pessoa.
-Devolva {"items":[{"id":"1","grade":0,"evidence":[1]}]} para todos os IDs exatamente uma vez.
-evidence = números de linhas reais da letra que sustentam o julgamento, no máximo três. Não cite nem reproduza letras, não invente linhas.
+Responda com um objeto JSON cujas chaves são os IDs dos hinos. Cada valor contém grade (0 a 4) e line (número de UMA linha real da letra que melhor sustenta o julgamento). Exemplo: {"1":{"grade":3,"line":2}}. Para notas 0 ou 1, indique uma linha representativa; ela não será apresentada como evidência positiva. Não reproduza letras.
 CONTEXTO: """+json.dumps(interpretation,ensure_ascii=False)+"\nHINOS: "+json.dumps(documents,ensure_ascii=False)
+    schema={'type':'object','properties':{
+        k:{'type':'object','properties':{'grade':{'type':'integer','enum':[0,1,2,3,4]},
+             'line':{'type':'integer','enum':list(range(1,len(lines[k])+1))}},
+             'required':['grade','line'],'additionalProperties':False}
+        for k in by_id},'required':list(by_id),'additionalProperties':False}
     def valid(d):
-        items=d.get('items')
-        if not isinstance(items,list) or len(items)!=len(by_id):return False
-        if {str(x.get('id')) for x in items}!=set(by_id):return False
-        for x in items:
-            k=str(x['id']);g=x.get('grade');e=x.get('evidence')
-            if type(g)!=int or not 0<=g<=4 or not isinstance(e,list) or len(e)>3:return False
-            if any(type(i)!=int or not 1<=i<=len(lines[k]) for i in e):return False
-            if g>=2 and not e:return False
+        if not isinstance(d,dict) or set(d)!=set(by_id):return False
+        for k,x in d.items():
+            if not isinstance(x,dict) or set(x)!={'grade','line'}:return False
+            g=x['grade'];e=x['line']
+            if type(g)!=int or not 0<=g<=4 or type(e)!=int or not 1<=e<=len(lines[k]):return False
         return True
-    d=chat(prompt,450,valid)
-    return [{**by_id[str(x['id'])],'grade':x['grade'],'evidence_lines':x['evidence']} for x in d['items']]
+    try:
+        d=chat(prompt,512,valid,schema)
+        return [{**by_id[k],'grade':x['grade'],'evidence_lines':[x['line']] if x['grade']>=2 else []} for k,x in d.items()]
+    except (RuntimeError,requests.RequestException) as error:
+        # Isolate bad batches rather than discarding the whole experiment.
+        if len(candidates)>1:
+            print('BATCH_SPLIT',len(candidates),type(error).__name__,flush=True)
+            mid=len(candidates)//2
+            return grade(interpretation,candidates[:mid])+grade(interpretation,candidates[mid:])
+        print('CANDIDATE_UNASSESSED',candidates[0]['id'],type(error).__name__,flush=True)
+        return [{**candidates[0],'grade':None,'evidence_lines':[],'assessment_error':True}]
 
 def main():
     started=time.monotonic()
@@ -87,24 +99,22 @@ def main():
     queries=[q for g in groups for q in g['queries']]+controls
     scenes=scenes_from_bible()
     scene_list=[{'id':i+1,'label':s['label'],'ref':s['reference']} for i,s in enumerate(scenes)]
+    replay=json.loads((ROOT/'qa/llm-route-replay.json').read_text())
+    assert replay['model_sha256']==MODEL_SHA and replay['kind']=='actual_model_output_replay'
+    assert [row['query'] for row in replay['rows']]==queries
     contexts=[]
-    for q in queries:
-        explicit=next((i+1 for i,s in enumerate(scenes) if normalize(q) in {normalize(x) for x in [s['reference'],s['label'],*s['aliases']]}),None)
-        text=''; 
-        if explicit:text=' '.join(scenes[explicit-1]['verses'])
-        prompt="""Interprete a intenção de busca por um hino. Identifique uma cena bíblica somente quando a consulta descreve o episódio específico ou pede explicitamente a passagem. Se é um pedido de conforto, fé, gratidão ou qualquer aplicação geral, use scene=0; não force uma cena por semelhança temática.
-Preserve os detalhes essenciais, incluindo as ações, sujeitos e desfecho quando houver. Resuma a intenção em até 60 palavras em português, sem inventar detalhes não sustentados.
-JSON: {"scene":0,"meaning":"..."}.
-CENAS DISPONÍVEIS: """+json.dumps(scene_list,ensure_ascii=False)+"\nCONSULTA: "+json.dumps(q,ensure_ascii=False)
-        if explicit:prompt+='\nREFERÊNCIA CONFIRMADA: '+str(explicit)+'\nTEXTO BÍBLICO: '+text+'\nO campo scene deve ser '+str(explicit)+'.'
-        def valid(d):
-            return type(d.get('scene'))==int and 0<=d['scene']<=len(scenes) and (explicit is None or d['scene']==explicit) and isinstance(d.get('meaning'),str) and 5<=len(d['meaning'])<=600
-        d=chat(prompt,200,valid)
-        scene=scenes[d['scene']-1] if d['scene'] else None
-        contexts.append({'query':q,'meaning':d['meaning'],'scene':scene['reference'] if scene else None,
+    for row in replay['rows']:
+        scene=next((s for s in scenes if s['reference']==row['scene']),None)
+        assert row['scene'] is None or scene is not None
+        contexts.append({'query':row['query'],'meaning':row['meaning'],'scene':row['scene'],
                          'label':scene['label'] if scene else None,
                          'bible_text':' '.join(scene['verses']) if scene else ''})
-        print('ROUTE',json.dumps({'query':q,'scene':contexts[-1]['scene'],'meaning':d['meaning']},ensure_ascii=False),flush=True)
+    # Independent shards cover disjoint queries, retaining the original route
+    # outputs including errors. This run tests the previously interrupted stage.
+    shard=int(os.environ.get('QA_SHARD','0'));shards=int(os.environ.get('QA_SHARDS','1'))
+    assert 0<=shard<shards
+    contexts=[c for i,c in enumerate(contexts) if i%shards==shard]
+    print('ROUTE_REPLAY',replay['source_run'],'shard',shard,'cases',len(contexts),flush=True)
     # Original and interpreted queries contribute independently. Explicit references
     # use their real text/summary instead of feeding numeric reference tokens to E5.
     model_path=ASSETS/'e5-model.onnx'
@@ -139,22 +149,26 @@ CENAS DISPONÍVEIS: """+json.dumps(scene_list,ensure_ascii=False)+"\nCONSULTA: "
         for start in range(0,len(shuffled),5):
             graded.extend(grade(judgement_context,shuffled[start:start+5]))
         original_rank={h['id']:i for i,h in enumerate(candidates)}
-        graded.sort(key=lambda h:(-h['grade'],original_rank[h['id']]))
-        finalists=graded[:5]
+        incomplete=sum(h['grade'] is None for h in graded)
+        graded.sort(key=lambda h:(-(h['grade'] if h['grade'] is not None else -1),original_rank[h['id']]))
+        finalists=[h for h in graded if h['grade'] is not None][:5]
         # Independent final evaluation of the strongest candidates together.
+        verified=[]
         if finalists:
             rng.shuffle(finalists)
+            first_pass={h['id']:h['grade'] for h in finalists}
             verified=grade(judgement_context,finalists)
-            verified.sort(key=lambda h:(-h['grade'],original_rank[h['id']]))
-            known={h['id'] for h in verified}
-            graded=verified+[h for h in graded if h['id'] not in known]
-        # Do not silently display rejected candidates as recommendations.
-        recommended=[h for h in graded if h['grade']>=3]
+            incomplete+=sum(h['grade'] is None for h in verified)
+            # Require agreement across the two passes, not just a high score once.
+            for h in verified:
+                if h['grade'] is not None:h['grade']=min(h['grade'],first_pass[h['id']])
+            verified.sort(key=lambda h:(-(h['grade'] if h['grade'] is not None else -1),original_rank[h['id']]))
+        recommended=[h for h in verified if h['grade'] is not None and h['grade']>=3]
         public=lambda h:{k:h[k] for k in ('number','title','collection','collection_ids','grade','evidence_lines') if k in h}
-        row={'query':c['query'],'route':c['scene'],'pool_size':len(candidates),'recommended_count':len(recommended),
+        row={'query':c['query'],'route':c['scene'],'pool_size':len(candidates),'recommended_count':len(recommended),'unassessed':incomplete,
              'pool':[{'number':h['number'],'title':h['title'],'collection':h['collection'],'collection_ids':h['collection_ids']} for h in candidates],
              'top10':[public(h) for h in recommended[:10]],
-             'all_graded':[public(h) for h in graded]}
+             'all_graded':[public(h) for h in graded],'verified':[public(h) for h in verified]}
         results.append(row)
         print('CASE',json.dumps({k:v for k,v in row.items() if k not in ('pool','all_graded')},ensure_ascii=False),flush=True)
         REPORT.parent.mkdir(exist_ok=True)
@@ -176,17 +190,17 @@ CENAS DISPONÍVEIS: """+json.dumps(scene_list,ensure_ascii=False)+"\nCONSULTA: "
         weak_rank=next((i+1 for i,h in enumerate(row['top10']) if weak(h)),None)
         row.update(episode=g['id'],pool_contains_known_positive=any(target(h) for h in row['pool']),first_known_positive=first,
                    user_contested_rank=weak_rank,route_ok=row['route']==g['queries'][0],
-                   passed=bool(first and first<=3 and (weak_rank is None or weak_rank>3)))
+                   passed=bool(first and first<=3 and (weak_rank is None or weak_rank>3) and not row['unassessed']))
     episodes=[r for r in results if 'episode' in r];ctrl=[r for r in results if r.get('control')]
     summary={'status':'experimental','catalog_count':1557,'catalog_sha256':CATALOG_SHA,'model_sha256':MODEL_SHA,'e5_sha256':MODEL_SHA256,
-             'human_review_status':'pending','cases':len(episodes),'known_positive_top1':sum(r['first_known_positive']==1 for r in episodes)/len(episodes),
+             'human_review_status':'pending','route_source':'replay 45387239783','shard':shard,'shards':shards,'cases':len(episodes),'known_positive_top1':sum(r['first_known_positive']==1 for r in episodes)/len(episodes),
              'known_positive_top3':sum(bool(r['first_known_positive'] and r['first_known_positive']<=3) for r in episodes)/len(episodes),
              'candidate_recall':sum(r['pool_contains_known_positive'] for r in episodes)/len(episodes),
              'episode_failures':sum(not r['passed'] for r in episodes),'control_false_routes':sum(not r['route_ok'] for r in ctrl),
              'episode_route_errors':sum(not r['route_ok'] for r in episodes),
-             'model_calls':calls,'total_tokens':tokens,'wall_seconds':round(time.monotonic()-started,1)}
+             'unassessed_total':sum(r['unassessed'] for r in results),'model_calls':calls,'total_tokens':tokens,'wall_seconds':round(time.monotonic()-started,1)}
     REPORT.write_text(json.dumps({**summary,'rows':results},ensure_ascii=False,indent=2)+'\n')
     print('LLM CONTEXT GATE',json.dumps(summary,ensure_ascii=False),flush=True)
-    if summary['episode_failures'] or summary['control_false_routes']:sys.exit(1)
+    if summary['episode_failures'] or summary['control_false_routes'] or summary['unassessed_total']:sys.exit(1)
 
 if __name__=='__main__':main()
