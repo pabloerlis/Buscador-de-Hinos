@@ -103,7 +103,7 @@
             <div class="nli-setup-heading"><h2 id="gguf-home-title">Qwen3 — IA local</h2><span class="local-badge">GGUF · Offline</span></div>
             <p id="gguf-home-status" class="nli-setup-status" role="status">Verificando motor local…</p>
             <div class="nli-control-actions"><button id="gguf-select-home" type="button" class="primary-btn">Selecionar arquivo .gguf</button><button id="gguf-load-home" type="button" class="secondary-btn">Carregar modelo</button></div>
-            <p class="subtle-note">Use Qwen3-4B-Instruct-2507 Q4_K_M. Depois de carregar, pesquise e toque em Selecionar hinos com Qwen3.</p>
+            <p class="subtle-note">Use Qwen3-4B-Instruct-2507 Q4_K_M. Depois de carregar, a pesquisa contextual usa o Qwen3 automaticamente no ranking principal.</p>
           </section>
         </div>
 
@@ -167,7 +167,7 @@
                 <p id="ai-last" class="ai-last"></p>
               </div>
               <div id="gguf-banner" data-gguf-ui class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
-                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir temas com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Selecionar hinos com Qwen3</button></div></div>
+                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Reavaliar com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Selecionar hinos com Qwen3</button></div></div>
               <div id="gguf-comparison" class="ai-interpretation hidden"><div id="gguf-comparison-text" role="status" aria-live="polite"></div><div id="gguf-comparison-actions" class="ai-buttons"></div></div>
               <div id="results-list" class="results-list" aria-live="polite"></div>
               <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
@@ -311,10 +311,10 @@
       <div id="settings-panel-ai" role="tabpanel" aria-labelledby="settings-tab-ai" tabindex="0" hidden>
       <section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (Qwen3 GGUF experimental)</h3>
-        <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. Use Qwen3-4B-Instruct-2507 Q4_K_M. Depois de carregar, faça uma busca e toque em Selecionar hinos com Qwen3. A avaliação integral de até 18 candidatos é experimental e pode ser lenta.</p>
+        <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. Use Qwen3-4B-Instruct-2507 Q4_K_M. Depois de carregar, faça uma busca. O Qwen3 define automaticamente a lista principal de hinos. A avaliação integral de até 18 candidatos é experimental e pode ser lenta.</p>
         <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
         <p id="gguf-phase" class="gguf-phase">Estado: verificando</p><p id="gguf-model-meta" class="subtle-note">Nenhum modelo foi carregado na memória.</p>
-        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Executar curadoria Qwen3 automaticamente após a busca (pode ser lento).</span></label>
+        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Qwen3 define o ranking principal automaticamente (pode ser lento). Desmarque para usar apenas o índice local.</span></label>
         <p id="gguf-last" class="gguf-phase" aria-live="polite">Última execução: nenhuma</p>
         <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
         <div class="settings-actions"><button id="gguf-test" class="secondary-btn" type="button" disabled>Testar modelo</button><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div>
