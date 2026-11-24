@@ -23,7 +23,11 @@
   <script src="offline-api.js" defer></script>
   <script src="local-hymn-ai.js" defer></script>
   <script src="about.js" defer></script>
+  <script src="semantic-tuner.js" defer></script>
+  <script src="semantic-tuner-ui.js" defer></script>
   <script src="app.js" defer></script>
+  <script src="telepatia-nli-sequence.js" defer></script>
+  <script src="telepatia-nli-client.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -83,6 +87,15 @@
         </div>
 
         <div id="welcome-panel" class="welcome-panel">
+          <section id="nli-home-card" class="nli-setup-card" aria-labelledby="nli-home-title">
+            <div class="nli-setup-heading"><h2 id="nli-home-title">Modelo de análise Telepatia</h2><span class="local-badge">Offline</span></div>
+            <p id="nli-status-home" class="nli-setup-status" role="status" aria-live="polite">Verificando modelo local…</p>
+            <div class="nli-control-actions">
+              <button id="nli-select-home" data-nli-select type="button" class="primary-btn">Selecionar ZIP do modelo</button>
+              <button id="nli-load-home" data-nli-load type="button" class="secondary-btn" disabled>Carregar</button>
+            </div>
+            <p class="subtle-note">Selecione o ZIP externo do telepatia-ai/laya-pt-es-nli sem descompactar. O modelo não acompanha o APK.</p>
+          </section>
           <div class="welcome-top"><h2>Experimente buscar</h2><span class="data-count" id="data-count">Aguardando biblioteca</span></div>
           <div class="suggestions">
             <button data-suggestion="Gratidão a Deus" type="button">Gratidão</button>
@@ -93,6 +106,10 @@
             <button data-suggestion="Filipenses 4:6" type="button">Filipenses 4:6</button>
             <button data-suggestion="Filho Pródigo" type="button">Filho Pródigo</button>
           </div>
+          <section id="tuner-history-home" class="tuner-history" aria-label="Histórico de pesquisas">
+            <div class="tuner-history-head"><h3>Pesquisas recentes</h3><button type="button" data-tuner-clear-history class="text-action">Limpar histórico</button></div>
+            <div id="tuner-history-home-list" class="tuner-history-list"></div>
+          </section>
         </div>
 
         <div id="results-panel" class="results-panel hidden">
@@ -103,6 +120,45 @@
           <p id="vector-results-state" data-vector-ui class="vector-live" role="status" aria-live="polite"></p>
           <div class="results-layout">
             <aside class="results-tools" aria-label="Ações da busca">
+              <section id="tuner-panel" class="semantic-tuner" aria-labelledby="tuner-title">
+                <div class="tuner-title-row"><div><h3 id="tuner-title">Ajuste contextual</h3><p>Reordenação instantânea, offline</p></div><span class="local-badge">Local</span></div>
+                <label class="tuner-switch"><input type="checkbox" id="tuner-enabled" checked><span>Busca direta, sem conversa</span></label>
+                <p class="tuner-info">Os ajustes usam evidências já calculadas. Não executam Laya NLI nem outro modelo a cada alteração.</p>
+                <div class="nli-controls" aria-label="Modelo de inferência textual">
+                  <div class="nli-controls-title"><strong>Telepatia Laya PT/ES NLI</strong><span class="local-badge">Modelo externo</span></div>
+                  <p id="nli-status" class="tuner-info" role="status" aria-live="polite">Verificando modelo selecionado…</p>
+                  <div class="nli-control-actions">
+                    <button type="button" id="nli-select" data-nli-select class="secondary-btn">Escolher ZIP do modelo</button>
+                    <button type="button" id="nli-load" data-nli-load class="secondary-btn" disabled>Carregar</button>
+                  </div>
+                  <p class="tuner-info">Analisa a mensagem central dos primeiros candidatos quando o modelo é carregado. Implicação, neutro e contradição não são probabilidades.</p>
+                </div>
+                <div class="tuner-presets" role="group" aria-label="Perfis de classificação">
+                  <button type="button" data-tuner-preset="narrative">Narrativa</button>
+                  <button type="button" data-tuner-preset="balanced">Equilibrada</button>
+                  <button type="button" data-tuner-preset="broad">Temática</button>
+                </div>
+                <div class="tuner-slider">
+                  <label for="tuner-topic">Semelhança temática <output id="tuner-topic-value" for="tuner-topic">70%</output></label>
+                  <input id="tuner-topic" type="range" min="0" max="100" step="5" value="70">
+                </div>
+                <div class="tuner-slider">
+                  <label for="tuner-narrative">Fidelidade à narrativa <output id="tuner-narrative-value" for="tuner-narrative">90%</output></label>
+                  <input id="tuner-narrative" type="range" min="0" max="100" step="5" value="90">
+                </div>
+                <div class="tuner-slider">
+                  <label for="tuner-events">Ações e sequência <output id="tuner-events-value" for="tuner-events">85%</output></label>
+                  <input id="tuner-events" type="range" min="0" max="100" step="5" value="85">
+                  <small>Indicador experimental; não comprova o desfecho.</small>
+                </div>
+                <div class="tuner-slider">
+                  <label for="tuner-min">Índice mínimo exibido <output id="tuner-min-value" for="tuner-min">0</output></label>
+                  <input id="tuner-min" type="range" min="0" max="100" step="5" value="0">
+                </div>
+                <p id="tuner-status" class="tuner-status" role="status" aria-live="polite">Pesquise para ajustar resultados.</p>
+                <div class="tuner-footer"><button type="button" id="tuner-reset" class="secondary-btn">Restaurar pesos</button></div>
+                <details class="tuner-history-tools"><summary>Pesquisas recentes</summary><div id="tuner-history-results-list" class="tuner-history-list"></div></details>
+              </section>
               <div class="results-actions">
                 <button id="refine-toggle" class="secondary-btn" type="button" aria-controls="refine-panel" aria-expanded="false">Refinar</button>
                 <button id="gguf-compare" class="secondary-btn" type="button" disabled>Comparar hinos</button>
@@ -218,8 +274,17 @@
       </section>
       </div>
       <div id="settings-panel-search" role="tabpanel" aria-labelledby="settings-tab-search" tabindex="0" hidden>
+      <section id="nli-settings-card" class="semantic-settings" aria-labelledby="nli-settings-title">
+        <div class="setting-section-heading"><h3 id="nli-settings-title">Modelo Telepatia NLI</h3><span class="local-badge">Modelo externo</span></div>
+        <p id="nli-status-settings" class="nli-setup-status" role="status" aria-live="polite">Verificando modelo local…</p>
+        <div class="settings-actions">
+          <button id="nli-select-settings" data-nli-select type="button" class="primary-btn">Selecionar ZIP do modelo</button>
+          <button id="nli-load-settings" data-nli-load type="button" class="secondary-btn" disabled>Carregar</button>
+        </div>
+        <p class="subtle-note">Baixe o pacote ONNX externo do Telepatia e selecione o ZIP original. Sem LFM3/GGUF e sem necessidade de descompactar.</p>
+      </section>
       <section class="semantic-settings" aria-label="Preferências de busca semântica">
-        <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>
+        <div class="setting-section-heading"><h3>Busca contextual offline</h3><span class="local-badge">E5 + NLI</span></div>
         <label for="search-mode">Prioridade da pesquisa</label>
         <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
         <label for="semantic-power">Força das relações semânticas <strong id="semantic-power-value">75%</strong></label>

@@ -40,12 +40,18 @@ public final class MainActivity extends Activity {
     private static final int MAX_JSON_BYTES = 12_000_000;
     private static final int PICK_FILE = 1205;
     private static final int PICK_GGUF = 1206;
+    private static final int PICK_NLI = 1207;
     private static final String PREFS = "hinos_local_llm";
     private static final String MODEL_URI_KEY = "model_uri";
     private static final String MODEL_DISPLAY_NAME_KEY = "model_display_name";
     private static final String MODEL_BYTES_KEY = "model_bytes";
     private final ExecutorService llmExecutor=Executors.newSingleThreadExecutor();
     private final ExecutorService vectorExecutor=Executors.newSingleThreadExecutor();
+    private final ExecutorService nliExecutor=Executors.newSingleThreadExecutor();
+    private volatile String nliPhase="none";
+    private volatile String nliError="";
+    private volatile boolean nliBusy=false;
+    private TelepatiaNliEngine nliEngine;
     private volatile String vectorState="Aguardando primeira pesquisa";
     private E5Engine embeddingEngine;
     private volatile boolean modelLoaded=false;
@@ -106,6 +112,13 @@ public final class MainActivity extends Activity {
                     try { return new WebResourceResponse("application/json", "UTF-8", new FileInputStream(data)); }
                     catch (IOException ex) { return forbidden(); }
                 }
+                if (path.startsWith("/nli/") && !path.contains("..") && !path.contains("\\")) {
+                    String file=path.substring("/nli/".length());
+                    File chosen=nliEngine==null?null:nliEngine.tokenizerFile(file);
+                    if(chosen==null)return forbidden();
+                    try{return new WebResourceResponse("application/json","UTF-8",new FileInputStream(chosen));}
+                    catch(IOException ignored){return forbidden();}
+                }
                 if (!path.startsWith("/assets/") || path.contains("..") || path.contains("\\")) return forbidden();
                 String file=path.substring("/assets/".length());
                 if (file.isEmpty()) file="index.html";
@@ -128,6 +141,12 @@ public final class MainActivity extends Activity {
         }
         if(BuildConfig.ENABLE_LOCAL_EMBEDDINGS||BuildConfig.ENABLE_LOCAL_MODELS){
             web.addJavascriptInterface(new VectorBridge(), "NativeVector");
+        }
+        // Telepatia utiliza apenas ONNX Runtime e arquivos externos. Nunca carrega GGUF.
+        if(BuildConfig.ENABLE_LOCAL_EMBEDDINGS) {
+            nliEngine=new TelepatiaNliEngine(this);
+            web.addJavascriptInterface(new NliBridge(), "NativeNLI");
+            if(nliEngine.isInstalled())nliPhase="selected";
         }
         web.loadUrl(HOST + "/assets/index.html");
     }
@@ -164,12 +183,79 @@ public final class MainActivity extends Activity {
         }
     }
 
+    /** Bridge external Telepatia NLI; no remote inference, no embedded weights. */
+    private final class NliBridge {
+        @JavascriptInterface public String status(){
+            try{return new JSONObject().put("available",true)
+                .put("phase",nliPhase).put("busy",nliBusy)
+                .put("installed",nliEngine!=null && nliEngine.isInstalled())
+                .put("loaded",nliEngine!=null && nliEngine.isLoaded())
+                .put("model_sha",nliEngine==null?"":nliEngine.modelSha())
+                .put("model","telepatia-ai/laya-pt-es-nli")
+                .put("revision",TelepatiaNliEngine.REV).put("error",nliError).toString();
+            }catch(Exception e){return "{}";}
+        }
+        @JavascriptInterface public void selectModel(){
+            runOnUiThread(()->{
+                try{
+                    Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);
+                    // Android file providers may label downloaded ZIPs as
+                    // application/octet-stream. Let DocumentsUI show them,
+                    // then verify .zip name, contents and pinned SHA-256.
+                    pick.setType("*/*");
+                    pick.addCategory(Intent.CATEGORY_OPENABLE);
+                    startActivityForResult(pick,PICK_NLI);
+                }catch(Exception e){nliPhase="error";nliError="Seletor ZIP indisponível.";nliEvent("selection",false,nliError);}
+            });
+        }
+        @JavascriptInterface public void loadModel(){
+            if(nliEngine==null||nliBusy)return;
+            nliBusy=true;nliPhase="loading";
+            nliExecutor.execute(()->{
+                try{
+                    nliEngine.load();
+                    nliError="";nliPhase="ready";
+                    nliEvent("load",true,"Telepatia NLI carregado e validado.");
+                }catch(Throwable e){
+                    nliPhase="error";nliError=e.getClass().getSimpleName()+": "+e.getMessage();
+                    nliEvent("load",false,nliError);
+                }finally{nliBusy=false;}
+            });
+        }
+        @JavascriptInterface public void infer(String id,String request){
+            if(id==null||id.length()>64||request==null||request.length()>150000||nliEngine==null)return;
+            nliExecutor.execute(()->{
+                try{
+                    if(!nliEngine.isLoaded())throw new IllegalStateException("Telepatia NLI não carregado.");
+                    JSONObject prediction=nliEngine.classify(new JSONObject(request));
+                    prediction.put("id",id).put("ok",true);
+                    nliReply(prediction);
+                }catch(Throwable e){
+                    try{nliReply(new JSONObject().put("id",id).put("ok",false)
+                        .put("error",e.getClass().getSimpleName()+": "+e.getMessage()));}
+                    catch(Exception ignored){}
+                }
+            });
+        }
+    }
+    private void nliEvent(String type,boolean success,String message){
+        try{
+            JSONObject obj=new JSONObject().put("event",type).put("ok",success).put("message",message);
+            runOnUiThread(()->{if(web!=null)web.evaluateJavascript(
+                "window.TelepatiaNative&&window.TelepatiaNative.event("+obj.toString()+")",null);});
+        }catch(Exception ignored){}
+    }
+    private void nliReply(JSONObject value){
+        runOnUiThread(()->{if(web!=null)web.evaluateJavascript(
+            "window.TelepatiaNative&&window.TelepatiaNative.complete("+value.toString()+")",null);});
+    }
+
     private static WebResourceResponse forbidden(){
         return new WebResourceResponse("text/plain", "UTF-8", new java.io.ByteArrayInputStream(new byte[0]));
     }
     private static String mimeType(String file){
         if(file.endsWith(".html"))return "text/html";
-        if(file.endsWith(".js"))return "application/javascript";
+        if(file.endsWith(".js")||file.endsWith(".mjs"))return "application/javascript";
         if(file.endsWith(".css"))return "text/css";
         if(file.endsWith(".json")||file.endsWith(".webmanifest"))return "application/json";
         if(file.endsWith(".svg"))return "image/svg+xml";
@@ -181,6 +267,32 @@ public final class MainActivity extends Activity {
         if(requestCode==PICK_FILE && pendingFile!=null){
             pendingFile.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode,data));
             pendingFile=null;
+        }
+        if(requestCode==PICK_NLI){
+            if(resultCode!=RESULT_OK||data==null||data.getData()==null){
+                nliEvent("selection",false,"Seleção cancelada.");return;
+            }
+            Uri uri=data.getData();
+            String name=modelName(uri);
+            if(!name.toLowerCase(Locale.ROOT).endsWith(".zip")){
+                nliPhase="error";nliError="Selecione o pacote ZIP externo verificado do Telepatia.";
+                nliEvent("selection",false,nliError);return;
+            }
+            if(nliBusy)return;
+            nliBusy=true;nliPhase="installing";
+            nliExecutor.execute(()->{
+                try(InputStream input=getContentResolver().openInputStream(uri)){
+                    if(input==null)throw new IOException("Arquivo ZIP inacessível.");
+                    nliEngine.install(input);
+                    nliEngine.load();
+                    nliPhase="ready";nliError="";
+                    nliEvent("selection",true,"Modelo Telepatia instalado, verificado e carregado.");
+                }catch(Throwable e){
+                    nliPhase="error";nliError=e.getClass().getSimpleName()+": "+e.getMessage();
+                    nliEvent("selection",false,nliError);
+                }finally{nliBusy=false;}
+            });
+            return;
         }
         if(requestCode==PICK_GGUF){
             if(resultCode!=RESULT_OK || data==null || data.getData()==null){
@@ -225,9 +337,11 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy(){
         if(pendingFile!=null)pendingFile.onReceiveValue(null);
         if(NATIVE_AVAILABLE&&!activeGenerationId.isEmpty())nativeCancel();
-        if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeGGUF");web.destroy();web=null;}
+        if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeGGUF");web.removeJavascriptInterface("NativeNLI");web.destroy();web=null;}
         llmExecutor.execute(()->{if(NATIVE_AVAILABLE)nativeUnload();});
         llmExecutor.shutdown();
+        nliExecutor.execute(()->{try{if(nliEngine!=null)nliEngine.close();}catch(Exception ignored){}});
+        nliExecutor.shutdown();
         super.onDestroy();
     }
     private String modelName(Uri uri) {

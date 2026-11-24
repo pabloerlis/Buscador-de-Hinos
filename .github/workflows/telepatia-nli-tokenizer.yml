@@ -1,0 +1,110 @@
+name: Telepatia NLI - paridade tokenizer Android JS
+on:
+  push:
+    branches: [feat/semantic-sliders-live-20261123]
+    paths:
+      - tests/qa_telepatia_tokenizer_parity.mjs
+      - .github/workflows/telepatia-nli-tokenizer.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  parity:
+    name: Agente tokenizacao independente | mmBERT Rust vs navegador JavaScript
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HF_HUB_DISABLE_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar referencias fixadas sem PyTorch
+        run: |
+          set -euo pipefail
+          python -m pip install "huggingface-hub==0.36.0" "tokenizers==0.22.1"
+          npm install --no-save --prefix .tmp/js --ignore-scripts '@huggingface/tokenizers@0.2.0'
+      - name: Baixar SOMENTE tokenizer Telepatia congelado sem pesos
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          from huggingface_hub import snapshot_download,model_info
+          rev='71459abd38f4e439b2f4e3a2dae87573ae40c77e'
+          assert model_info('telepatia-ai/laya-pt-es-nli',revision=rev).sha==rev
+          root=Path(snapshot_download('telepatia-ai/laya-pt-es-nli',
+              revision=rev,local_dir='.tmp/model',allow_patterns=['tokenizer/*']))
+          for name in ['tokenizer.json','tokenizer_config.json']:
+              file=root/'tokenizer'/name
+              assert file.exists() and file.stat().st_size>0,name
+          PY
+      - name: Gerar referencias independentes do tokenizador oficial Rust
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,random
+          from pathlib import Path
+          from tokenizers import Tokenizer
+          tok=Tokenizer.from_file('.tmp/model/tokenizer/tokenizer.json')
+          texts=[
+            'O filho que se arrependeu voltou e foi acolhido pelo pai.',
+            'Não é uma história de volta ao pai, mas de alegria nos céus.',
+            'O pastor procurou a ovelha perdida e a trouxe de volta.',
+            'A mulher enferma tocou nas vestes de Jesus e foi curada.',
+            'A tempestade no barco cessou quando Jesus ordenou silêncio.',
+            'João 14:1-6, Lucas 15:11-32, Salmo 23:1.',
+            'Amém! Perdão, perdão, reconciliação, graça, fé, esperança.',
+            '¡Él volvió a su padre! ¿Qué sucedió después?',
+            'Coração não é coracao; bênção não é bencao.',
+            '[MASK] [SEP] [CLS] [PAD] [UNK]',
+            '{"state": "Um menino foi acolhido pelo pai."}',
+            'choice question: Leia integralmente o texto e avalie a relação lógica.',
+            ' contradiction: O texto fornece evidências de que a hipótese é falsa.',
+            ' entailment: O texto fornece evidências suficientes para confirmar a hipótese.',
+            ' neutral: O texto não fornece evidências suficientes para confirmar ou contradizer.',
+            '\nUma estrofe, outra estrofe!\nCom vírgulas e traços — assim.',
+            'Palavras\xa0com espaço não quebrável e\nquebra de linha.',
+            'Ação de graças, acolhimento, regressar, afastamento, retorno.',
+            'O mesmo assunto pode ser expresso de maneiras diferentes.',
+            '中文 العربية 한국어 日本語 हिंदी (mistura de idiomas)',
+            '🙂 ✨ 💡 🚦 Um coração e uma cruz.',
+          ]
+          rng=random.Random(20261123)
+          words=('perdão pai retornou filho misericórdia consolo caminho oração alegria recomeço '.split())
+          for i in range(36):
+              texts.append(' '.join(rng.choice(words) for _ in range(rng.randint(3,35)))+f' #{i}.')
+          ref={'revision':'71459abd38f4e439b2f4e3a2dae87573ae40c77e',
+               'samples':[{'index':i,'text':s,'ids':tok.encode(s,add_special_tokens=False).ids}
+                          for i,s in enumerate(texts)],
+               'specials':{name:tok.token_to_id(name) for name in
+                   [item['content'] if isinstance(item,dict) else item
+                    for item in [
+                        json.loads(Path('.tmp/model/tokenizer/tokenizer_config.json').read_text())['cls_token'],
+                        json.loads(Path('.tmp/model/tokenizer/tokenizer_config.json').read_text())['sep_token'],
+                        json.loads(Path('.tmp/model/tokenizer/tokenizer_config.json').read_text())['mask_token']]]}}
+          assert len(ref['samples'])>=50
+          Path('.tmp/tokenizer-reference.json').write_text(json.dumps(ref,ensure_ascii=False))
+          print('Rust token reference generated',len(texts), 'cases')
+          PY
+      - name: Paridade exata JS vs Rust sem download em tempo de execucao
+        run: |
+          set -euo pipefail
+          node tests/qa_telepatia_tokenizer_parity.mjs \
+            .tmp/model/tokenizer \
+            .tmp/tokenizer-reference.json \
+            "$PWD/.tmp/js/node_modules/@huggingface/tokenizers/dist/tokenizers.mjs"
+          sha256sum .tmp/js/node_modules/@huggingface/tokenizers/dist/tokenizers.mjs
+      - name: Publicar codigo JS auditado e licenca SEM pesos nem tokenizer do usuario
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telepatia-nli-tokenizer-js-reviewed
+          path: |
+            .tmp/js/node_modules/@huggingface/tokenizers/dist/tokenizers.mjs
+            .tmp/js/node_modules/@huggingface/tokenizers/LICENSE
+          retention-days: 90
+          if-no-files-found: error

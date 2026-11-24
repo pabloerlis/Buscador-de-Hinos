@@ -1,0 +1,174 @@
+name: Telepatia NLI ONNX externo - exportacao e paridade
+on:
+  push:
+    branches: [feat/semantic-sliders-live-20261123]
+    paths:
+      - scripts/qa_telepatia_onnx_export.py
+      - .github/workflows/telepatia-nli-onnx-export.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  export_and_parity:
+    name: Agente NLI | Exportar checkpoint Telepatia e verificar PyTorch ONNX
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      PYTHONUNBUFFERED: "1"
+      TOKENIZERS_PARALLELISM: "false"
+      HF_HUB_DISABLE_TELEMETRY: "1"
+      OMP_NUM_THREADS: "4"
+      USE_TF: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Confirmar recursos e ambiente
+        run: |
+          set -euo pipefail
+          free -h
+          df -h .
+          python -m py_compile scripts/qa_telepatia_onnx_export.py
+      - name: Instalar CPU PyTorch, Laya, exportador ONNX e auditoria
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install "torch==2.9.1" --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install "laya==0.4.20" "transformers==4.57.3" \
+            "huggingface-hub==0.36.0" "safetensors==0.6.2" \
+            "onnx==1.19.1" "onnxruntime==1.23.2" "onnxscript==0.5.4"
+      - name: Baixar exportador upstream fixado por commit e auditar integridade
+        run: |
+          set -euo pipefail
+          mkdir -p .tmp/upstream
+          curl --fail --location --retry 3 --max-time 120 \
+            'https://raw.githubusercontent.com/NandhaKishorM/laya/54c72865e4781233396a56c2db013e29ced3b43c/laya-dotnet/tools/export_onnx.py' \
+            -o .tmp/upstream/export_onnx.py
+          test "$(wc -c < .tmp/upstream/export_onnx.py)" -gt 20000
+          python -m py_compile .tmp/upstream/export_onnx.py
+          echo "Pinned exporter 54c72865e4781233396a56c2db013e29ced3b43c"
+          sha256sum .tmp/upstream/export_onnx.py
+          # PyTorch 2.9.1 exige dominios dinamicos compativeis com os guards:
+          # batch e comprimento de sequencia >1 durante tracing (batch=2).
+          # A verificacao ORT tambem executa com batch=1.
+          python - <<'PY'
+          from pathlib import Path
+          file=Path(".tmp/upstream/export_onnx.py")
+          text=file.read_text()
+          for before,after in [
+              ('batch = Dim("batch", min=1, max=1024)', 'batch = Dim("batch", min=2, max=1024)'),
+              ('seq = Dim("seq", min=1, max=8192)', 'seq = Dim("seq", min=2, max=8192)'),
+          ]:
+              assert text.count(before)==1,(before,text.count(before))
+              text=text.replace(before,after)
+          # PyTorch 2.9 + onnxscript 0.5.4 cria grafo com funcoes ONNX,
+          # mas a conversao automatica de versao tenta reduzi-las e falha.
+          # Testar o grafo no opset nativo; checker e execucao ORT continuam
+          # bloqueantes (nenhum arquivo e aprovado sem paridade).
+          anchor='    from torch.export.dynamic_shapes import Dim'
+          assert text.count(anchor)==1
+          text=text.replace(anchor,anchor+'''
+              from onnxscript._framework_apis import torch_2_9 as _api
+              def _native_version(model, target_version):
+                  print("NATIVE_GRAPH_OPSETS",str(getattr(model,"opset_imports",{})),flush=True)
+                  return model
+              _api.convert_version = _native_version
+          ''')
+          # O trace deixa a importacao do dominio padrao no opset 18, embora
+          # use a operacao padrao Gelu introduzida em opsets posteriores.
+          # Declarar opset 23 e VALIDAR executando o grafo em ORT contra Torch.
+          onnx_anchor="        proto = onnx.load(tmp_path)"
+          assert text.count(onnx_anchor)==1
+          text=text.replace(onnx_anchor,onnx_anchor+'''
+                  for imp in proto.opset_import:
+                      if imp.domain == "":
+                          print("UPGRADE_GRAPH_OPSET_FROM",imp.version,"TO",23,flush=True)
+                          imp.version=23
+          ''')
+          # Exportar atenção pela formula explícita de MatMul + Softmax.
+          # ORT 1.23 exige máscara no formato exato para Attention(opset23),
+          # mas o ModernBERT usa máscara broadcast Q. Manter equivalência
+          # verificada contra a atenção PyTorch original; nunca silenciosa.
+          source='    from torch.export.dynamic_shapes import Dim'
+          assert text.count(source)==1
+          text=text.replace(source,source+'''
+              import math
+              import torch.nn.functional as _f
+              def _manual_sdpa(q,k,v,attn_mask=None,dropout_p=0.0,is_causal=False,scale=None,enable_gqa=False):
+                  if is_causal or dropout_p or enable_gqa:
+                      raise RuntimeError("Unhandled SDPA export mode")
+                  factor=(1.0/math.sqrt(q.shape[-1])) if scale is None else scale
+                  weights=torch.matmul(q,k.transpose(-2,-1))*factor
+                  if attn_mask is not None:
+                      if attn_mask.dtype==torch.bool:
+                          weights=weights.masked_fill(~attn_mask,float("-inf"))
+                      else:
+                          weights=weights+attn_mask
+                  return torch.matmul(torch.softmax(weights,dim=-1),v)
+              _f.scaled_dot_product_attention=_manual_sdpa
+          ''')
+          file.write_text(text)
+          print("SDPA manual decomposition installed; Torch/ORT parity required",flush=True)
+          PY
+          python -m py_compile .tmp/upstream/export_onnx.py
+          sha256sum .tmp/upstream/export_onnx.py
+      - name: Baixar pesos externos do Telepatia sob revisao imutavel
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from huggingface_hub import snapshot_download, model_info
+          from pathlib import Path
+          rev="71459abd38f4e439b2f4e3a2dae87573ae40c77e"
+          info=model_info("telepatia-ai/laya-pt-es-nli",revision=rev)
+          assert info.sha==rev, (info.sha,rev)
+          files=snapshot_download(
+              "telepatia-ai/laya-pt-es-nli", revision=rev,
+              local_dir=".tmp/checkpoint/telepatia-pt-es-nli",
+              allow_patterns=["rl_agent_config.json","model.safetensors",
+                  "encoder/*","tokenizer/*","SHA256SUMS","ATTRIBUTIONS.md","provenance.json"],
+          )
+          root=Path(files)
+          for name in ["model.safetensors","rl_agent_config.json","tokenizer/tokenizer.json"]:
+              f=root/name
+              assert f.exists() and f.stat().st_size>0,name
+          assert (root/"model.safetensors").stat().st_size>400_000_000
+          print("Checkpoint revision",rev,"bytes", (root/"model.safetensors").stat().st_size,flush=True)
+          PY
+      - name: Exportar o modelo original para ONNX - sem APK
+        run: |
+          set -euo pipefail
+          python .tmp/upstream/export_onnx.py \
+            .tmp/checkpoint/telepatia-pt-es-nli \
+            --out .tmp/exports --opset 23 --verify
+      - name: Verificar paridade de respostas NLI portuguesas e hashes
+        run: |
+          set -euo pipefail
+          python scripts/qa_telepatia_onnx_export.py \
+            --checkpoint .tmp/checkpoint/telepatia-pt-es-nli \
+            --bundle .tmp/exports/telepatia-pt-es-nli \
+            --report qa-report/telepatia-onnx-export-manifest.json
+          cp qa-report/telepatia-onnx-export-manifest.json \
+            .tmp/exports/telepatia-pt-es-nli/manifest.json
+      - name: Publicar relatorio somente se a comparacao passar
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telepatia-nli-onnx-parity-manifest
+          path: qa-report/telepatia-onnx-export-manifest.json
+          retention-days: 90
+          if-no-files-found: error
+      - name: Publicar pesos convertidos SOMENTE como modelo externo verificado
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: telepatia-nli-onnx-external-fp32
+          path: |
+            .tmp/exports/telepatia-pt-es-nli/model.onnx
+            .tmp/exports/telepatia-pt-es-nli/model.onnx.data
+            .tmp/exports/telepatia-pt-es-nli/rl_agent_config.json
+            .tmp/exports/telepatia-pt-es-nli/manifest.json
+            .tmp/exports/telepatia-pt-es-nli/tokenizer/
+          compression-level: 0
+          retention-days: 30
+          if-no-files-found: error

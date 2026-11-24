@@ -51,10 +51,11 @@ function resultCard(hymn,{unlearned=false}={}){
   const collection=`<span class="library-tag">${escapeHTML(hymn.collection||'Importados')}</span>`;
   const tags=(hymn.topics||[]).slice(0,3).map(t=>`<span class="small-tag">${escapeHTML(t)}</span>`).join('');
   const klass=hymn.relevance==='Muito relevante'?'':hymn.relevance==='Relevante'?'mid':'low';
-  const scoreLabel=hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
-  const score=Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
-  return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Estimativa heurística de afinidade, não probabilidade ou certeza"><strong>${score}%</strong> ${scoreLabel}</span></div>
+  const scoreLabel=Number.isFinite(hymn.tuner_score)?'índice personalizado':hymn.match_type==='numero'?'número exato':hymn.match_type==='vetorial'?'semântica E5':'afinidade estimada';
+  const score=Number.isFinite(hymn.tuner_score)?hymn.tuner_score:Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
+  return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}"><div class="result-head"><span class="hymn-number">${number}</span><span class="relevance ${klass}" title="Índice heurístico de ordenação, não probabilidade, certeza nem avaliação NLI"><strong>${score}%</strong> ${scoreLabel}</span></div>
   <h3>${escapeHTML(hymn.title)}</h3>${collection}<div class="score-track" aria-label="Afinidade estimada ${score} por cento"><span style="width:${score}%"></span></div>
+  ${hymn.nli_label?`<div class="nli-result-label" title="Classificação real do Telepatia PT/ES, não probabilidade">Telepatia: ${hymn.nli_label==='entailment'?'implicação':hymn.nli_label==='contradiction'?'contradição':'neutro'}</div>`:''}
   <p class="lyric-quote">“${escapeHTML(hymn.snippet||'Nenhum trecho disponível')}”</p>
   ${hymn.reason?`<p class="why"><strong>Por que foi sugerido:</strong> ${escapeHTML(hymn.reason)}</p>`:''}
   <div class="result-bottom"><div class="tag-row">${tags}</div><button class="repertoire-action ${unlearned?'undo':''}" type="button" data-repertoire-id="${Number(hymn.id)}" data-not-learned="${unlearned?'false':'true'}">${unlearned?'Marcar como aprendido':'Ainda não aprendido'}</button><button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">Ver hino <svg viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></svg></button></div></article>`;
@@ -69,6 +70,7 @@ function setRefineOpen(open) {
   $('refine-toggle').setAttribute('aria-expanded', String(open));
   $('refine-panel').classList.toggle('hidden', !open);
 }
+const SearchTuner=createSearchTuner({state,byId:$,card:resultCard,submit:submitSearch});
 async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false}={}){
   if(state.busy)return false;
   if(!state.ready){toast('Importe a coletânea para começar.');$('import-panel').scrollIntoView({behavior:'smooth',block:'center'});return false;}
@@ -89,8 +91,8 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
   try {
     let data;
     if(page>1)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),semantic_hints:semanticHints,settings:state.searchSettings});
+    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings,tuner_pool:true});
+    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),semantic_hints:semanticHints,settings:state.searchSettings,tuner_pool:true});
     if(page===1){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.deprioritize=data.deprioritized||[];state.requiredTerms=data.required||[];state.semanticHints=semanticHints;
@@ -119,6 +121,11 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     $('load-more').classList.toggle('hidden',!data.has_more);
     if(page===1)RepertoireUI.renderSearch(data);
     $('load-more').textContent='Carregar mais '+data.page_size+' hinos';
+    if(page===1&&typeof SearchTuner!=='undefined'){
+      SearchTuner.accept(data);
+      if(!refine&&!preserveContext)SearchTuner.record(query);
+      if(window.TelepatiaUI)window.TelepatiaUI.onResults(data,state.effectiveQuery,state.searchEpoch);
+    }
     succeeded=true;
   }catch(error){
     if(page===1&&!preserveContext){
@@ -129,7 +136,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     toast(error.message);
   }finally{busySearch(false);}
   if(succeeded&&page===1&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
-  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
+  if(succeeded && page===1 && !isBibleSearch && !state.exactNumber && autoAI && (typeof SearchTuner==='undefined'||!SearchTuner.isDirect()) && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
   GGUF.info?.();
   return succeeded;
 }
@@ -255,9 +262,9 @@ $('refine-form').addEventListener('submit',async ev=>{
     $('results-title').focus({preventScroll:true});
   }
 });
-$('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false}));
+$('load-more').addEventListener('click',()=>{if(!SearchTuner.more())performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false});});
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
+$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;SearchTuner.clearPool();window.TelepatiaUI?.reset();state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();window.scrollTo({top:0,behavior:'smooth'});$('conversation').replaceChildren();});
 document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;submitSearch(b.dataset.suggestion);}));
 
 const settingsTabs = [...document.querySelectorAll('.settings-tabs [role="tab"]')];
@@ -548,7 +555,7 @@ const EmbeddingSearch=(()=>{
       if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off')return;
       state.vectorQuery=answer.vector;
       const result=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
-        semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings});
+        semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings,tuner_pool:true});
       if(epoch!==state.searchEpoch)return;
       state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
       state.aiContext=result.ai_context;
@@ -558,6 +565,8 @@ const EmbeddingSearch=(()=>{
       $('load-more').classList.toggle('hidden',!result.has_more);
       $('load-more').textContent='Carregar mais '+result.page_size+' hinos';
       $('results-subtitle').textContent=`${result.total} resultados · busca híbrida com E5 Small`;
+      SearchTuner.accept(result);
+      if(window.TelepatiaUI)window.TelepatiaUI.onResults(result,state.effectiveQuery,epoch);
       status('E5 Small: ranking vetorial atualizado em '+(answer.ms/1000).toFixed(1)+'s. Sem internet.');
     }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · modelo E5: '+error.message);}
   }

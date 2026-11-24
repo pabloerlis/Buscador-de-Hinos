@@ -90,6 +90,28 @@ public class E5DeviceSmokeTest {
                 evaluate(web,"Boolean(typeof EventFrameEngine!=='undefined' && " +
                     "OfflineAPI.searchOptions().eventEvidence===true && " +
                     "document.getElementById('event-toggle'))"));
+            assertEquals("Semantic slider controls or persistence failed in actual Android WebView","true",
+                evaluate(web,
+                    "(()=>{try{" +
+                    "const el=id=>document.getElementById(id);" +
+                    "if(typeof SemanticTuner==='undefined'||!el('tuner-panel'))return false;" +
+                    "const topic=el('tuner-topic');topic.value='25';" +
+                    "topic.dispatchEvent(new Event('input',{bubbles:true}));" +
+                    "const saved=JSON.parse(localStorage.getItem('hinos-semantic-tuner-v1'));" +
+                    "if(saved.topic!==25||el('tuner-topic-value').textContent!=='25%')return false;" +
+                    "document.querySelector('[data-tuner-preset=narrative]').click();" +
+                    "if(topic.value!=='35'||el('tuner-narrative').value!=='100')return false;" +
+                    "const toggle=el('tuner-enabled');toggle.click();" +
+                    "const off=!document.documentElement.classList.contains('semantic-direct-mode');" +
+                    "toggle.click();" +
+                    "const on=document.documentElement.classList.contains('semantic-direct-mode');" +
+                    "const list=SemanticTuner.rank([" +
+                    "{id:1,relevance_percent:70,tuner_signals:{lexical:20,semantic:20}}," +
+                    "{id:2,relevance_percent:65,tuner_signals:{narrative:20,biblical:20,actions:10}}]," +
+                    "{topic:0,narrative:100,events:100,min:0});" +
+                    "el('tuner-reset').click();" +
+                    "return off&&on&&list[0].id===2&&el('tuner-topic').value==='70';" +
+                    "}catch(e){return false}})()"));
             assertEquals("Android narrative actor/action engine not functional","true",
                 evaluate(web,
                     "(()=>{try{" +
