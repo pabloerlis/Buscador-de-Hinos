@@ -609,13 +609,48 @@ const OfflineAPI = (() => {
     const topicIds=thematic?new Set(semantic?.interpret(term).direct.map(topic=>topic.id)):new Set();
     return {term,normalized,thematic,topicIds};
   }
+  // Equivalências lexicais explícitas. Relações temáticas do ranking não
+  // satisfazem filtros estritos (por exemplo, ansiedade não é sinônimo de paz).
+  const synonymGroups=[
+    ['oração','prece','súplica'],['orar','rezar','suplicar'],
+    ['paz','tranquilidade','serenidade'],['alegria','júbilo','regozijo','felicidade'],
+    ['tristeza','pesar','melancolia'],['angústia','aflição'],['medo','temor','receio'],
+    ['ajuda','auxílio','socorro'],['ajudar','auxiliar','socorrer'],
+    ['consolo','conforto','alento'],['consolar','confortar'],
+    ['refúgio','abrigo'],['proteção','amparo'],['gratidão','agradecimento'],
+    ['perdão','remissão'],['salvação','redenção'],['caminho','trajeto','rota'],
+    ['casa','morada','habitação'],['cântico','canção'],['tempestade','tormenta'],
+    ['mar','oceano'],['vitória','triunfo'],['união','unidade'],
+    ['compaixão','misericórdia','piedade'],['humildade','modéstia'],
+    ['retorno','volta','regresso'],
+    ['louvar','enaltecer','exaltar'],['fortaleza','fortificação']
+  ].map(group=>group.map(normalizeLyrics));
+  const synonymIndex=new Map(synonymGroups.flatMap(group=>group.map(term=>[term,group.filter(other=>other!==term)])));
+  function filterSynonyms(term){return (synonymIndex.get(normalizeLyrics(term))||[]).slice();}
+  function searchFilters(source){
+    if(!Array.isArray(source))return [];
+    return source.slice(0,12).flatMap(filter=>{
+      const term=typeof filter?.term==='string'?normalizeLyrics(filter.term.slice(0,80)):'';
+      if(!term)return [];
+      const kind=['require','exclude','prefer'].includes(filter.kind)?filter.kind:'require';
+      const field=['title','lyrics'].includes(filter.field)?filter.field:'both';
+      const words=[term,...(filter.synonyms===true?filterSynonyms(term):[])];
+      const patterns=words.map(word=>new RegExp('(?:^| )'+reEscape(word)+'(?=$| )'));
+      return [{kind,field,words,patterns}];
+    });
+  }
+  function matchesFilter(filter,title,lyrics){
+    return filter.patterns.some(pattern=>(filter.field!=='lyrics'&&pattern.test(title))||
+      (filter.field!=='title'&&pattern.test(lyrics)));
+  }
   // Conversão VISUAL heurística não calibrada: NÃO é probabilidade nem confiança estatística.
   function percentage(score, exactNumber=false){
     if(exactNumber)return 100;
     return Math.max(20, Math.min(98, Math.round(30 + 68*(1-Math.exp(-score/22)))));
   }
   function search(payload){
-    let query=String(payload?.query||'').trim();if(!query||query.length>MAX_QUERY_LENGTH)throw Error(`Digite uma consulta de até ${MAX_QUERY_LENGTH} caracteres.`);
+    const filters=searchFilters(payload?.term_filters);
+    let query=String(payload?.query||'').trim();if((!query&&!filters.length)||query.length>MAX_QUERY_LENGTH)throw Error(`Digite uma consulta de até ${MAX_QUERY_LENGTH} caracteres.`);
     const opts=searchOptions(payload?.settings);
     opts.customAliases={...personalAliases,...opts.customAliases};
     const page=Math.max(1,Math.min(100,Number(payload.page)||1));
@@ -629,7 +664,10 @@ const OfflineAPI = (() => {
       .filter(term=>!excludedTerms.has(normalizeLyrics(term)));
     const required=combineRestrictions(ctx.fresh?[]:payload?.require,ctx.required);
     const criteria={effective_query:query,excluded,deprioritized,required,reset_context:ctx.fresh};
-    if(!query)return {results:[],page,page_size:opts.pageSize,total:0,has_more:false,...criteria,used_ai:false,summary:'Nenhum critério positivo informado.'};
+    if(!query&&!filters.length)return {results:[],page,page_size:opts.pageSize,total:0,has_more:false,...criteria,used_ai:false,summary:'Nenhum critério positivo informado.'};
+    const filterOnly=!query;
+    const hardFilters=filters.filter(filter=>filter.kind!=='prefer');
+    const preferred=filters.filter(filter=>filter.kind==='prefer');
     const norm=normalize(query), numberMatch=norm.match(/^(?:(coletanea|principal|avulsos?|cia|criancas|infantil)\s+)?(?:hino\s*|louvor\s*)?(\d{1,4})$/);
     const bible=typeof BibleContext!=='undefined'?BibleContext.lookup(query):null;
     const scripture=opts.scripture&&scriptureIndex?scriptureIndex.lookup(query):null;
@@ -682,7 +720,7 @@ const OfflineAPI = (() => {
     const requiredCriteria=required.map(term=>searchCriterion(term,allowTopics));
     const excludedCriteria=excluded.map(term=>searchCriterion(term,allowTopics));
     const lowerCriteria=deprioritized.map(term=>searchCriterion(term,allowTopics));
-    const snippetPhrases=[...new Set([...requiredCriteria.map(item=>item.normalized).filter(Boolean),...(quoted.length?quoted:exactPhrase.length>=4?[exactPhrase]:[])])];
+    const snippetPhrases=[...new Set([...requiredCriteria.map(item=>item.normalized).filter(Boolean),...filters.filter(item=>item.kind==='require').flatMap(item=>item.words),...(quoted.length?quoted:exactPhrase.length>=4?[exactPhrase]:[])])];
     // A proximidade complementa buscas temáticas livres e preserva a evidência de consultas exatas.
     const usePassages=semanticWeight>0&&!numberMatch&&!quoted.length&&!required.length&&
       !scripture&&!isBiblicalRef&&!storyIntent?.matches.length;
@@ -691,12 +729,13 @@ const OfflineAPI = (() => {
     const vectorHits=vectorEnabled?VectorIndex.topForQuery(payload.vector_query,100):[];
     const vectorScores=new Map(vectorHits.map(h=>[h.id,h.similarity]));
     const ranked=[];
-    for(const song of (graphCtx||quoted.length?hymns:candidateSongs(numberMatch,lexicalCandidates,intent,storyIntent,vectorHits,exactTitles))){
+    for(const song of (graphCtx||quoted.length||filterOnly?hymns:candidateSongs(numberMatch,lexicalCandidates,intent,storyIntent,vectorHits,exactTitles))){
       if(!collectionEnabled(song,opts))continue;
       const indexedText=searchTexts.get(song.id);
       const {title,lyrics,titleWords,words}=indexedText;
       const matchesText=term=>hasWord(title,term)||hasWord(lyrics,term);
       if(quoted.some(phrase=>!matchesText(phrase)))continue;
+      if(hardFilters.some(filter=>matchesFilter(filter,title,lyrics)!==(filter.kind==='require')))continue;
       const matchesTopic=criterion=>song.semantic_profile?.find(topic=>criterion.topicIds.has(topic.id));
       const matchesCriterion=criterion=>criterion.normalized&&(matchesText(criterion.normalized)||
         (criterion.thematic&&(matchesTopic(criterion)||song.topics.some(topic=>normalizeLyrics(topic)===criterion.normalized))));
@@ -708,6 +747,9 @@ const OfflineAPI = (() => {
       if(numberMatch){
         if(!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2])))continue;
         score=100;evidence.push('número exato');
+      }else if(filterOnly){
+        score=7;
+        evidence.push('Atende aos filtros de busca');
       }else{
         const lexicalWeight=opts.mode==='context'?0.7:1;
         // Não premiar um título por conter apenas parte de uma narrativa reconhecida.
@@ -760,6 +802,7 @@ const OfflineAPI = (() => {
         }
       }
       if(score<(semanticResult?.score>0||storyResult?.score>0||graphResult?.score>=7||vectorScores.get(song.id)>0.76||spelling.length?4.7:7))continue;
+      if(!numberMatch)score+=Math.min(12,preferred.filter(filter=>matchesFilter(filter,title,lyrics)).length*4);
       const sharedPassage=passageTopics.size>=2?findSharedPassage(song,indexedText,passageTopics):null;
       if(sharedPassage){
         score+=9*Math.min(semanticWeight,1);
@@ -770,7 +813,7 @@ const OfflineAPI = (() => {
       const matchedTokens=qTokens.filter(x=>words.has(x));
       const reason=numberMatch?'Número exato do hino.':evidence.length?evidence.slice(0,2).join('. ')+'.':matchedTokens.length?'A letra contém termos relacionados: '+matchedTokens.slice(0,3).join(', ')+'.':'Possível relação temática; confira a letra antes de utilizar.';
       const percent=percentage(score,!!numberMatch);
-      if(percent<opts.minAffinity)continue;
+      if(!filterOnly&&percent<opts.minAffinity)continue;
       const explanations=[...(graphResult?.reasons||[]),...(storyResult?.reasons||[]),...(semanticResult?.proof||[])].slice(0,3);
       const selectedRef=numberMatch? song.collectionRefs.find(ref=>Number(ref.number)===Number(numberMatch[2])&&(!namedCollection||ref.id===namedCollection)) : song.collectionRefs.find(ref=>opts.collections[ref.id]!==false);
       ranked.push({id:song.id,number:selectedRef?.number||song.number,title:song.title,collection:selectedRef?.name||song.collection,collection_ids:song.collections.slice(),edition:selectedRef?.edition||song.edition,
@@ -781,7 +824,7 @@ const OfflineAPI = (() => {
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
         _narrativeTier:storyResult?.tier||0,
         vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
-        match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
+        match_type:filterOnly?'filtro':numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     // Consulta composta: preservar o peso dos outros requisitos; o nível
@@ -958,5 +1001,5 @@ const OfflineAPI = (() => {
     if(match)return hymnDetail(Number(match[1]));
     throw Error('Operação não reconhecida.');
   }
-   return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions};
+   return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions,filterSynonyms};
 })();

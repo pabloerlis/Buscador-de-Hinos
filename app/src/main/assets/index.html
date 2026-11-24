@@ -48,10 +48,10 @@
           <form id="search-form" class="search-box" role="search">
             <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="7"/><path d="m16 16 5 5"/></svg>
             <label class="sr-only" for="search-input">Pesquisar hinos</label>
-            <input id="search-input" type="search" maxlength="500" autocomplete="off" placeholder="Título, tema ou referência" required>
+            <input id="search-input" type="search" maxlength="500" autocomplete="off" placeholder="Título, tema ou referência">
             <button type="submit" id="search-button">Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           </form>
-          <details class="quick-filters"><summary>Filtros</summary>
+          <details class="quick-filters"><summary>Filtros<span id="quick-filter-count"></span></summary>
           <div class="filter-panel">
           <div class="collection-quick" id="quick-collections" aria-label="Filtrar coleções">
             <label><input type="checkbox" data-collection="principal" checked> Coletânea 2018 <small id="quick-count-principal">—</small></label>
@@ -59,12 +59,41 @@
             <label><input type="checkbox" data-collection="cia" checked> CIA <small id="quick-count-cia">—</small></label>
             <label><input type="checkbox" data-collection="pessoal" checked> Pessoal <small id="quick-count-pessoal">—</small></label>
           </div>
+          <button id="open-term-filters" class="text-action term-filters-link" type="button">Termos da busca</button>
           <label class="quick-rank"><input id="quick-context-rank" type="checkbox"> Ordem contextual <small>Experimental</small></label>
           </div>
           </details>
         </div>
       </section>
 
+      <details id="term-filters-panel" class="live-filters">
+        <summary><span>Termos da busca</span><span id="term-filter-count"></span></summary>
+        <div class="live-filters-body">
+          <div id="term-filter-rows"></div>
+          <div class="live-filters-actions">
+            <button id="term-filter-add" class="secondary-btn" type="button">+ Termo</button>
+            <button id="term-filter-clear" class="text-action" type="button">Limpar termos</button>
+          </div>
+        </div>
+      </details>
+      <template id="term-filter-template">
+        <div class="term-filter-row">
+          <select data-field="kind" aria-label="Tipo de filtro">
+            <option value="require">Exigir</option>
+            <option value="exclude">Excluir</option>
+            <option value="prefer">Preferir</option>
+          </select>
+          <input data-field="term" type="text" maxlength="80" aria-label="Palavra ou trecho" placeholder="Palavra ou trecho">
+          <button data-action="remove" class="icon-button" type="button" aria-label="Remover termo">×</button>
+          <label class="term-synonym"><input data-field="synonyms" type="checkbox"> Aceitar sinônimos</label>
+          <select data-field="field" aria-label="Onde procurar">
+            <option value="both">Título e letra</option>
+            <option value="title">Só no título</option>
+            <option value="lyrics">Só na letra</option>
+          </select>
+          <small class="term-synonym-preview" hidden></small>
+        </div>
+      </template>
       <section class="main-content" aria-label="Pesquisa e resultados">
         <div id="upgrade-panel" class="import-panel hidden" role="region" aria-label="Ampliar biblioteca de hinos">
           <div class="import-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></div>

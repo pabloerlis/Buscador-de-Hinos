@@ -50,7 +50,7 @@ function resultCard(hymn,{unlearned=false}={}){
     <button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">
       <span class="result-identity"><span class="hymn-number">${number} · ${escapeHTML(hymn.collection||'Importados')}</span>
         <span class="result-name">${escapeHTML(hymn.title)}</span></span>
-      <span class="relevance" title="Afinidade estimada"><strong>${score}%</strong><span class="sr-only"> de afinidade</span></span>
+      ${hymn.match_type==='filtro'?'':`<span class="relevance" title="Afinidade estimada"><strong>${score}%</strong><span class="sr-only"> de afinidade</span></span>`}
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
     </button>
   </article>`;
@@ -67,10 +67,11 @@ function updatePages(){
   $('load-more').disabled=state.busy||!state.hasMore;
   $('page-status').textContent=`Página ${state.page} de ${Math.max(1,Math.ceil(state.total/state.searchSettings.pageSize))}`;
 }
-async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false,paging=page>1}={}){
+async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=true,preserveContext=false,paging=page>1,termFilters=state.searchFilters||[],allowVector=true}={}){
   if(state.busy)return false;
   if(!state.ready){toast('Importe a coletânea para começar.');$('import-remote').focus();return false;}
-  if(!String(query).trim())return false;
+  if(!String(query).trim()&&!termFilters.length)return false;
+  state.searchFilters=termFilters;
   if(!paging){
     state.searchEpoch++;
     GGUF.cancelSearchTask();
@@ -88,7 +89,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     let data;
     if(paging)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
     else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else data=await jsonRequest('/api/search',{query,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),semantic_hints:semanticHints,settings:state.searchSettings});
+    else data=await jsonRequest('/api/search',{query,term_filters:termFilters,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),semantic_hints:semanticHints,settings:state.searchSettings});
     if(!paging){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
       state.effectiveQuery=data.effective_query;state.exclude=data.excluded||[];state.deprioritize=data.deprioritized||[];state.requiredTerms=data.required||[];state.semanticHints=semanticHints;
@@ -96,7 +97,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
       state.aiContext=data.ai_context;
       state.exactNumber=Boolean(data.exact_number);
       $('results-list').innerHTML='';$('results-title').textContent=refine?'Pesquisa refinada':'Hinos encontrados';
-      $('results-subtitle').textContent=`${data.total} resultado${data.total===1?'':'s'} para “${query}”`;
+      $('results-subtitle').textContent=`${data.total} resultado${data.total===1?'':'s'}${query?` para “${query}”`:" com os filtros"}`;
       const fragments=[];
       if(data.used_ai)fragments.push('IA local sugeriu conceitos; a classificação foi conferida na letra original.');
       else if(refine)fragments.push('Critérios contextuais aplicados localmente.');
@@ -126,13 +127,13 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],autoAI=
     }
     toast(error.message);
   }finally{busySearch(false);}
-  if(succeeded&&!paging&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
-  if(succeeded && !paging && !isBibleSearch && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
+  if(succeeded&&query&&allowVector&&!paging&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
+  if(succeeded && query && !paging && !isBibleSearch && !state.exactNumber && autoAI && !semanticHints.length) GGUF.maybeAuto(state.effectiveQuery);
   GGUF.info?.();
   return succeeded;
 }
 function searchRestrictions(){
-  return {exclude:state.exclude,deprioritize:state.deprioritize,require:state.requiredTerms};
+  return {exclude:state.exclude,deprioritize:state.deprioritize,require:state.requiredTerms,term_filters:state.searchFilters||[]};
 }
 function appendConversation(kind,text){const el=document.createElement('div');el.className=kind==='user'?'user-message':'assistant-message';el.textContent=text;$('conversation').appendChild(el);$('conversation').scrollTop=$('conversation').scrollHeight;}
 function relatedCard(hymn,{unlearned=false}={}){
@@ -206,19 +207,113 @@ async function importRemote(){
 async function importFile(input){const file=input.files?.[0];if(!file)return;if(file.size>12_000_000){toast('O arquivo precisa ter até 12 MB.');return;}
   try{const data=JSON.parse(await file.text());const response=await jsonRequest('/api/import',{data});toast(`Biblioteca: ${response.count} hinos únicos (${response.added} novos).`);await refreshStatus();closeLayer();}
   catch(e){toast('Falha ao importar JSON: '+e.message);}finally{input.value='';}}
-$('search-form').addEventListener('submit',ev=>{ev.preventDefault();performSearch($('search-input').value.trim());});
+$('search-form').addEventListener('submit',ev=>{ev.preventDefault();LiveSearch.submit();});
 $('refine-form').addEventListener('submit',async ev=>{ev.preventDefault();const message=$('refine-input').value.trim();if(!message||state.busy)return;appendConversation('user',message);$('refine-input').value='';closeLayer();const success=await performSearch(message,{refine:true});appendConversation('assistant',success?`Pesquisa refinada: ${state.total} resultados. Acrescente outra restrição se necessário.`:'Não consegui refinar a pesquisa.');});
 $('open-refine').addEventListener('click',()=>{openLayer('refine');$('refine-input').focus();});
 $('load-more').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page+1,autoAI:false,paging:true}));
 $('previous-page').addEventListener('click',()=>performSearch(state.effectiveQuery,{page:state.page-1,autoAI:false,paging:true}));
 $('results-list').addEventListener('click',ev=>{const button=ev.target.closest('[data-hymn-id]');if(button)openHymn(button.dataset.hymnId);});
-$('new-search').addEventListener('click',()=>{if(state.busy)return;state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');document.body.classList.remove('has-results');$('welcome-panel').classList.remove('hidden');$('search-input').value='';$('search-input').focus();$('conversation').replaceChildren();});
-document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;performSearch(b.dataset.suggestion);}));
+function clearSearchResults(){
+  state.searchFilters=[];state.effectiveQuery='';state.originalQuery='';state.searchRootQuery='';state.hymnTrail=[];state.exclude=[];state.deprioritize=[];state.requiredTerms=[];state.semanticHints=[];state.lastResults=[];state.vectorQuery=null;state.aiContext=null;state.exactNumber=false;state.searchEpoch++;GGUF.cancelSearchTask();$('results-panel').classList.add('hidden');document.body.classList.remove('has-results');$('welcome-panel').classList.remove('hidden');
+  $('conversation').replaceChildren();
+}
+$('new-search').addEventListener('click',()=>{
+  if(state.busy)return;
+  LiveSearch.clear();
+  clearSearchResults();
+  $('search-input').value='';
+  $('search-input').focus();
+});
+document.querySelectorAll('[data-suggestion]').forEach(b=>b.addEventListener('click',()=>{$('search-input').value=b.dataset.suggestion;LiveSearch.submit();}));
 $('open-settings').addEventListener('click',()=>openLayer('settings'));$('ai-indicator').addEventListener('click',()=>openLayer('settings'));
 $('about-app').addEventListener('toggle',()=>{if($('about-app').open)BuildAbout.render();});
 $('import-remote').addEventListener('click',importRemote);$('settings-import').addEventListener('click',importRemote);$('upgrade-import').addEventListener('click',importRemote);
 $('import-file').addEventListener('change',ev=>importFile(ev.target));$('settings-file').addEventListener('change',ev=>importFile(ev.target));
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeLayer));document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeLayer();});
+
+const LiveSearch=(()=>{
+  const panel=$('term-filters-panel');
+  const rows=$('term-filter-rows');
+  const input=$('search-input');
+  let timer;
+  let appliedInput=null;
+  function readFilters(){
+    return [...rows.children].flatMap(row=>{
+      const term=q('[data-field="term"]',row).value.trim();
+      if(!/[a-z0-9]/.test(OfflineAPI.normalize(term)))return [];
+      return [{term,kind:q('[data-field="kind"]',row).value,field:q('[data-field="field"]',row).value,
+        synonyms:q('[data-field="synonyms"]',row).checked}];
+    });
+  }
+  function refreshControls(){
+    const count=readFilters().length;
+    $('term-filter-count').textContent=count?String(count):'';
+    $('quick-filter-count').textContent=count?' · '+count:'';
+    $('term-filter-add').disabled=rows.children.length>=12;
+    $('term-filter-clear').disabled=!rows.children.length;
+  }
+  function add(focus=true){
+    if(rows.children.length>=12)return;
+    const row=$('term-filter-template').content.firstElementChild.cloneNode(true);
+    rows.append(row);
+    refreshControls();
+    if(focus)q('[data-field="term"]',row).focus();
+  }
+  function run(live,filtersChanged=false){
+    clearTimeout(timer);
+    if(live&&!state.ready)return;
+    if(state.busy){timer=setTimeout(()=>run(live,filtersChanged),90);return;}
+    const query=input.value.trim();
+    const termFilters=readFilters();
+    if(!query&&!termFilters.length){
+      if(!$('results-panel').classList.contains('hidden'))clearSearchResults();
+      return;
+    }
+    const preserve=filtersChanged&&query===appliedInput&&!$('results-panel').classList.contains('hidden');
+    appliedInput=query;
+    performSearch(preserve?state.effectiveQuery:query,{
+      termFilters,autoAI:!live,allowVector:!live,preserveContext:preserve,semanticHints:preserve?state.semanticHints:[]
+    });
+  }
+  function schedule(filtersChanged=false){
+    refreshControls();
+    clearTimeout(timer);
+    timer=setTimeout(()=>run(true,filtersChanged),180);
+  }
+  $('open-term-filters').onclick=()=>{
+    q('.quick-filters').open=false;
+    panel.open=true;
+    if(!rows.children.length)add();
+    else q('[data-field="term"]',rows).focus();
+  };
+  $('term-filter-add').onclick=()=>add();
+  $('term-filter-clear').onclick=()=>{rows.replaceChildren();add(false);schedule(true);};
+  rows.addEventListener('input',event=>{
+    const row=event.target.closest('.term-filter-row');
+    const preview=q('.term-synonym-preview',row);
+    const term=q('[data-field="term"]',row).value.trim();
+    preview.hidden=!term||!q('[data-field="synonyms"]',row).checked;
+    if(!preview.hidden){
+      const synonyms=OfflineAPI.filterSynonyms(term);
+      preview.textContent=synonyms.length?'Também aceita: '+synonyms.join(', '):'Sem equivalências para este termo.';
+    }
+    schedule(true);
+  });
+  rows.addEventListener('click',event=>{
+    const button=event.target.closest('[data-action="remove"]');
+    if(!button)return;
+    button.closest('.term-filter-row').remove();
+    if(!rows.children.length)add(false);
+    schedule(true);
+  });
+  input.addEventListener('input',()=>schedule());
+  panel.addEventListener('toggle',()=>{if(panel.open&&!rows.children.length)add(false);});
+  // Busca por atalhos inicia sem usar uma pesquisa que ficou na fila da digitação.
+  return {
+    submit:()=>run(false),
+    clear(){clearTimeout(timer);appliedInput=null;rows.replaceChildren();panel.open=false;refreshControls();}
+  };
+})();
 
 // Configurações 1.5 — persistência local e dicionário pessoal; não chamam o GGUF.
 const SearchPreferences=(()=>{
@@ -255,7 +350,7 @@ const SearchPreferences=(()=>{
     fill();
   }
   function refreshSearch(){
-    if(state.ready&&state.effectiveQuery)performSearch(state.effectiveQuery,{semanticHints:state.semanticHints,autoAI:false,preserveContext:true});
+    if(state.ready&&(state.effectiveQuery||state.searchFilters?.length))performSearch(state.effectiveQuery,{semanticHints:state.semanticHints,autoAI:false,preserveContext:true});
   }
   $('rec-weight').oninput=()=>{$('rec-weight-value').textContent=$('rec-weight').value+'%';};
   $('semantic-power').oninput=()=>{$('semantic-power-value').textContent=$('semantic-power').value+'%';};
@@ -378,7 +473,7 @@ const PersonalDictionary=(()=>{
   function searchTerm(term){
     AppTabs.showSearch();
     $('search-input').value=term;
-    performSearch(term);
+    LiveSearch.submit();
   }
   $('view-aliases').onclick=()=>showStories(false);
   $('view-stories').onclick=()=>showStories(true);
@@ -658,7 +753,7 @@ const RepertoireUI=(()=>{
     try{
       const result=await jsonRequest('/api/repertoire/mark',{hymn_id:Number(id),not_learned:flag});
       toast(flag?'Hino marcado como não aprendido. Continua disponível na seção separada.':'Hino devolvido às indicações principais.');
-      if(state.ready&&state.effectiveQuery){
+      if(state.ready&&(state.effectiveQuery||state.searchFilters?.length)){
         const epoch=state.searchEpoch;
         const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
           semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
@@ -688,7 +783,7 @@ const RepertoireUI=(()=>{
     update(b.dataset.repertoireId,b.dataset.notLearned==='true');
   },true);
   $('not-learned-more').addEventListener('click',async()=>{
-    if(operation||!state.effectiveQuery)return;
+    if(operation||(!state.effectiveQuery&&!state.searchFilters?.length))return;
     operation=true;const next=hiddenPage+1;
     try{
       const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,not_learned_page:next,

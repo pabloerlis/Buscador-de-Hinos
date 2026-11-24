@@ -431,3 +431,54 @@ button:focus-visible, summary:focus-visible, a:focus-visible {
 .dictionary-backup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dictionary-backup-actions :focus-within { outline: 2px solid #2b7767; outline-offset: 2px; }
 .dictionary-backup-actions label:has(input:disabled) { pointer-events: none; opacity: .6; }
+
+/* Editor de termos ao vivo. */
+.live-filters:not([open]) { display: none; }
+.live-filters {
+  width: min(720px, calc(100% - 28px));
+  margin: 9px auto 0;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.live-filters > summary {
+  min-height: 36px;
+  padding: 9px 4px;
+  cursor: pointer;
+  color: var(--green);
+  font-weight: 700;
+  font-size: 13px;
+}
+#term-filter-count { margin-left: 7px; color: var(--muted); }
+.term-filters-link { min-height: 38px; }
+#term-filter-rows { display: grid; gap: 6px; max-height: 25vh; overflow-y: auto; }
+.term-filter-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) minmax(0, 2fr) 40px;
+  gap: 4px;
+  align-items: center;
+  padding: 5px;
+  border-radius: 7px;
+  background: var(--pale);
+}
+.term-filter-row select, .term-filter-row > input {
+  min-width: 0;
+  width: 100%;
+  min-height: 37px;
+  padding: 4px;
+  border: 1px solid #bfd4cf;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.term-filter-row > input { font-size: 16px; }
+.term-filter-row [data-field="field"] { grid-column: 2 / span 2; }
+.term-filter-row [data-action="remove"] { width: 40px; color: #853c2f; font-size: 20px; }
+.term-synonym { display: flex; align-items: center; gap: 3px; color: var(--green); font-size: 11px; }
+.term-synonym input { accent-color: var(--green); flex-shrink: 0; }
+.term-synonym-preview { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+.live-filters-actions { display: flex; justify-content: space-between; align-items: center; gap: 7px; padding: 6px 0; }
+.live-filters-actions .secondary-btn { min-height: 37px; padding: 5px 9px; }
