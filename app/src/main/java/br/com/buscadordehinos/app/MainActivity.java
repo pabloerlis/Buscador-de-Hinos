@@ -199,7 +199,10 @@ public final class MainActivity extends Activity {
             runOnUiThread(()->{
                 try{
                     Intent pick=new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                    pick.setType("application/zip");
+                    // Android file providers may label downloaded ZIPs as
+                    // application/octet-stream. Let DocumentsUI show them,
+                    // then verify .zip name, contents and pinned SHA-256.
+                    pick.setType("*/*");
                     pick.addCategory(Intent.CATEGORY_OPENABLE);
                     startActivityForResult(pick,PICK_NLI);
                 }catch(Exception e){nliPhase="error";nliError="Seletor ZIP indisponível.";nliEvent("selection",false,nliError);}
