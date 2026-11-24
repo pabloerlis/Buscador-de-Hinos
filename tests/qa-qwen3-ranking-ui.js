@@ -16,7 +16,7 @@ const full=rows.map(r=>({...r,lyrics:'Mensagem de teste '+r.id+'\nSegunda linha 
   w.HTMLElement.prototype.scrollTo=function(){};
   w.scrollTo=()=>{};
   let loaded=true,active=null,calls=0,mode='normal',hold=false,vectorHold=false,vectorPending=[];
-  const decisions=[];
+  const decisions=[],observedQueries=new Set();
   const base={results:rows,tuner_candidates:rows,total:3,page:1,page_size:5,has_more:true,excluded:[],required:[],deprioritized:[],interpretation:[],ai_context:{reference:null,passage:'',topics:[]},not_learned_total:0};
   w.OfflineAPI={
    searchOptions(p={}){return {collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'balanced',fusionMode:'rrf',mode:'balanced',strength:75,minAffinity:0,pageSize:5,recWeight:65,recCount:5,bibleDepth:1,customAliases:{},...p};},
@@ -26,7 +26,7 @@ const full=rows.map(r=>({...r,lyrics:'Mensagem de teste '+r.id+'\nSegunda linha 
     if(url==='/api/stories')return {stories:[]};
     if(url==='/api/repertoire')return {count:0,not_learned:[]};
     if(url.startsWith('/api/hymns/'))return full.find(h=>h.id===Number(url.split('/').pop()));
-    if(url==='/api/search')return {...base,effective_query:payload.query,exact_number:payload.query==='001',results:payload.query==='001'?[rows[0]]:rows};
+    if(url==='/api/search'){observedQueries.add(payload.query);return {...base,effective_query:payload.query,exact_number:payload.query==='001',results:payload.query==='001'?[rows[0]]:rows};}
     throw Error('Unexpected API '+url);
    }
   };
@@ -53,7 +53,7 @@ const full=rows.map(r=>({...r,lyrics:'Mensagem de teste '+r.id+'\nSegunda linha 
   for(const name of ['semantic-tuner.js','semantic-tuner-ui.js','app.js'])w.eval(asset(name));
   const ids=()=>[...d.querySelectorAll('#results-list [data-card-id]')].map(n=>Number(n.dataset.cardId));
   const mainTitle=()=> $('results-title').textContent;
-  const search=async query=>{ $('search-input').value=query;$('search-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>mainTitle().includes('Qwen3')||mainTitle().includes('índice local')||mainTitle()==='Hino encontrado','search start');};
+  const search=async query=>{ $('search-input').value=query;$('search-form').dispatchEvent(new w.Event('submit',{bubbles:true,cancelable:true}));await until(()=>observedQueries.has(query)&&!$('search-button').disabled,'new query rendered: '+query);};
   await until(()=>$('data-count').textContent.includes('3 hinos'),'initialization');
   assert.equal($('gguf-auto').checked,true,'LLM must default on even after update');
   // Deterministic ranking is [1,2,3]. First real wiring test rejects #1,
@@ -70,7 +70,7 @@ const full=rows.map(r=>({...r,lyrics:'Mensagem de teste '+r.id+'\nSegunda linha 
   await until(()=>mainTitle()==='Hinos recomendados pelo Qwen3'&&ids().length===1&&ids()[0]===2,'counterfactual LLM decision');
   // Abstention must stay empty, never fall back silently.
   mode='abstain';await search('Contexto C');
-  await until(()=>mainTitle()==='Hinos recomendados pelo Qwen3'&&ids().length===0,'abstention');
+  await until(()=>mainTitle()==='Hinos recomendados pelo Qwen3'&&ids().length===0&&/Nenhum hino aprovado/.test($('results-list').textContent),'abstention');
   assert.match($('results-list').textContent,/Nenhum hino aprovado/);
   // Simulate E5 response initiated with LLM off, then turn Qwen3 on while
   // the vector request is outstanding. Late E5 must not replace Qwen3.
