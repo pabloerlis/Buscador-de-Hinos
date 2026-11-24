@@ -60,7 +60,11 @@ const OfflineAPI = (() => {
   let narratives=null;
   let personalStories=[];
   let personalNarratives=null;
-  const personalStoryKey='hinos-narrativas-pessoais-v1';
+  let personalAliases={};
+  let personalWrites=Promise.resolve();
+  let personalDataError=null;
+  const personalDataKey='personal-dictionary-v1';
+  const backupFormat='buscador-de-hinos/dicionario';
   const maxPersonalStories=50;
   let recommender=null;
   let scriptureIndex=null;
@@ -68,13 +72,14 @@ const OfflineAPI = (() => {
   let bridge=null;
   let queryRankingCache=new Map();
   const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,contextRerank:false,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
+  const validStoryId=id=>/^[a-z0-9_]{2,45}$/.test(id)&&!Object.prototype.hasOwnProperty.call(Object.prototype,id);
   function searchOptions(raw){
     const p=raw&&typeof raw==='object'?raw:{};
     const clamp=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;
     const aliases={};
     if(p.customAliases&&typeof p.customAliases==='object'){
       for(const [id,terms] of Object.entries(p.customAliases).slice(0,50)){
-        if(!/^[a-z0-9_]{2,45}$/.test(id)||!Array.isArray(terms))continue;
+        if(!validStoryId(id)||!Array.isArray(terms))continue;
         aliases[id]=[...new Set(terms.filter(t=>typeof t==='string'&&t.length>3&&t.length<=90).slice(0,15))];
       }
     }
@@ -223,28 +228,127 @@ const OfflineAPI = (() => {
       ...story,aliases:[],phrases:[],groups:story.clues.length?story.clues.map(clue=>[clue]):[[],[]]
     }))}):null;
   }
-  function loadPersonalStories(){
-    if(typeof StoryEngine==='undefined'||typeof localStorage==='undefined')return;
-    try{
-      const saved=JSON.parse(localStorage.getItem(personalStoryKey)||'[]');
-      if(!Array.isArray(saved))return;
-      const ids=new Set();
-      const rows=[];
-      for(const item of saved.slice(0,maxPersonalStories)){
-        if(!/^local_story_[1-9]\d*$/.test(item?.id)||ids.has(item.id))continue;
-        try{
-          rows.push({id:item.id,...readPersonalStory(item)});
-          ids.add(item.id);
-        }catch(error){console.warn('Narrativa pessoal inválida:',error.message);}
+  function readAssociations(source,rows){
+    if(!source||typeof source!=='object'||Array.isArray(source))throw Error('Associações do dicionário inválidas.');
+    const ids=new Set(rows.map(story=>story.id));
+    const aliases={};
+    let count=0;
+    for(const [id,terms] of Object.entries(source)){
+      if(!validStoryId(id)||!Array.isArray(terms)||terms.length>15||
+        (id.startsWith('local_story_')&&!ids.has(id)))throw Error('O arquivo contém uma associação inválida ou sem narrativa.');
+      const unique=new Map();
+      for(const term of terms){
+        if(typeof term!=='string'||term.trim().length<4||term.length>90||!normalizeLyrics(term))
+          throw Error('O arquivo contém uma expressão inválida.');
+        unique.set(normalizeLyrics(term),term.trim());
       }
-      personalNarratives=compilePersonalStories(rows);
-      personalStories=rows;
-    }catch(error){console.warn('Narrativas pessoais indisponíveis:',error.message);}
+      if(unique.size)aliases[id]=[...unique.values()];
+      count+=unique.size;
+      if(count>50)throw Error('Limite de 50 associações no dicionário.');
+    }
+    return aliases;
+  }
+  function readBackup(raw){
+    if(raw?.format!==backupFormat||raw.version!==1||!Array.isArray(raw.stories)||raw.stories.length>maxPersonalStories)
+      throw Error('Formato ou versão de backup do dicionário não reconhecido.');
+    const ids=new Set();
+    const names=new Set();
+    const stories=raw.stories.map(item=>{
+      if(typeof item?.id!=='string'||!/^local_story_[1-9]\d{0,8}$/.test(item.id)||ids.has(item.id))throw Error('O arquivo contém IDs de narrativas inválidos ou duplicados.');
+      const story=readPersonalStory(item);
+      const name=normalizeLyrics(story.label);
+      if(names.has(name))throw Error('O arquivo contém narrativas com nomes duplicados.');
+      names.add(name);
+      ids.add(item.id);
+      return {id:item.id,...story};
+    });
+    return {stories,aliases:readAssociations(raw.associations,stories)};
+  }
+  function personalSnapshot(stories=personalStories,aliases=personalAliases){
+    return {format:backupFormat,version:1,stories:stories.map(story=>({...story,clues:story.clues.slice()})),
+      associations:Object.fromEntries(Object.entries(aliases).map(([id,terms])=>[id,terms.slice()]))};
+  }
+  async function persistPersonal(stories,aliases){
+    const engine=compilePersonalStories(stories);
+    await writeCache(personalSnapshot(stories,aliases),personalDataKey);
+    personalStories=stories;
+    personalAliases=aliases;
+    personalNarratives=engine;
+    queryRankingCache.clear();
+  }
+  function queuePersonalWrite(action){
+    const next=personalWrites.then(()=>{if(personalDataError)throw personalDataError;return action();});
+    personalWrites=next.catch(()=>{});
+    return next;
+  }
+  async function loadPersonalData(){
+    const data=await readCache(personalDataKey);
+    if(data){
+      const {stories,aliases}=readBackup(data);
+      personalStories=stories;
+      personalAliases=aliases;
+      personalNarratives=compilePersonalStories(stories);
+      return;
+    }
+    if(typeof localStorage==='undefined')return;
+    const oldStories=localStorage.getItem('hinos-narrativas-pessoais-v1');
+    const oldSettings=localStorage.getItem('hinos-search-preferences-v15');
+    if(!oldStories&&!oldSettings)return;
+    const legacy=oldStories?JSON.parse(oldStories):[];
+    const aliases=oldSettings?JSON.parse(oldSettings)?.customAliases||{}:{};
+    const migrated=readBackup({format:backupFormat,version:1,stories:legacy,associations:aliases});
+    if(migrated.stories.length||Object.keys(migrated.aliases).length)await persistPersonal(migrated.stories,migrated.aliases);
+  }
+  function nextPersonalId(stories){
+    let next=1;
+    while(stories.some(item=>item.id==='local_story_'+next))next++;
+    return 'local_story_'+next;
+  }
+  async function restorePersonalBackup(raw){
+    const incoming=readBackup(raw);
+    const stories=personalStories.slice();
+    const known=new Map(stories.map(story=>[normalizeLyrics(story.label),story]));
+    const builtIn=new Set((narratives?.list()||[]).map(story=>normalizeLyrics(story.label)));
+    const ids=new Map();
+    for(const story of incoming.stories){
+      const name=normalizeLyrics(story.label);
+      const existing=known.get(name);
+      if(existing){
+        if(existing.reference!==story.reference||JSON.stringify(existing.clues.map(normalizeLyrics).sort())!==
+          JSON.stringify(story.clues.map(normalizeLyrics).sort()))throw Error('Já existe outra narrativa chamada “'+story.label+'”. Renomeie uma delas antes de restaurar.');
+        ids.set(story.id,existing.id);
+      }else{
+        if(builtIn.has(name))throw Error('A narrativa “'+story.label+'” já existe no catálogo. Renomeie-a antes de restaurar.');
+        const id=stories.some(item=>item.id===story.id)?nextPersonalId(stories):story.id;
+        stories.push({...story,id});
+        ids.set(story.id,id);
+      }
+    }
+    if(stories.length>maxPersonalStories)throw Error('O backup excederia o limite de 50 narrativas pessoais.');
+    const aliases=personalSnapshot().associations;
+    const existingTerms=new Map(Object.entries(aliases).flatMap(([id,terms])=>terms.map(term=>[normalizeLyrics(term),id])));
+    let added=0,conflicts=0;
+    for(const [sourceId,terms] of Object.entries(incoming.aliases)){
+      const id=ids.get(sourceId)||sourceId;
+      for(const term of terms){
+        const key=normalizeLyrics(term);
+        if(existingTerms.has(key)){
+          if(existingTerms.get(key)!==id)conflicts++;
+          continue;
+        }
+        (aliases[id]??=[]).push(term);
+        existingTerms.set(key,id);
+        added++;
+      }
+    }
+    const addedStories=stories.length-personalStories.length;
+    await persistPersonal(stories,readAssociations(aliases,stories));
+    return {addedStories,addedAliases:added,conflicts};
   }
   function listPersonalStories(){
     return personalStories.map(story=>({...story,clues:story.clues.slice(),personal:true}));
   }
-  function savePersonalStory(raw){
+  async function savePersonalStory(raw){
     if(typeof StoryEngine==='undefined')throw Error('Busca por narrativas indisponível.');
     const current=raw?.id?personalStories.find(story=>story.id===raw.id):null;
     if(raw?.id&&!current)throw Error('Narrativa pessoal não encontrada.');
@@ -253,16 +357,9 @@ const OfflineAPI = (() => {
     const label=normalizeLyrics(story.label);
     if([...(narratives?.list()||[]),...personalStories].some(item=>item.id!==current?.id&&normalizeLyrics(item.label)===label))
       throw Error('Já existe uma narrativa com esse nome.');
-    let nextId=1;
-    while(personalStories.some(item=>item.id==='local_story_'+nextId))nextId++;
-    const entry={id:current?.id||'local_story_'+nextId,...story};
+    const entry={id:current?.id||nextPersonalId(personalStories),...story};
     const next=current?personalStories.map(item=>item.id===current.id?entry:item):[...personalStories,entry];
-    const engine=compilePersonalStories(next);
-    try{localStorage.setItem(personalStoryKey,JSON.stringify(next));}
-    catch(error){throw Error('Não foi possível salvar a narrativa neste aparelho.');}
-    personalStories=next;
-    personalNarratives=engine;
-    queryRankingCache.clear();
+    await persistPersonal(next,personalAliases);
     return {...entry,clues:entry.clues.slice(),personal:true};
   }
 
@@ -314,18 +411,21 @@ const OfflineAPI = (() => {
       request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);
     });
   }
-  async function readCache(){
+  async function readCache(key='hymns'){
     const db=await openDb();try{
-      return await new Promise((resolve,reject)=>{const tx=db.transaction('cache','readonly');const rq=tx.objectStore('cache').get('hymns');rq.onsuccess=()=>resolve(rq.result||null);rq.onerror=()=>reject(rq.error);});
+      return await new Promise((resolve,reject)=>{const tx=db.transaction('cache','readonly');const rq=tx.objectStore('cache').get(key);rq.onsuccess=()=>resolve(rq.result||null);rq.onerror=()=>reject(rq.error);});
     }finally{db.close();}
   }
-  async function writeCache(value){
+  async function writeCache(value,key='hymns'){
     const db=await openDb();try{
-      await new Promise((resolve,reject)=>{const tx=db.transaction('cache','readwrite');tx.objectStore('cache').put(value,'hymns');tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+      await new Promise((resolve,reject)=>{const tx=db.transaction('cache','readwrite');tx.objectStore('cache').put(value,key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
     }finally{db.close();}
   }
   async function init(){
-    if (!initialized)initialized=(async()=>{await loadSemantic();loadPersonalStories();const cache=await readCache();if(cache&&Array.isArray(cache.hymns)){hymns=cache.hymns;metadata=cache.metadata||metadata;const migrated=hymns.some(h=>!Array.isArray(h.collections)||!h.collectionRefs?.length);for(const h of hymns)populateReferences(h);if((semantic&&cache.semantic_revision!==semantic.revision)||(narratives&&cache.story_revision!==narratives.revision)){
+    if (!initialized)initialized=(async()=>{await loadSemantic();try{await loadPersonalData();personalDataError=null;}catch(error){
+      personalDataError=Error('Não foi possível ler o dicionário local. Os dados foram preservados.');
+      console.warn('Falha ao abrir dicionário:',error.message);
+    }const cache=await readCache();if(cache&&Array.isArray(cache.hymns)){hymns=cache.hymns;metadata=cache.metadata||metadata;const migrated=hymns.some(h=>!Array.isArray(h.collections)||!h.collectionRefs?.length);for(const h of hymns)populateReferences(h);if((semantic&&cache.semantic_revision!==semantic.revision)||(narratives&&cache.story_revision!==narratives.revision)){
       for(let i=0;i<hymns.length;i++){
         const song=hymns[i];if(semantic){song.semantic_profile=semantic.indexHymn(song.title,song.lyrics);song.topics=song.semantic_profile.slice(0,12).map(t=>t.label);}
         if(narratives) song.story_profile=narratives.indexHymn(song.title,song.lyrics);
@@ -517,6 +617,7 @@ const OfflineAPI = (() => {
   function search(payload){
     let query=String(payload?.query||'').trim();if(!query||query.length>MAX_QUERY_LENGTH)throw Error(`Digite uma consulta de até ${MAX_QUERY_LENGTH} caracteres.`);
     const opts=searchOptions(payload?.settings);
+    opts.customAliases={...personalAliases,...opts.customAliases};
     const page=Math.max(1,Math.min(100,Number(payload.page)||1));
     const refine=Boolean(payload?.refine);
     const ctx=payload?.parsed_query===true&&!refine?{query,excluded:[],deprioritized:[],required:[],fresh:false}:
@@ -832,8 +933,15 @@ const OfflineAPI = (() => {
       bible_graph_ready:!!bibleGraph,bible_graph_stats:bibleGraph?.stats||null,bible_graph_narratives:bibleGraph?.narrativeCount||0,
       bridge_ready:!!bridge,bridge_entries:bridge?.entries||0,collections:libraryCounts(),
       collection:metadata.collection,edition:metadata.edition,ai_configured:false,source_url:SOURCE,chat_mode:narratives?'Narrativas bíblicas + temas offline':'Busca contextual local'};
-    if(url==='/api/stories')return {stories:[...(narratives?.list()||[]),...listPersonalStories()]};
-    if(url==='/api/stories/save')return savePersonalStory(payload);
+    if(url==='/api/stories')return {stories:[...(narratives?.list()||[]),...listPersonalStories()],associations:personalSnapshot().associations,dictionaryError:personalDataError?.message||''};
+    if(url==='/api/stories/save')return queuePersonalWrite(()=>savePersonalStory(payload));
+    if(url==='/api/dictionary/aliases')return queuePersonalWrite(async()=>{
+      if(JSON.stringify(payload?.previous)!==JSON.stringify(personalAliases))throw Error('O dicionário mudou. Abra a associação novamente.');
+      await persistPersonal(personalStories,readAssociations(payload.associations,personalStories));
+      return personalSnapshot().associations;
+    });
+    if(url==='/api/dictionary/export'){await personalWrites;if(personalDataError)throw personalDataError;return personalSnapshot();}
+    if(url==='/api/dictionary/restore')return queuePersonalWrite(()=>restorePersonalBackup(payload));
     if(url==='/api/repertoire')return {count:RepertoireStore.marked(hymns).length,
       not_learned:RepertoireStore.marked(hymns).map(song=>({id:song.id,title:song.title,number:song.number,collection:song.collection}))};
     if(url==='/api/repertoire/mark'){
