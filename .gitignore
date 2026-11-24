@@ -15,3 +15,7 @@ app/src/main/assets/e5-source.txt
 
 # OpenWordnet-PT, gerado a partir da release oficial
 app/src/main/assets/lexical-pt.json
+
+# Runtime do tokenizer gerado de pacote fixado por SHA512
+app/src/main/assets/harrier-tokenizers.js
+app/src/main/assets/harrier-tokenizers-LICENSE.txt

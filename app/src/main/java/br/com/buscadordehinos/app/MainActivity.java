@@ -35,6 +35,7 @@ public final class MainActivity extends Activity {
     private static final int CREATE_DICTIONARY_BACKUP = 1207;
     private static final int MAX_DICTIONARY_BACKUP_BYTES = 256_000;
     private final ExecutorService vectorExecutor=Executors.newSingleThreadExecutor();
+    private final ExecutorService harrierExecutor=Executors.newSingleThreadExecutor();
     private volatile String vectorState="Aguardando primeira pesquisa";
     private E5Engine embeddingEngine;
     private WebView web;
@@ -70,6 +71,12 @@ public final class MainActivity extends Activity {
                     try { return new WebResourceResponse("application/json", "UTF-8", new FileInputStream(data)); }
                     catch (IOException ex) { return forbidden(); }
                 }
+                if ("/harrier/tokenizer.json".equals(path)||"/harrier/tokenizer_config.json".equals(path)){
+                    File file=HarrierPackage.get(getFilesDir()).localFile(path.substring("/harrier/".length()));
+                    if(file==null)return forbidden();
+                    try{return new WebResourceResponse("application/json","UTF-8",new FileInputStream(file));}
+                    catch(IOException e){return forbidden();}
+                }
                 if (!path.startsWith("/assets/") || path.contains("..") || path.contains("\\")) return forbidden();
                 String file=path.substring("/assets/".length());
                 if (file.isEmpty()) file="index.html";
@@ -102,6 +109,36 @@ public final class MainActivity extends Activity {
         @JavascriptInterface public void install(){pack.start();}
         @JavascriptInterface public void cancel(){pack.cancel();}
         @JavascriptInterface public void remove(){pack.remove();}
+        @JavascriptInterface public void diagnose(String encodedIds){
+            if(encodedIds==null||encodedIds.length()>12000)return;
+            final File directory;
+            try{directory=pack.beginDiagnostic();}
+            catch(Exception e){publishDiagnostic(false,null,e.getMessage());return;}
+            try{harrierExecutor.execute(()->{
+                try{
+                    pack.verifyInstalled(directory);
+                    java.io.ByteArrayOutputStream content=new java.io.ByteArrayOutputStream();
+                    try(InputStream in=getAssets().open("harrier-conformance.json")){
+                        byte[] buf=new byte[8192];int n;
+                        while((n=in.read(buf))!=-1){if(content.size()+n>200000)throw new IOException("Referência muito grande");content.write(buf,0,n);}
+                    }
+                    JSONObject reference=new JSONObject(new String(content.toByteArray(),StandardCharsets.UTF_8));
+                    JSONObject result=HarrierEngine.verify(directory,reference,new org.json.JSONArray(encodedIds));
+                    pack.finishDiagnostic("Diagnóstico aprovado. Busca vetorial ainda experimental.");
+                    publishDiagnostic(true,result,"");
+                }catch(Throwable error){
+                    String message=error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage());
+                    pack.finishDiagnostic("Diagnóstico falhou: "+message);
+                    publishDiagnostic(false,null,message);
+                }
+            });}catch(RuntimeException error){pack.finishDiagnostic("Diagnóstico indisponível.");publishDiagnostic(false,null,error.getMessage());}
+        }
+        private void publishDiagnostic(boolean ok,JSONObject result,String error){
+            try{
+                JSONObject event=new JSONObject().put("ok",ok).put("result",result==null?JSONObject.NULL:result).put("error",error==null?"":error);
+                runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.HarrierDiagnostic&&window.HarrierDiagnostic.complete("+event.toString()+")",null);});
+            }catch(Exception ignored){}
+        }
     }
     private final class VectorBridge {
         @JavascriptInterface public String status(){
@@ -186,6 +223,7 @@ public final class MainActivity extends Activity {
         if(pendingFile!=null)pendingFile.onReceiveValue(null);
         if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeVector");web.removeJavascriptInterface("NativeHarrierPackage");web.destroy();web=null;}
         vectorExecutor.shutdown();
+        harrierExecutor.shutdown();
         super.onDestroy();
     }
 

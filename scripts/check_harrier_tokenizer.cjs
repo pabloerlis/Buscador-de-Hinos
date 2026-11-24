@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),assert=require('node:assert/strict');
+const root=path.join(__dirname,'../app/src/main/assets');
+const dir=process.argv[2];if(!dir)throw Error('Informe o diretório temporário do tokenizer');
+const ctx=vm.createContext({console,TextEncoder,TextDecoder,Uint8Array,ArrayBuffer});
+vm.runInContext(fs.readFileSync(path.join(root,'harrier-tokenizers.js'),'utf8'),ctx);
+const adapter=vm.runInContext(fs.readFileSync(path.join(root,'harrier-tokenization.js'),'utf8')+'\nHarrierTokenization',ctx);
+const read=name=>JSON.parse(fs.readFileSync(path.join(dir,name),'utf8'));
+const reference=JSON.parse(fs.readFileSync(path.join(root,'harrier-conformance.json'),'utf8'));
+const encode=adapter.create(read('tokenizer.json'),read('tokenizer_config.json'));
+const ids=adapter.conform(encode,reference);
+assert.equal(ids.length,3);
+assert.throws(()=>adapter.conform(()=>[0],reference),/divergente/);
+assert.throws(()=>encode('palavra '.repeat(1000)),/192 tokens/);
+console.log('Tokenizer Harrier: três casos reais 100% idênticos ao tokenizer Python; limites e divergência tratados.');

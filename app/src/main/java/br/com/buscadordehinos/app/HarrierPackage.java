@@ -39,7 +39,7 @@ final class HarrierPackage {
     private volatile HttpURLConnection active;
     private HarrierPackage(File filesDir){
         root=new File(filesDir,"harrier");installed=new File(root,"v1");
-        if(hasFiles(installed)){phase="installed";message="Arquivos instalados. Motor Android ainda não ativado.";downloaded=TOTAL_BYTES;}
+        if(hasFiles(installed)){phase="installed";message="Arquivos instalados. Execute o diagnóstico para verificar a inferência.";downloaded=TOTAL_BYTES;}
     }
     static boolean hasFiles(File dir){
         if(!dir.isDirectory())return false;
@@ -101,7 +101,7 @@ final class HarrierPackage {
         throw new IOException("Excesso de redirecionamentos");
     }
     synchronized void start(){
-        if("downloading".equals(phase)||"removing".equals(phase)||"installed".equals(phase))return;
+        if("downloading".equals(phase)||"removing".equals(phase)||"installed".equals(phase)||"testing".equals(phase))return;
         cancel=false;downloaded=0;phase="downloading";message="Verificando armazenamento…";
         new Thread(this::install,"harrier-install").start();
     }
@@ -126,7 +126,7 @@ final class HarrierPackage {
                 if(!hasFiles(stage))throw new IOException("Pacote inválido");
                 if(installed.exists())delete(installed);
                 if(!stage.renameTo(installed))throw new IOException("Não foi possível finalizar instalação");
-                downloaded=TOTAL_BYTES;message="Arquivos instalados e verificados. Motor Android ainda não ativado.";phase="installed";
+                downloaded=TOTAL_BYTES;message="Arquivos instalados e verificados. Execute o diagnóstico para verificar a inferência.";phase="installed";
             }
         }catch(Exception e){
             try{delete(stage);}catch(IOException ignored){}
@@ -136,13 +136,36 @@ final class HarrierPackage {
     }
     synchronized void cancel(){if(!"downloading".equals(phase))return;cancel=true;message="Cancelando…";HttpURLConnection c=active;if(c!=null)c.disconnect();}
     synchronized void remove(){
-        if("downloading".equals(phase)||"removing".equals(phase))return;
+        if("downloading".equals(phase)||"removing".equals(phase)||"testing".equals(phase))return;
         phase="removing";message="Removendo pacote…";
         new Thread(()->{
             try{delete(root);downloaded=0;message="Pacote removido.";phase="absent";}
             catch(IOException e){message="Falha ao remover pacote.";phase="error";}
         },"harrier-remove").start();
     }
+    synchronized File localFile(String name){
+        if(!"installed".equals(phase)&&!"testing".equals(phase))return null;
+        if(!"tokenizer.json".equals(name)&&!"tokenizer_config.json".equals(name))return null;
+        File f=new File(installed,name);
+        return f.isFile()?f:null;
+    }
+    synchronized File beginDiagnostic()throws IOException{
+        if(!"installed".equals(phase)||!hasFiles(installed))throw new IOException("Instale o pacote antes do teste");
+        phase="testing";message="Verificando integridade do pacote…";
+        return installed;
+    }
+    void verifyInstalled(File directory)throws Exception{
+        if(!installed.equals(directory)||!hasFiles(directory))throw new IOException("Pacote incompleto");
+        for(Entry e:ENTRIES){
+            message="Conferindo SHA-256: "+e.path;
+            try(InputStream in=new BufferedInputStream(new FileInputStream(new File(directory,e.path)),65536)){
+                copyVerified(in,new OutputStream(){@Override public void write(int b){} @Override public void write(byte[] b,int off,int len){}},
+                    e.bytes,e.sha,()->false,n->{});
+            }
+        }
+        message="Executando inferência Harrier no Android…";
+    }
+    synchronized void finishDiagnostic(String result){if("testing".equals(phase)){phase="installed";message=result;}}
     String phase(){return phase;}
     String message(){return message;}
     long downloaded(){return downloaded;}

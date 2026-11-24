@@ -11,8 +11,8 @@ android {
         minSdk 24
         targetSdk 34
         ndk { abiFilters 'arm64-v8a' }
-        versionCode 73
-        versionName '2.8.3'
+        versionCode 74
+        versionName '2.8.4'
         buildConfigField 'boolean', 'ENABLE_EMBEDDINGS', enableEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
         buildConfigField 'String', 'BUILD_DATE_UTC', '"' + buildDateUtc + '"'
@@ -20,13 +20,12 @@ android {
     buildFeatures { buildConfig true }
     if (!enableEmbeddings) {
         androidResources { ignoreAssetsPatterns.addAll(['e5-model.onnx', 'e5-index.json', 'e5-vocab.bin', 'e5-source.txt']) }
-        packaging { jniLibs { excludes.add('**/libonnxruntime*.so') } }
     }
     androidResources { noCompress 'onnx' }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
 }
 
-dependencies { implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0' }
+dependencies { implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.31.1' }
 
 // A build from the local workstation must not silently omit the lexical database.
 tasks.register('verifyLexicalAsset') {
@@ -38,3 +37,14 @@ tasks.register('verifyLexicalAsset') {
     }
 }
 tasks.named('preBuild').configure { dependsOn('verifyLexicalAsset') }
+
+tasks.register('verifyHarrierTokenizer') {
+    doLast {
+        for (name in ['harrier-tokenizers.js', 'harrier-tokenizers-LICENSE.txt', 'harrier-conformance.json']) {
+            if (!file('src/main/assets/' + name).isFile()) {
+                throw new GradleException('Tokenizer ausente. Execute python3 scripts/prepare_harrier_tokenizer.py.')
+            }
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn('verifyHarrierTokenizer') }

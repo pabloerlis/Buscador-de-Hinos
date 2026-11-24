@@ -55,11 +55,14 @@ with zipfile.ZipFile(APK) as archive:
             check(marker in html,"Controle de filtro ausente do APK: "+marker)
     if "assets/style.css" in files:
         check(b".live-filters:not([open]){display:block}" in archive.read("assets/style.css"),"Acesso direto aos filtros ausente do APK")
+    for required in ("assets/harrier-tokenizers.js","assets/harrier-tokenizers-LICENSE.txt","assets/harrier-conformance.json","assets/harrier-tokenization.js","lib/arm64-v8a/libonnxruntime.so","lib/arm64-v8a/libonnxruntime4j_jni.so"):
+        check(required in files,"Componente Harrier ausente: "+required)
     for name in files:
         lowered = name.lower()
         check(not re.search(r"local-hymn-ai|hinosllm|llama",lowered),"Motor de geração descontinuado incluído: "+name)
-        check(not (lowered.endswith((".gguf",".onnx",".tflite")) or
-                   re.search(r"/lib(?:onnxruntime|hinosllm)[^/]*\.so$",lowered)),
+        check(not (lowered.endswith((".gguf",".onnx",".onnx_data",".tflite",".safetensors")) or
+                   lowered in ("assets/tokenizer.json","assets/tokenizer_config.json","assets/index.json","assets/e5-index.json","assets/e5-vocab.bin") or
+                   re.search(r"/libhinosllm[^/]*\.so$",lowered)),
               "Modelo de IA não autorizado no APK padrão: "+name)
         check(name not in ("assets/colecao.json","assets/data/data.json",
                            "assets/hinos-avaliacao.json"),

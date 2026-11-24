@@ -37,3 +37,5 @@ Por solicitação expressa do responsável pelo projeto, em 24/11/2026, a corres
 ## Backlog de produto
 
 Consultar `docs/roadmap.md` ao planejar próximas versões. Funcionalidades registradas ali não devem ser tratadas como implementadas. A inclusão manual e por arquivo de novas letras, com indexação incremental local, é requisito futuro solicitado pelo responsável em 24/11/2026.
+
+O runtime ONNX ARM64 e o código do tokenizer (licença Apache-2.0) podem integrar o APK para executar o pacote externo Harrier. Pesos, dados externos ONNX, vocabulário do modelo e índice vetorial continuam proibidos no APK padrão. Fixtures sintéticas de conformidade são permitidas; não incluem letras da coletânea.

@@ -24,6 +24,8 @@ jobs:
         run: python3 scripts/build_bible_graph.py
       - name: Gerar indice OpenWordnet-PT 1.0.0
         run: python3 scripts/build_lexical_pt.py
+      - name: Preparar tokenizer fixado por SHA512
+        run: python3 scripts/prepare_harrier_tokenizer.py
       - name: Auditar proveniencia, integridade e cobertura
         run: python3 scripts/qa_sources.py
       - name: Compartilhar apenas indices biblicos licenciados
@@ -34,6 +36,8 @@ jobs:
             app/src/main/assets/scripture-pt.json
             app/src/main/assets/bible-graph.json
             app/src/main/assets/lexical-pt.json
+            app/src/main/assets/harrier-tokenizers.js
+            app/src/main/assets/harrier-tokenizers-LICENSE.txt
           retention-days: 1
           if-no-files-found: error
 
@@ -46,6 +50,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Preparar tokenizer e verificar tokens reais
+        run: |
+          python3 scripts/prepare_harrier_tokenizer.py --test-dir /tmp/harrier-tokenizer
+          node scripts/check_harrier_tokenizer.cjs /tmp/harrier-tokenizer
       - name: Sintaxe JavaScript de todos os arquivos
         shell: bash
         run: |
