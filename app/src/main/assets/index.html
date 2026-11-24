@@ -69,12 +69,12 @@
       </section>
 
       <details id="term-filters-panel" class="live-filters">
-        <summary><span class="filter-summary-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h12M4 18h8"/><path d="m16 17 2 2 4-4"/></svg></span><span class="filter-summary-text">Filtros de palavras<small>Obrigatórias, exclusões e sinônimos</small></span><span id="term-filter-count"></span><svg class="filter-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <summary><span class="filter-summary-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h12M4 18h8"/><path d="m16 17 2 2 4-4"/></svg></span><span class="filter-summary-text">Filtros de palavras<small id="active-filter-summary">Obrigatórias, exclusões e sinônimos</small></span><span id="term-filter-count"></span><svg class="filter-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
         <div class="live-filters-body">
           <div id="term-filter-rows"></div>
           <div class="live-filters-actions">
             <button id="term-filter-add" class="secondary-btn" type="button">+ Termo</button>
-            <button id="term-filter-clear" class="text-action" type="button">Limpar termos</button>
+            <button id="term-filter-clear" class="text-action" type="button">Limpar</button><button id="term-filter-done" class="primary-btn" type="button">Concluir</button>
           </div>
         </div>
       </details>
@@ -94,7 +94,7 @@
             <option value="lyrics">Só na letra</option>
           </select>
           <select data-field="lexical" aria-label="Fonte dos sinônimos" disabled><option value="full">Base lexical completa + pessoal</option><option value="curated">Apenas curados + pessoais</option></select>
-          <small class="term-synonym-preview" hidden></small>
+          <details class="term-synonym-preview" hidden><summary class="synonym-preview-title">Sinônimos aceitos</summary><div class="synonym-preview-words"></div></details>
         </div>
       </template>
       <section class="main-content" aria-label="Pesquisa e resultados">
@@ -307,13 +307,16 @@
 
   <div id="modal-layer" class="modal-layer hidden" aria-hidden="true">
     <div class="modal-scrim" data-close="modal"></div>
-    <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <section class="detail-modal hymn-reader" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-top"><div><span class="modal-overline" id="modal-number">HINO</span><h2 id="modal-title">Detalhes do hino</h2></div><button class="icon-button" data-close="modal" aria-label="Fechar detalhes">×</button></div>
       <div class="modal-body">
+        <div class="reader-toolbar"><h3>Letra do hino</h3><div class="reader-controls" role="group" aria-label="Tamanho da letra"><button id="lyric-smaller" type="button" aria-label="Diminuir fonte">A−</button><output id="lyric-size" aria-live="polite">17</output><button id="lyric-larger" type="button" aria-label="Aumentar fonte">A+</button></div></div>
+        <details id="reader-evidence" class="reader-evidence hidden"><summary>Correspondências da busca</summary>
+          <p id="modal-match-reason" class="match-reason hidden"></p>
+          <p id="modal-filter-evidence" class="filter-evidence-detail hidden"></p>
+        </details>
+        <div class="modal-section reader-page"><div id="modal-lyrics" class="hymn-lyrics"></div></div>
         <div class="modal-section repertoire-modal-status"><strong id="modal-repertoire-status">Disponível para indicação</strong><button id="modal-repertoire-toggle" class="secondary-btn" type="button">Marcar como não aprendido</button></div>
-        <p id="modal-match-reason" class="match-reason hidden"></p>
-        <p id="modal-filter-evidence" class="filter-evidence-detail hidden"></p>
-        <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div>
         <div class="related-heading"><button class="secondary-btn hidden" id="related-back" type="button">← Voltar ao hino anterior</button><span id="related-trail" class="related-trail"></span></div>
         <section class="modal-section related-section" id="related-section" aria-label="Recomendações de hinos semelhantes">
           <div class="related-top"><div><span class="section-kicker">DESCUBRA MAIS HINOS</span><h3>Hinos semelhantes a este</h3></div><span class="local-badge">100% offline</span></div>

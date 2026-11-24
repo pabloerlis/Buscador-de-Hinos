@@ -16,10 +16,12 @@ A compilação `build_apk` depende de `sources`, `static`, `regressions` e `rele
 
 ## Assinatura e atualização dos APKs distribuídos
 
-- Manter o mesmo `applicationId` e assinar os APKs distribuídos com a mesma chave e o mesmo certificado entre versões. Incrementar o `versionCode` a cada entrega. Usar um keystore persistente e protegido, com backup e acesso via segredos do CI. Proibir a publicação de APKs assinados por uma chave de depuração gerada pelo runner.
-- Antes da primeira entrega que implementar esta regra, verificar se a chave privada correspondente ao APK de referência está disponível. Para a 2.6.1-agentes-QA original (build 20), o SHA-256 do certificado é `cf07bce9b5f581a50beb7817e390d0393b46cc2dc771bf54df4cc03537c0c511`. Se a chave estiver indisponível, registrar que a atualização direta a partir desse APK é inviável, definir a migração para uma chave persistente e informar o usuário antes da entrega.
-- No CI, verificar a assinatura com `apksigner verify --print-certs`, comparar o SHA-256 do certificado com o da versão de referência da mesma linha de distribuição e bloquear a publicação em caso de divergência. Manter a impressão digital pública versionada e a chave privada fora do repositório.
-- Antes de publicar, instalar o APK anterior e atualizar com o candidato via `adb install -r`. Confirmar a nova versão e a preservação dos dados do aplicativo, incluindo a coletânea importada e as marcações do repertório.
+Por solicitação expressa do responsável pelo projeto, em 24/11/2026, a correspondência com o certificado anterior deixa de bloquear a entrega da linha de testes. A assinatura criptográfica válida continua obrigatória.
+
+- Manter o applicationId e incrementar o versionCode. Verificar o APK com apksigner verify --print-certs e registrar o SHA-256 do certificado, a integridade e a proveniência.
+- A divergência do certificado da versão 2.6.1-agentes-QA é um aviso, não uma falha. Não prometer atualização direta nem preservação dos dados sem teste de instalação.
+- APKs auditados da linha de testes podem ser distribuídos com chave de depuração. Não publicar chaves privadas. A distribuição estável com atualização automática deverá adotar keystore persistente, quando solicitada.
+- Preservar todos os demais gates de qualidade, incluindo verificação de assinatura válida.
 
 ## Regras para cada funcionalidade futura
 

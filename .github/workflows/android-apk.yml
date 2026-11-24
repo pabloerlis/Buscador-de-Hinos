@@ -173,13 +173,22 @@ jobs:
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python3 scripts/qa_apk.py apk-candidate/app-debug.apk
-      # A chave da linha de distribuição e o teste de atualização precisam existir
-      # antes de expor um APK para instalação. Este fluxo guarda apenas a auditoria.
+      # Compatibilidade com certificados anteriores é informativa nesta linha de testes.
+      # A validação criptográfica e todos os outros gates continuam obrigatórios.
       - name: Guardar relatorio de auditoria do candidato
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apk-audit-qa
           path: qa-report/apk-audit.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Disponibilizar APK auditado
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-auditado
+          path: apk-candidate/app-debug.apk
           retention-days: 30
           if-no-files-found: error

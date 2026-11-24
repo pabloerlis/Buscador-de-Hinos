@@ -17,6 +17,7 @@ from signature_policy import inspect_signature
 ROOT = Path(__file__).resolve().parents[1]
 APK = Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/"app/build/outputs/apk/debug/app-debug.apk"
 errors = []
+warnings = []
 
 
 def check(test, reason):
@@ -94,7 +95,8 @@ if apksigner.is_file():
                           text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False)
     signature = inspect_signature(result.stdout, result.returncode)
     check(signature["verified"],"Assinatura Android inválida ou certificado ambíguo: "+result.stderr.strip())
-    check(signature["update_certificate_matches"],"Certificado incompatível com a linha original 2.6.1-agentes-QA; publicação bloqueada")
+    if signature["verified"] and not signature["update_certificate_matches"]:
+        warnings.append("Certificado diferente da linha 2.6.1; atualização sobre a instalação anterior não garantida.")
 
 sha=hashlib.sha256(APK.read_bytes()).hexdigest()
 report={"apk":APK.name,"version_name":version_name,"version_code":int(version_code),
@@ -102,11 +104,14 @@ report={"apk":APK.name,"version_name":version_name,"version_code":int(version_co
         "signed":signature["verified"],
         "signature":signature,
         "update_install_tested":False,
-        "distribution_approved":False,
-        "passed":not errors,"errors":errors}
+        "distribution_approved":not errors,
+        "update_certificate_required":False,
+        "passed":not errors,"errors":errors,"warnings":warnings}
 output=ROOT/"qa-report/apk-audit.json"
 output.parent.mkdir(exist_ok=True)
 output.write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")
+for warning in warnings:
+    print("AGENTE APK — AVISO:",warning)
 if errors:
     for reason in errors:
         print("AGENTE APK — FALHA:",reason)

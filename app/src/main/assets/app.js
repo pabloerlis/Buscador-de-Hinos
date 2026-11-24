@@ -197,6 +197,8 @@ async function openHymn(id,{fromRelated=false,back=false}={}){
     const filterLabel=filterEvidenceLabel(hymn.filter_evidence);
     $('modal-filter-evidence').textContent=filterLabel;
     $('modal-filter-evidence').classList.toggle('hidden',!filterLabel);
+    $('reader-evidence').classList.toggle('hidden',!reason&&!filterLabel);
+    $('reader-evidence').open=false;
     renderHighlighted($('modal-lyrics'),hymn.lyrics,hymn.filter_highlights?.lyrics);$('modal-topics').replaceChildren();
     if(hymn.topics?.length)hymn.topics.forEach(t=>{const s=document.createElement('span');s.className='small-tag';s.textContent=t;$('modal-topics').appendChild(s);});
     else $('modal-topics').textContent='Ainda não foram identificados temas automaticamente.';
@@ -205,7 +207,7 @@ async function openHymn(id,{fromRelated=false,back=false}={}){
     $('modal-ai-output').classList.add('hidden');$('modal-ai-output').textContent='';
     RepertoireUI.renderModal(hymn);
     if(state.activeModal!=='modal')openLayer('modal');
-    else q('.modal-body')?.scrollTo({top:0,behavior:'instant'});
+    else q('#modal-layer .modal-body')?.scrollTo({top:0,behavior:'instant'});
     GGUF.info();await renderRecommendations(hymn);
   }catch(e){toast(e.message);}
 }
@@ -251,6 +253,21 @@ $('import-remote').addEventListener('click',importRemote);$('settings-import').a
 $('import-file').addEventListener('change',ev=>importFile(ev.target));$('settings-file').addEventListener('change',ev=>importFile(ev.target));
 document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click',closeLayer));document.addEventListener('keydown',ev=>{if(ev.key==='Escape')closeLayer();});
 
+// Reading preference is local; no lyric text or search state is modified.
+const LyricReader=(()=>{
+  let size=17;
+  try{const saved=Number(localStorage.getItem('hinos-lyric-size'));if(Number.isInteger(saved)&&saved>=15&&saved<=25)size=saved;}catch(_){}
+  function render(){
+    $('modal-lyrics').style.setProperty('--lyric-size',size+'px');
+    $('lyric-size').textContent=String(size);
+    $('lyric-smaller').disabled=size<=15;
+    $('lyric-larger').disabled=size>=25;
+  }
+  function change(delta){size=Math.max(15,Math.min(25,size+delta));render();try{localStorage.setItem('hinos-lyric-size',String(size));}catch(_){}}
+  $('lyric-smaller').onclick=()=>change(-1);
+  $('lyric-larger').onclick=()=>change(1);
+  render();
+})();
 const LiveSearch=(()=>{
   const panel=$('term-filters-panel');
   const rows=$('term-filter-rows');
@@ -266,7 +283,10 @@ const LiveSearch=(()=>{
     });
   }
   function refreshControls(){
-    const count=readFilters().length;
+    const active=readFilters();
+    const count=active.length;
+    const labels={require:'+',exclude:'−',prefer:'~'};
+    $('active-filter-summary').textContent=count?active.map(f=>labels[f.kind]+' '+f.term+(f.synonyms?' ≈':'')).join(' · '):'Obrigatórias, exclusões e sinônimos';
     $('term-filter-count').textContent=count?String(count):'';
     $('quick-filter-count').textContent=count?' · '+count:'';
     $('term-filter-add').disabled=rows.children.length>=12;
@@ -307,6 +327,7 @@ const LiveSearch=(()=>{
     else q('[data-field="term"]',rows).focus();
   };
   $('term-filter-add').onclick=()=>add();
+  $('term-filter-done').onclick=()=>{panel.open=false;panel.querySelector('summary').focus();};
   $('term-filter-clear').onclick=()=>{rows.replaceChildren();add(false);schedule(true);};
   function refreshPreview(row){
     if(!row)return;
@@ -318,7 +339,9 @@ const LiveSearch=(()=>{
     if(!preview.hidden){
       const wide=q('[data-field="lexical"]',row).value==='full';
       const synonyms=OfflineAPI.filterSynonyms(term,{lexical:wide});
-      preview.textContent=(wide&&!state.status?.lexical_ready?'Base ampla indisponível. ':'')+(synonyms.length?'Aceita ('+synonyms.length+'): '+synonyms.join(', '):'Sem equivalências para este termo.');
+      q('.synonym-preview-title',preview).textContent=(wide&&!state.status?.lexical_ready?'Base ampla indisponível · ':'')+(synonyms.length?synonyms.length+' sinônimos aceitos':'Sem sinônimos disponíveis');
+      q('.synonym-preview-words',preview).textContent=synonyms.join(', ')||'Somente o termo literal.';
+      if(!synonyms.length)preview.open=false;
     }
   }
   rows.addEventListener('input',event=>{refreshPreview(event.target.closest('.term-filter-row'));schedule(true);});

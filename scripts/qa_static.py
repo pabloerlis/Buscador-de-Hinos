@@ -51,6 +51,8 @@ for element in ("term-filters-panel", "term-filter-template", "term-filter-rows"
 for field in ("kind", "term", "synonyms", "field", "lexical"):
     require('data-field="' + field + '"' in html, "Controle ausente: " + field)
 require("lexical-pt.js" in page.js, "Motor lexical ausente da interface")
+for element in ("active-filter-summary", "term-filter-done", "lyric-smaller", "lyric-larger", "lyric-size", "reader-evidence"):
+    require(element in page.ids, "Controle de interface ausente: " + element)
 require('href="polished-ui.css"' in html and (ASSETS/"polished-ui.css").is_file(), "Camada visual ausente")
 require('.live-filters:not([open]){display:block}' in (ASSETS / "style.css").read_text(), "Acesso direto aos filtros ausente")
 
