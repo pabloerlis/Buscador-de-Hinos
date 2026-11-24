@@ -695,7 +695,7 @@ const GGUF=(()=>{
     return [];
   }
   function maybeAuto(query){
-    if(!$('gguf-auto').checked||!state.ready||!canUseTopics())return false;
+    if(!$('gguf-auto').checked||!state.ready||!canUseTopics()||state.repertoirePending)return false;
     const s=info();
     if(!s.loaded){SearchTuner.setAuthority({epoch:state.searchEpoch,status:'fallback',message:s.busy?'Qwen3 carregando; resultados provisórios sem LLM.':'Qwen3 não carregado; resultados sem LLM.'});return false;}
     SearchTuner.setAuthority({epoch:state.searchEpoch,status:'pending',message:'Qwen3: interpretando a consulta e avaliando letras.'});
@@ -784,7 +784,7 @@ const GGUF=(()=>{
         if(!Array.isArray(answer)||answer.length!==batch.length)throw Error('Resposta incompleta.');
         return batch.map((h,i)=>{const p=answer[i];if(!Array.isArray(p)||p.length!==2||!Number.isInteger(p[0])||p[0]<0||p[0]>4||!Number.isInteger(p[1])||p[1]<1||p[1]>h.lines.length)throw Error('Nota ou linha inválida.');return {...h,grade:p[0],evidence:p[1]};});
       };
-      const reviewed=[];let failed=0;
+      const reviewed=[];let failed=ids.length-docs.length;
       const safeGrade=async batch=>{try{return await grade(batch);}catch(error){check();if(batch.length>1){const mid=Math.ceil(batch.length/2);return [...await safeGrade(batch.slice(0,mid)),...await safeGrade(batch.slice(mid))];}failed++;return [];}};
       for(let i=0;i<docs.length;i+=3){check();progress('Contexto: '+meaning+'\nAvaliando letras completas: '+Math.min(i+3,docs.length)+'/'+docs.length);reviewed.push(...await safeGrade(docs.slice(i,i+3)));}
       reviewed.sort((a,b)=>b.grade-a.grade||ids.indexOf(a.id)-ids.indexOf(b.id));
@@ -792,12 +792,11 @@ const GGUF=(()=>{
       const verified=[];
       for(let i=0;i<finalists.length;i+=3){check();progress('Verificando finalistas: '+Math.min(i+3,finalists.length)+'/'+finalists.length);verified.push(...await safeGrade(finalists.slice(i,i+3)));}
       check();
-      const picks=verified.map(h=>({...h,grade:Math.min(h.grade,reviewed.find(x=>x.id===h.id).grade)})).filter(h=>h.grade>=3).sort((a,b)=>b.grade-a.grade||ids.indexOf(a.id)-ids.indexOf(b.id));
-      output.textContent='Contexto: '+meaning+'\n\n'+(picks.length?picks.map(h=>(h.number?'Hino '+h.number+' — ':'')+h.title+' · Nota '+h.grade+'/4\nEvidência: '+h.lines[h.evidence-1]).join('\n\n'):'Nenhum hino aprovado nas duas avaliações.')+'\n\n'+reviewed.length+'/'+docs.length+' letras avaliadas. '+failed+' falhas de avaliação. Notas experimentais, não probabilidades.';
-      const finalRows=picks.map(h=>({...h,llm_grade:h.grade,snippet:h.lines[h.evidence-1],reason:'Qwen3 aprovou a mensagem central em duas avaliações da letra integral.'}));
-      if(failed&&reviewed.length===0&&docs.length>0)throw Error('Nenhuma letra pôde ser avaliada pelo Qwen3.');
-      SearchTuner.setAuthority({epoch:task.epoch,status:'final',rows:finalRows,reviewed:reviewed.length,candidates:docs.length,failed,meaning,seconds:Math.round((performance.now()-task.startedAt)/1000)});
-      for(const h of picks){const button=document.createElement('button');button.className='secondary-btn';button.type='button';button.textContent='Ver '+h.title;button.addEventListener('click',()=>openHymn(h.id));actions.appendChild(button);}
+      const picks=verified.map(h=>{const first=reviewed.find(x=>x.id===h.id).grade;return {...h,first_grade:first,second_grade:h.grade,grade:Math.min(h.grade,first)};}).filter(h=>h.grade>=3).sort((a,b)=>b.grade-a.grade||ids.indexOf(a.id)-ids.indexOf(b.id));
+      output.textContent='Contexto interpretado pelo Qwen3: '+meaning+'\n'+reviewed.length+'/'+ids.length+' letras avaliadas. '+failed+' falhas. O ranking principal apresenta somente hinos aprovados em duas avaliações. Notas ordinais, não probabilidades.';
+      const finalRows=picks.map(h=>({...h,llm_grade:h.grade,snippet:h.lines[h.evidence-1],reason:'Qwen3: primeira avaliação '+h.first_grade+'/4; segunda avaliação '+h.second_grade+'/4. Evidência da letra integral.'}));
+      if(failed&&reviewed.length===0&&ids.length>0)throw Error('Nenhuma letra pôde ser avaliada pelo Qwen3.');
+      SearchTuner.setAuthority({epoch:task.epoch,status:'final',rows:finalRows,reviewed:reviewed.length,candidates:ids.length,failed,meaning,seconds:Math.round((performance.now()-task.startedAt)/1000)});
       resetTask('Curadoria concluída: '+picks.length+' sugestões; '+failed+' falhas.');
     }catch(error){if(alive()){output.textContent='Curadoria não concluída: '+error.message;resetTask(error.message,true);}}
   }
