@@ -9,6 +9,9 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="polished-ui.css">
+  <link rel="stylesheet" href="appearance.css">
+  <script src="appearance.js" defer></script>
   <script src="semantic-engine.js" defer></script>
   <script src="story-engine.js" defer></script>
   <script src="scripture-index.js" defer></script>
@@ -19,8 +22,8 @@
   <script src="vector-index.js" defer></script>
   <script src="repertoire-store.js" defer></script>
   <script src="context-ranker.js" defer></script>
+  <script src="lexical-pt.js" defer></script>
   <script src="offline-api.js" defer></script>
-  <script src="local-hymn-ai.js" defer></script>
   <script src="about.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -29,16 +32,17 @@
     <header class="topbar">
       <a href="index.html" class="brand" aria-label="Buscador de Hinos, início">
         <span class="brand-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6c-3-2.4-6.3-2.4-9-1v14c2.6-1.4 6-1.4 9 1 3-2.4 6.4-2.4 9-1V5c-2.7-1.4-6-1.4-9 1zM12 6v14"/></svg></span>
-        <span>Buscador<span class="brand-light"> de Hinos</span></span>
+        <span class="brand-copy"><span>Buscador<span class="brand-light"> de Hinos</span></span><small>Pesquisa &amp; repertório</small></span>
       </a>
       <div class="top-actions">
-        <span class="top-state" id="collection-label">Biblioteca de hinos</span><button id="ai-indicator" data-gguf-ui type="button" class="ai-indicator ai-off" aria-label="Ver estado da IA local">IA: inativa</button>
+        <span class="top-state" id="collection-label">Biblioteca de hinos</span>
+        <button id="open-appearance" class="icon-button" type="button" title="Aparência" aria-label="Personalizar aparência"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.1-2.7H18a3 3 0 0 0 3-3 9 9 0 0 0-9-9Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="6.8" r="1"/><circle cx="15.5" cy="7" r="1"/></svg></button>
         <button id="open-settings" class="icon-button" title="Configurações e informações" aria-label="Configurações e informações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a1.9 1.9 0 0 0 .4 2.1l-2 2a1.9 1.9 0 0 0-2.1-.4 1.9 1.9 0 0 0-1.2 1.7h-2.9a1.9 1.9 0 0 0-1.2-1.7 1.9 1.9 0 0 0-2.1.4l-2-2A1.9 1.9 0 0 0 6.6 15a1.9 1.9 0 0 0-1.7-1.2v-2.9A1.9 1.9 0 0 0 6.6 9.7a1.9 1.9 0 0 0-.4-2.1l2-2a1.9 1.9 0 0 0 2.1.4 1.9 1.9 0 0 0 1.2-1.7h2.9A1.9 1.9 0 0 0 15.6 6a1.9 1.9 0 0 0 2.1-.4l2 2a1.9 1.9 0 0 0-.4 2.1 1.9 1.9 0 0 0 1.7 1.2v2.9a1.9 1.9 0 0 0-1.6 1.2z"/></svg></button>
       </div>
     </header>
     <nav class="app-tabs" role="tablist" aria-label="Áreas do aplicativo">
-      <button id="tab-search" type="button" role="tab" aria-controls="search-tab-panel" aria-selected="true">Buscar</button>
-      <button id="tab-dictionary" type="button" role="tab" aria-controls="dictionary-tab-panel" aria-selected="false" tabindex="-1">Dicionário</button>
+      <button id="tab-search" type="button" role="tab" aria-controls="search-tab-panel" aria-selected="true"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>Buscar</button>
+      <button id="tab-dictionary" type="button" role="tab" aria-controls="dictionary-tab-panel" aria-selected="false" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h6a3 3 0 0 1 2 1 3 3 0 0 1 2-1h6v15h-6a3 3 0 0 0-2 1 3 3 0 0 0-2-1H4zM12 5v15"/></svg>Dicionário</button>
     </nav>
     <main>
       <div id="search-tab-panel" role="tabpanel" aria-labelledby="tab-search">
@@ -48,10 +52,10 @@
           <form id="search-form" class="search-box" role="search">
             <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="7"/><path d="m16 16 5 5"/></svg>
             <label class="sr-only" for="search-input">Pesquisar hinos</label>
-            <input id="search-input" type="search" maxlength="500" autocomplete="off" placeholder="Título, tema ou referência" required>
+            <input id="search-input" type="search" maxlength="500" autocomplete="off" placeholder="Título, tema ou referência">
             <button type="submit" id="search-button">Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           </form>
-          <details class="quick-filters"><summary>Filtros</summary>
+          <details class="quick-filters"><summary aria-label="Filtros de coleções e ordem"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="8" cy="7" r="2" fill="white"/><circle cx="15" cy="12" r="2" fill="white"/><circle cx="10" cy="17" r="2" fill="white"/></svg>Coleções<span id="quick-filter-count"></span></summary>
           <div class="filter-panel">
           <div class="collection-quick" id="quick-collections" aria-label="Filtrar coleções">
             <label><input type="checkbox" data-collection="principal" checked> Coletânea 2018 <small id="quick-count-principal">—</small></label>
@@ -59,12 +63,42 @@
             <label><input type="checkbox" data-collection="cia" checked> CIA <small id="quick-count-cia">—</small></label>
             <label><input type="checkbox" data-collection="pessoal" checked> Pessoal <small id="quick-count-pessoal">—</small></label>
           </div>
+          <button id="open-term-filters" class="text-action term-filters-link" type="button">Abrir filtros de palavras</button>
           <label class="quick-rank"><input id="quick-context-rank" type="checkbox"> Ordem contextual <small>Experimental</small></label>
           </div>
           </details>
         </div>
       </section>
 
+      <details id="term-filters-panel" class="live-filters">
+        <summary><span class="filter-summary-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h12M4 18h8"/><path d="m16 17 2 2 4-4"/></svg></span><span class="filter-summary-text">Filtros de palavras<small id="active-filter-summary">Obrigatórias, exclusões e sinônimos</small></span><span id="term-filter-count"></span><svg class="filter-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>
+        <div class="live-filters-body">
+          <div id="term-filter-rows"></div>
+          <div class="live-filters-actions">
+            <button id="term-filter-add" class="secondary-btn" type="button">+ Termo</button>
+            <button id="term-filter-clear" class="text-action" type="button">Limpar</button><button id="term-filter-done" class="primary-btn" type="button">Concluir</button>
+          </div>
+        </div>
+      </details>
+      <template id="term-filter-template">
+        <div class="term-filter-row">
+          <select data-field="kind" aria-label="Tipo de filtro">
+            <option value="require">Exigir</option>
+            <option value="exclude">Excluir</option>
+            <option value="prefer">Preferir</option>
+          </select>
+          <input data-field="term" type="text" maxlength="80" aria-label="Palavra ou trecho" placeholder="Palavra ou trecho">
+          <button data-action="remove" class="icon-button" type="button" aria-label="Remover termo">×</button>
+          <label class="term-synonym"><input data-field="synonyms" type="checkbox"> Aceitar sinônimos</label>
+          <select data-field="field" aria-label="Onde procurar">
+            <option value="both">Título e letra</option>
+            <option value="title">Só no título</option>
+            <option value="lyrics">Só na letra</option>
+          </select>
+          <select data-field="lexical" aria-label="Fonte dos sinônimos" disabled><option value="full">Base lexical completa + pessoal</option><option value="curated">Apenas curados + pessoais</option></select>
+          <details class="term-synonym-preview" hidden><summary class="synonym-preview-title">Sinônimos aceitos</summary><div class="synonym-preview-words"></div></details>
+        </div>
+      </template>
       <section class="main-content" aria-label="Pesquisa e resultados">
         <div id="upgrade-panel" class="import-panel hidden" role="region" aria-label="Ampliar biblioteca de hinos">
           <div class="import-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></div>
@@ -108,16 +142,6 @@
               <div class="evidence-panel">
               <div id="notice" class="notice hidden" role="status"></div>
               <div id="search-diagnostics" class="semantic-interpret hidden"><strong>Como o índice interpretou a busca</strong><div id="search-concepts" class="concept-list"></div></div>
-              <div id="ai-workspace" data-gguf-ui class="ai-workspace hidden" aria-live="polite">
-                <div class="ai-workspace-head"><strong id="ai-state-badge" class="ai-stage">IA não carregada</strong><span id="ai-timer" class="ai-timer"></span></div>
-                <div id="ai-task" class="ai-task">Busca local disponível.</div>
-                <p id="ai-detail" class="ai-detail">O GGUF pode sugerir temas, comparar trechos e pedir uma busca complementar na coletânea.</p>
-                <button id="ai-cancel" class="secondary-btn hidden" type="button">Interromper IA</button><div id="ai-activity" class="ai-activity hidden"><span class="ai-spinner"></span><span id="ai-progress">Preparando...</span></div>
-                <p id="ai-last" class="ai-last"></p>
-              </div>
-              <div id="gguf-banner" data-gguf-ui class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
-                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar com IA</button></div></div>
-              <div id="gguf-comparison" class="ai-interpretation hidden"><div id="gguf-comparison-text" role="status" aria-live="polite"></div><div id="gguf-comparison-actions" class="ai-buttons"></div></div>
               </div></details>
               <div id="results-list" class="results-list" aria-live="polite"></div>
               <nav class="load-more-wrap hidden" id="result-pages" aria-label="Paginação de hinos">
@@ -146,6 +170,7 @@
         <div class="dictionary-views" role="group" aria-label="Opções do dicionário">
           <button id="view-aliases" type="button" aria-controls="dictionary-aliases" aria-pressed="true">Associações</button>
           <button id="view-stories" type="button" aria-controls="dictionary-stories" aria-pressed="false">Narrativas</button>
+          <button id="view-synonyms" type="button" aria-controls="dictionary-synonyms" aria-pressed="false">Sinônimos</button>
           <button id="dictionary-backup" type="button" class="dictionary-backup">Backup</button>
         </div>
         <div id="dictionary-aliases">
@@ -174,6 +199,20 @@
             <button id="story-next" class="load-more" type="button" aria-label="Próxima página de narrativas">›</button>
           </nav>
         </div>
+        <div id="dictionary-synonyms" hidden>
+          <p id="synonym-state" class="dictionary-state" role="status">Carregando sinônimos…</p>
+          <form id="synonym-form" class="synonym-form">
+            <input id="synonym-term-a" class="dictionary-input" maxlength="80" aria-label="Primeiro termo" placeholder="Termo" required>
+            <input id="synonym-term-b" class="dictionary-input" maxlength="80" aria-label="Segundo termo" placeholder="Sinônimo" required>
+            <button id="synonym-save" class="primary-btn" type="submit" disabled>Adicionar</button>
+          </form>
+          <ul id="synonym-list" class="dictionary-list"></ul>
+          <nav id="synonym-pages" class="load-more-wrap" aria-label="Páginas de sinônimos" hidden>
+            <button id="synonym-previous" class="load-more" type="button" aria-label="Página anterior">‹</button>
+            <span id="synonym-page-status"></span>
+            <button id="synonym-next" class="load-more" type="button" aria-label="Próxima página">›</button>
+          </nav>
+        </div>
       </section>
     </main>
   </div>
@@ -186,7 +225,7 @@
         <button class="icon-button" type="button" data-close="dictionary-backup" aria-label="Fechar backup">×</button>
       </div>
       <div class="modal-body dictionary-form">
-        <p class="dictionary-state">Exporte narrativas e associações em um arquivo JSON. A restauração combina o backup com os cadastros do aparelho.</p>
+        <p class="dictionary-state">Exporte narrativas, associações e sinônimos em um arquivo JSON. A restauração combina o backup com os cadastros do aparelho.</p>
         <div class="dictionary-backup-actions">
           <button id="dictionary-export" class="primary-btn" type="button">Exportar JSON</button>
           <label id="dictionary-import-label" class="secondary-btn file-upload">Restaurar JSON
@@ -250,7 +289,7 @@
       <div class="modal-top"><h2 id="refine-title">Refinar busca</h2><button class="icon-button" data-close="refine" aria-label="Fechar refinamento">×</button></div>
             <div class="refine-panel modal-body">
               <p id="refine-mode" class="sr-only">Busca contextual</p>
-              <button id="gguf-compare" class="secondary-btn compare-offline" type="button" disabled>Comparar resultados</button>
+              <button id="offline-compare" class="secondary-btn compare-offline" type="button" disabled>Comparar resultados</button>
               <div id="conversation" class="conversation" aria-live="polite"></div>
               <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
               <p class="privacy-note">Use “apenas os de vigilância” para exigir um tema, “sem alegria” para excluir, “sem foco em alegria” para reduzir a prioridade ou “nova busca por esperança” para limpar o contexto.</p>
@@ -260,12 +299,16 @@
 
   <div id="modal-layer" class="modal-layer hidden" aria-hidden="true">
     <div class="modal-scrim" data-close="modal"></div>
-    <section class="detail-modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <section class="detail-modal hymn-reader" role="dialog" aria-modal="true" aria-labelledby="modal-title">
       <div class="modal-top"><div><span class="modal-overline" id="modal-number">HINO</span><h2 id="modal-title">Detalhes do hino</h2></div><button class="icon-button" data-close="modal" aria-label="Fechar detalhes">×</button></div>
       <div class="modal-body">
+        <div class="reader-toolbar"><h3>Letra do hino</h3><div class="reader-controls" role="group" aria-label="Tamanho da letra"><button id="lyric-smaller" type="button" aria-label="Diminuir fonte">A−</button><output id="lyric-size" aria-live="polite">17</output><button id="lyric-larger" type="button" aria-label="Aumentar fonte">A+</button></div></div>
+        <details id="reader-evidence" class="reader-evidence hidden"><summary>Correspondências da busca</summary>
+          <p id="modal-match-reason" class="match-reason hidden"></p>
+          <p id="modal-filter-evidence" class="filter-evidence-detail hidden"></p>
+        </details>
+        <div class="modal-section reader-page"><div id="modal-lyrics" class="hymn-lyrics"></div></div>
         <div class="modal-section repertoire-modal-status"><strong id="modal-repertoire-status">Disponível para indicação</strong><button id="modal-repertoire-toggle" class="secondary-btn" type="button">Marcar como não aprendido</button></div>
-        <p id="modal-match-reason" class="match-reason hidden"></p>
-        <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div>
         <div class="related-heading"><button class="secondary-btn hidden" id="related-back" type="button">← Voltar ao hino anterior</button><span id="related-trail" class="related-trail"></span></div>
         <section class="modal-section related-section" id="related-section" aria-label="Recomendações de hinos semelhantes">
           <div class="related-top"><div><span class="section-kicker">DESCUBRA MAIS HINOS</span><h3>Hinos semelhantes a este</h3></div><span class="local-badge">100% offline</span></div>
@@ -278,8 +321,24 @@
           <p class="related-method">As porcentagens são índices de afinidade estimada, não probabilidades nem avaliação teológica oficial.</p>
         </section>
         <div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
-      <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
+      <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local.</p><button id="modal-summary-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-summary-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
       <div class="modal-bottom"><span id="modal-edition"></span><button class="secondary-btn" data-close="modal">Fechar</button></div>
+    </section>
+  </div>
+
+  <div id="appearance-layer" class="modal-layer hidden" aria-hidden="true">
+    <div class="modal-scrim" data-close="appearance"></div>
+    <section class="detail-modal appearance-modal" role="dialog" aria-modal="true" aria-labelledby="appearance-title">
+      <div class="modal-top"><div><span class="modal-overline">PERSONALIZAÇÃO</span><h2 id="appearance-title">Aparência</h2></div><button class="icon-button" type="button" data-close="appearance" aria-label="Fechar aparência">×</button></div>
+      <div class="modal-body appearance-content">
+        <section class="appearance-section"><h3>Paleta de cores</h3><div id="appearance-palettes" class="palette-list" role="group" aria-label="Paletas de cores"></div></section>
+        <section class="appearance-section"><h3>Modo de exibição</h3><div class="appearance-options " role="group" aria-label="Tema"><button type="button" data-appearance="mode" data-value="light" aria-pressed="false">Claro</button><button type="button" data-appearance="mode" data-value="dark" aria-pressed="false">Escuro</button><button type="button" data-appearance="mode" data-value="system" aria-pressed="false">Sistema</button></div></section>
+        <section class="appearance-section"><h3>Animação das janelas</h3><div class="appearance-options four" role="group" aria-label="Animação"><button type="button" data-appearance="motion" data-value="slide" aria-pressed="false">Deslizar</button><button type="button" data-appearance="motion" data-value="zoom" aria-pressed="false">Zoom</button><button type="button" data-appearance="motion" data-value="fade" aria-pressed="false">Suave</button><button type="button" data-appearance="motion" data-value="none" aria-pressed="false">Nenhuma</button></div></section>
+        <section class="appearance-section"><h3>Velocidade</h3><div class="appearance-options " role="group" aria-label="Velocidade"><button type="button" data-appearance="speed" data-value="fast" aria-pressed="false">Rápida</button><button type="button" data-appearance="speed" data-value="normal" aria-pressed="false">Normal</button><button type="button" data-appearance="speed" data-value="slow" aria-pressed="false">Lenta</button></div></section>
+        <div id="appearance-demo" class="appearance-demo"><span class="sample-mark" aria-hidden="true">♪</span><div><strong>Prévia da aparência</strong><small>As alterações são aplicadas imediatamente.</small></div></div>
+        <div class="appearance-footer"><button id="appearance-reset" class="secondary-btn" type="button">Restaurar padrão</button><button id="appearance-preview" class="secondary-btn" type="button">Testar animação</button></div>
+        <p class="appearance-note">Preferências salvas neste dispositivo. A opção de movimento reduzido do sistema é respeitada.</p>
+      </div>
     </section>
   </div>
 
@@ -302,7 +361,7 @@
           </div>
           <p class="subtle-note">Informações obtidas diretamente do APK instalado; data exibida em UTC. Estes dados não dependem da conexão com a internet.</p>
         </div>
-      </details><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span data-gguf-ui>Modelo GGUF</span><strong id="settings-ai" data-gguf-ui>Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      </details><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
       <section class="semantic-settings" aria-label="Coleções e importação">
         <div class="setting-section-heading"><h3>Biblioteca unificada</h3><span class="local-badge">Offline</span></div>
         <p class="subtle-note">Escolha onde pesquisar. Hinos idênticos em várias coleções aparecem uma única vez, preservando suas referências de origem.</p>
@@ -357,19 +416,8 @@
         <p class="subtle-note">Afinidade é uma pontuação heurística. Associações são sugeridas a partir de evidências da letra, não são avaliação teológica oficial.</p>
         <div class="settings-actions"><button id="settings-search-save" class="primary-btn" type="button">Aplicar preferências</button><button id="settings-search-reset" class="secondary-btn" type="button">Restaurar padrões</button></div>
       </section></details>
-      <details class="advanced-settings" data-gguf-ui><summary>IA local experimental (GGUF)</summary><section class="gguf-box" aria-label="Modelo de IA local">
-        <h3>IA local (GGUF)</h3>
-        <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. O modelo pode sugerir temas, comparar até cinco trechos e solicitar uma busca complementar na coletânea. Use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
-        <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
-        <p id="gguf-phase" class="gguf-phase">Estado: verificando</p><p id="gguf-model-meta" class="subtle-note">Nenhum modelo foi carregado na memória.</p>
-        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Usar IA automaticamente para sugerir palavras-chave (desativado por padrão). A busca offline sempre aparece primeiro.</span></label>
-        <p id="gguf-last" class="gguf-phase" aria-live="polite">Última execução: nenhuma</p>
-        <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
-        <div class="settings-actions"><button id="gguf-test" class="secondary-btn" type="button" disabled>Testar modelo</button><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div>
-        <p id="gguf-test-result" class="subtle-note" role="status" aria-live="polite">Carregue o GGUF para testar a geração no aparelho.</p>
-        <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
-      </section></details>
       <p class="subtle-note">Fontes das relações: Bible Topics Dataset (NEUU, CC BY 4.0) e Bible Cross-References Dataset (NEUU/OpenBible, CC BY 4.0), com curadoria de nomes narrativos em português. Fontes: <a href="https://github.com/neuu-org/bible-topics-dataset">Temas</a> e <a href="https://github.com/neuu-org/bible-crossrefs-dataset">Referências cruzadas</a>. Texto bíblico: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
+       <p class="subtle-note">Base lexical: <a href="https://github.com/own-pt/openWordnet-PT/releases/tag/v1.0.0">OpenWordnet-PT 1.0.0</a> — Alexandre Rademaker, Valeria de Paiva, Fredson Aguiar e colaboradores. Licença <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; baseada no Princeton WordNet 3.0 (<a href="https://wordnet.princeton.edu/wordnet/license/">licença</a>). Adaptação: lemas normalizados e agrupados por sentido compartilhado.</p>
       <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p></div>
     </section>
   </div>

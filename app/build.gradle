@@ -1,32 +1,24 @@
 plugins { id 'com.android.application' }
-def enableLocalModels = providers.gradleProperty('enableLocalModels').map { it.toBoolean() }.orElse(false).get()
+def enableEmbeddings = providers.gradleProperty('enableEmbeddings').map { it.toBoolean() }.orElse(false).get()
 // Valores incorporados ao APK: independentes de conexão e da biblioteca importada.
 def sourceRevision = (System.getenv('BUILD_SOURCE_SHA') ?: System.getenv('GITHUB_SHA') ?: 'local').replaceAll('[^a-zA-Z0-9]', '')
 def buildDateUtc = java.time.Instant.now().toString()
 android {
     namespace 'br.com.buscadordehinos.app'
     compileSdk 35
-    ndkVersion '27.2.12479018'
     defaultConfig {
         applicationId 'br.com.buscadordehinos.app'
         minSdk 24
         targetSdk 34
         ndk { abiFilters 'arm64-v8a' }
-        versionCode 63
-        versionName '2.7.3'
-        buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
+        versionCode 72
+        versionName '2.8.2'
+        buildConfigField 'boolean', 'ENABLE_EMBEDDINGS', enableEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
         buildConfigField 'String', 'BUILD_DATE_UTC', '"' + buildDateUtc + '"'
     }
     buildFeatures { buildConfig true }
-    if (enableLocalModels) {
-        externalNativeBuild {
-            cmake {
-                path 'src/main/cpp/CMakeLists.txt'
-                version '3.22.1'
-            }
-        }
-    } else {
+    if (!enableEmbeddings) {
         androidResources { ignoreAssetsPatterns.addAll(['e5-model.onnx', 'e5-index.json', 'e5-vocab.bin', 'e5-source.txt']) }
         packaging { jniLibs { excludes.add('**/libonnxruntime*.so') } }
     }
@@ -35,3 +27,14 @@ android {
 }
 
 dependencies { implementation 'com.microsoft.onnxruntime:onnxruntime-android:1.20.0' }
+
+// A build from the local workstation must not silently omit the lexical database.
+tasks.register('verifyLexicalAsset') {
+    doLast {
+        def lexical = file('src/main/assets/lexical-pt.json')
+        if (!lexical.isFile() || lexical.length() < 100000) {
+            throw new GradleException('Base lexical ausente. Execute python3 scripts/build_lexical_pt.py na raiz do projeto.')
+        }
+    }
+}
+tasks.named('preBuild').configure { dependsOn('verifyLexicalAsset') }

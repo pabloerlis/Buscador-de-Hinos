@@ -1,0 +1,91 @@
+/* Visual identity 2.8.0: palette-driven surfaces, intentional typography and motion. */
+:root{--header-a:#174b3d;--header-b:#28785e;--action:#174b3d;--motion-ms:250ms}
+:root[data-theme="dark"]{color-scheme:dark}
+body{background:var(--ivory);color:var(--ink)}
+.topbar{background:linear-gradient(115deg,var(--header-a),var(--header-b));color:#fff;border:0;height:66px;box-shadow:0 4px 16px #00000014}
+.topbar .brand{color:#fff;gap:9px}
+.brand-icon{background:#ffffff18;border:1px solid #ffffff35;box-shadow:none;color:var(--gold);width:37px;height:37px;border-radius:12px}
+.brand-copy{display:flex;flex-direction:column;line-height:1.15}
+.brand-copy small{color:#ffffffd9;font-size:10px;font-weight:500;letter-spacing:.25px;margin-top:4px}
+.topbar .icon-button{color:#fff;background:#ffffff12;border-color:#ffffff40;width:40px;height:40px}
+.topbar .icon-button:hover{background:#ffffff25}
+.app-tabs{background:transparent;margin-top:10px;gap:0}
+.app-tabs button{background:var(--paper);color:var(--muted);border:1px solid var(--line);border-radius:0;box-shadow:none}
+.app-tabs button:first-child{border-radius:12px 0 0 12px}
+.app-tabs button:last-child{border-radius:0 12px 12px 0}
+.app-tabs button[aria-selected="true"]{background:var(--pale);color:var(--green);border-color:var(--green);box-shadow:inset 0 -3px 0 var(--green)}
+.app-tabs button[aria-selected="true"]:hover{color:var(--green)}
+.search-box,.quick-filters>summary,.live-filters,.welcome-panel,.import-panel,.result-card,.dictionary-row,.dictionary-views button,.load-more,.results-actions .icon-button,.filter-panel,.evidence-panel,.empty-results,.detail-modal,.settings-modal,.modal-top,.reader-page,.reader-controls,.reader-controls button,.dictionary-input,.term-filter-row select,.term-filter-row>input,.secondary-btn,.related-card,.advanced-settings,.status-grid,.semantic-settings select,.semantic-settings input[type="text"],.concept-chip,.knowledge-row{background:var(--paper);color:var(--ink);border-color:var(--line)}
+.search-box{border-radius:16px;box-shadow:var(--shadow);border-color:var(--line)}
+.search-box input,.search-box input::placeholder,.dictionary-input::placeholder,.term-filter-row>input::placeholder{color:var(--muted)}
+.search-box input{color:var(--ink)}
+.primary-btn,.search-box button,.dictionary-views button[aria-pressed="true"]{background:linear-gradient(135deg,var(--header-a),var(--header-b));color:#fff;border-color:var(--header-a)}
+.primary-btn:hover,.search-box button:hover{background:var(--header-a)}
+.secondary-btn,.text-action,.icon-button,.load-more,.reader-controls button,.dictionary-row-actions button,.quick-filters>summary,.results-evidence>summary{color:var(--green)}
+.quick-filters>summary svg circle{fill:var(--paper)}
+.quick-filters[open]>summary,.results-evidence[open]>summary,.filter-panel .collection-quick label,.filter-summary-icon,.term-filter-row,.suggestions button,.result-index,.result-card .relevance,.repertoire-modal-status,.related-section,.semantic-settings,.unlearned-drawer,.hymn-reader .modal-body,.reader-toolbar,.dictionary-undo,.alias-row,.semantic-interpret,.notice,.vector-live,.repertoire-action{background:var(--pale);color:var(--green);border-color:var(--line)}
+.result-card .view-btn:hover,.related-card:hover,.result-card.is-unlearned{background:var(--pale)}
+.result-card{border-radius:14px}
+.result-index{border-radius:10px;box-shadow:inset 0 -2px 0 var(--line)}
+.result-name,.hymn-lyrics,.modal-top h2,.dictionary-heading h1,.dictionary-entry strong,.related-card-title,.dictionary-form label,.settings-content h3,.results-heading h2{color:var(--ink)}
+.result-identity .hymn-number,.result-identity .filter-evidence-line,.results-heading p,.filter-summary-text small,.dictionary-state,.dictionary-entry span,.modal-section #modal-references,.subtle-note,.status-grid span,.settings-content>p,.modal-bottom,.related-evidence,.related-method,.related-trail,.related-top small,.related-card-top,.setting-check small,.semantic-settings label{color:var(--muted)}
+.filter-summary-text,.modal-overline,.reader-toolbar h3,.modal-section h3,.related-top h3,.related-card-top strong,.related-open,.related-components,.advanced-settings summary,.dictionary-views .dictionary-backup{color:var(--green)}
+.term-synonym-preview,.reader-evidence,.match-reason,.filter-evidence-detail,.reader-evidence .match-reason,.reader-evidence .filter-evidence-detail,.settings-content .setting-warning{background:var(--pale);color:var(--ink);border-color:var(--line)}
+.filter-highlight{background:#f3d88e;color:#262019}
+input[type="checkbox"],input[type="range"]{accent-color:var(--action)}
+.toast{background:var(--action);color:#fff}
+:root[data-theme="dark"] .setting-warning,:root[data-theme="dark"] .dictionary-feedback{color:#ffd29b}
+:root[data-theme="dark"] .dictionary-row-actions [data-action="remove"],:root[data-theme="dark"] .term-filter-row [data-action="remove"]{color:#f3ada2}
+:root[data-theme="dark"] .small-tag,:root[data-theme="dark"] .local-badge,:root[data-theme="dark"] .library-tag,:root[data-theme="dark"] .concept-chip,:root[data-theme="dark"] .unlearned-drawer>summary strong{background:var(--pale);color:var(--green);border-color:var(--line)}
+:root[data-theme="dark"] .refine-panel,:root[data-theme="dark"] .conversation,:root[data-theme="dark"] .assistant-message,:root[data-theme="dark"] .refine-form input,:root[data-theme="dark"] .ai-interpretation,:root[data-theme="dark"] .repertoire-action.undo{background:var(--paper);color:var(--ink);border-color:var(--line)}
+/* Live preview and appearance controls */
+.appearance-modal{width:min(490px,100%);max-height:94dvh}
+.appearance-modal .modal-top{background:linear-gradient(120deg,var(--header-a),var(--header-b));color:#fff;border:0}
+.appearance-modal .modal-top h2,.appearance-modal .modal-overline{color:#fff}
+.appearance-modal .modal-top .icon-button{background:#ffffff12;color:#fff;border-color:#ffffff45}
+.appearance-content{padding:12px 15px 18px;display:grid;gap:12px}
+.appearance-section{min-width:0}
+.appearance-section h3{margin:0 0 7px;color:var(--ink);font-size:13px;font-weight:750}
+.palette-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.palette-option{display:flex;align-items:center;gap:7px;min-height:49px;min-width:0;padding:6px 7px;border:1px solid var(--line);border-radius:11px;background:var(--paper);color:var(--ink);text-align:left}
+.palette-option strong{font-size:12px;min-width:0;overflow-wrap:anywhere}
+.palette-sample{display:flex;width:43px;height:29px;border-radius:7px;overflow:hidden;flex-shrink:0}
+.palette-sample i{flex:1}
+.palette-check{margin-left:auto;visibility:hidden;color:var(--green);font-size:14px;font-weight:800}
+.palette-option[aria-pressed="true"],.appearance-options button[aria-pressed="true"]{background:var(--pale);border-color:var(--green);color:var(--green)}
+.palette-option[aria-pressed="true"] .palette-check{visibility:visible}
+.appearance-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+.appearance-options.four{grid-template-columns:repeat(4,minmax(0,1fr))}
+.appearance-options button{min-height:42px;background:var(--paper);color:var(--muted);border:1px solid var(--line);border-radius:9px;font-size:12px;padding:5px 3px;font-weight:650}
+.appearance-demo{display:flex;align-items:center;gap:10px;background:var(--pale);border:1px solid var(--line);border-radius:12px;padding:10px;color:var(--ink)}
+.appearance-demo .sample-mark{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:var(--action);color:#fff;flex-shrink:0}
+.appearance-demo strong{font-size:13px}
+.appearance-demo small{display:block;color:var(--muted);font-size:11px}
+.appearance-footer{display:flex;gap:8px;justify-content:space-between}
+.appearance-footer button{min-height:42px;padding:6px 10px;font-size:12px}
+.appearance-note{font-size:11px;color:var(--muted);margin:0}
+/* Motion uses only opacity and transform to avoid layout thrashing. */
+@keyframes hinos-fade-in{from{opacity:0}to{opacity:1}}
+@keyframes hinos-fade-out{from{opacity:1}to{opacity:0}}
+@keyframes hinos-slide-in{from{opacity:0;transform:translateY(22px)}to{opacity:1;transform:translateY(0)}}
+@keyframes hinos-slide-out{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(22px)}}
+@keyframes hinos-zoom-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@keyframes hinos-zoom-out{from{opacity:1;transform:scale(1)}to{opacity:0;transform:scale(.96)}}
+.modal-layer:not(.hidden):not(.is-closing) .modal-scrim{animation:hinos-fade-in var(--motion-ms) ease both}
+.modal-layer:not(.hidden):not(.is-closing)>section,.animate-demo{animation:hinos-fade-in var(--motion-ms) cubic-bezier(.2,.75,.2,1) both}
+.modal-layer.is-closing{pointer-events:none}
+.modal-layer.is-closing .modal-scrim,.modal-layer.is-closing>section{animation:hinos-fade-out var(--motion-ms) ease both}
+[data-motion="slide"] .modal-layer:not(.hidden):not(.is-closing)>section,[data-motion="slide"] .animate-demo{animation-name:hinos-slide-in}
+[data-motion="slide"] .modal-layer.is-closing>section{animation-name:hinos-slide-out}
+[data-motion="zoom"] .modal-layer:not(.hidden):not(.is-closing)>section,[data-motion="zoom"] .animate-demo{animation-name:hinos-zoom-in}
+[data-motion="zoom"] .modal-layer.is-closing>section{animation-name:hinos-zoom-out}
+[role="tabpanel"].tab-enter{animation:hinos-fade-in var(--motion-ms) ease}
+[data-motion="slide"] [role="tabpanel"].tab-enter{animation-name:hinos-slide-in}
+[data-motion="zoom"] [role="tabpanel"].tab-enter{animation-name:hinos-zoom-in}
+@media(prefers-reduced-motion:reduce){.modal-layer>section,.modal-layer .modal-scrim,.animate-demo,.tab-enter{animation:none!important}}
+@media(max-width:380px){.topbar{padding-inline:10px;height:61px}.brand-copy{font-size:15px}.brand-copy small{font-size:9px}.topbar .icon-button{width:36px;height:36px}.topbar .brand-icon{width:32px;height:32px}.topbar .top-actions{gap:4px}.appearance-content{padding:10px 11px}.palette-option{gap:5px;padding:5px}.palette-sample{width:35px}}
+@media(max-height:650px){.topbar{height:55px}.appearance-content{gap:9px}.palette-option{min-height:44px}.appearance-options button{min-height:38px}}
+
+/* Busca: mantém a aparência normal ao editar; somente o cursor indica foco. */
+#search-form:focus-within{border-color:var(--line);box-shadow:var(--shadow);outline:none}
+#search-input:focus,#search-input:focus-visible{outline:none;box-shadow:none;caret-color:var(--ink)}

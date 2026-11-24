@@ -46,6 +46,25 @@ require("about-app" in page.ids, "Configurações sem seção Sobre")
 for element in ("about-developer", "about-version", "about-code", "about-commit", "about-date"):
     require(element in page.ids, "Campo Sobre ausente: " + element)
 
+for element in ("term-filters-panel", "term-filter-template", "term-filter-rows", "term-filter-add", "view-synonyms"):
+    require(element in page.ids, "Filtro de palavras ausente: " + element)
+for field in ("kind", "term", "synonyms", "field", "lexical"):
+    require('data-field="' + field + '"' in html, "Controle ausente: " + field)
+require("lexical-pt.js" in page.js, "Motor lexical ausente da interface")
+for path in (ASSETS/"app.js", ASSETS/"index.html", ASSETS/"style.css", ASSETS/"appearance.css", ROOT/"app/build.gradle", ROOT/"app/src/main/java/br/com/buscadordehinos/app/MainActivity.java"):
+    require(not re.search(r"gguf|llama\.cpp|NativeGGUF|hinosllm|local-hymn-ai", path.read_text(encoding="utf-8"), re.I), "Referência a geração de texto em " + str(path))
+require(not (ASSETS/"local-hymn-ai.js").exists(), "Motor de geração descontinuado ainda presente")
+require("appearance.js" in page.js and (ASSETS/"appearance.css").is_file(), "Personalização ausente")
+appearance_css = (ASSETS/"appearance.css").read_text(encoding="utf-8")
+require("#search-form:focus-within{border-color:var(--line);box-shadow:var(--shadow);outline:none}" in appearance_css, "Contorno externo de foco voltou à busca")
+require("#search-input:focus,#search-input:focus-visible{outline:none;box-shadow:none;caret-color:var(--ink)}" in appearance_css, "Contorno de foco do campo de busca voltou")
+for element in ("open-appearance","appearance-layer","appearance-palettes","appearance-preview","appearance-reset"):
+    require(element in page.ids, "Controle de aparência ausente: " + element)
+for element in ("active-filter-summary", "term-filter-done", "lyric-smaller", "lyric-larger", "lyric-size", "reader-evidence"):
+    require(element in page.ids, "Controle de interface ausente: " + element)
+require('href="polished-ui.css"' in html and (ASSETS/"polished-ui.css").is_file(), "Camada visual ausente")
+require('.live-filters:not([open]){display:block}' in (ASSETS / "style.css").read_text(), "Acesso direto aos filtros ausente")
+
 gradle = (ROOT / "app/build.gradle").read_text(encoding="utf-8")
 activity = (ROOT / "app/src/main/java/br/com/buscadordehinos/app/MainActivity.java").read_text(encoding="utf-8")
 about = (ASSETS / "about.js").read_text(encoding="utf-8")

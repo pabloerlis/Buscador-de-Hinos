@@ -61,6 +61,7 @@ const OfflineAPI = (() => {
   let personalStories=[];
   let personalNarratives=null;
   let personalAliases={};
+  let personalSynonyms=[];
   let personalWrites=Promise.resolve();
   let personalDataError=null;
   const personalDataKey='personal-dictionary-v1';
@@ -70,6 +71,7 @@ const OfflineAPI = (() => {
   let scriptureIndex=null;
   let bibleGraph=null;
   let bridge=null;
+  let lexicalPT=null;
   let queryRankingCache=new Map();
   const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,contextRerank:false,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   const validStoryId=id=>/^[a-z0-9_]{2,45}$/.test(id)&&!Object.prototype.hasOwnProperty.call(Object.prototype,id);
@@ -176,6 +178,11 @@ const OfflineAPI = (() => {
     return [...new Set((Array.isArray(hints)?hints:[]).map(h=>allowed.get(normalize(h))).filter(Boolean))].slice(0,4);
   }
   async function loadSemantic(){
+    if(typeof LexicalPT!=='undefined')try{
+      const response=await fetch('lexical-pt.json');
+      if(!response.ok)throw Error('Base lexical indisponível');
+      lexicalPT=LexicalPT.create(await response.json());
+    }catch(error){console.warn('OpenWordnet-PT indisponível:',error.message);}
     if(typeof SemanticEngine!=='undefined')try{
       const response=await fetch('semantic-db.json');
       if(!response.ok)throw Error('Base semântica indisponível');
@@ -248,6 +255,18 @@ const OfflineAPI = (() => {
     }
     return aliases;
   }
+  // Explicit bidirectional pairs, never transitive: A↔B and B↔C do not imply A↔C.
+  function readSynonymPairs(raw=[]){
+    if(!Array.isArray(raw)||raw.length>200)throw Error('Limite de 200 pares de sinônimos.');
+    const unique=new Map();
+    for(const pair of raw){
+      if(!Array.isArray(pair)||pair.length!==2||pair.some(word=>typeof word!=='string'||word.length>80))throw Error('Par de sinônimos inválido.');
+      const words=pair.map(normalizeLyrics).sort();
+      if(!words[0]||!words[1]||words[0]===words[1])throw Error('Informe dois termos diferentes.');
+      unique.set(JSON.stringify(words),words);
+    }
+    return [...unique.values()].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b),'pt-BR'));
+  }
   function readBackup(raw){
     if(raw?.format!==backupFormat||raw.version!==1||!Array.isArray(raw.stories)||raw.stories.length>maxPersonalStories)
       throw Error('Formato ou versão de backup do dicionário não reconhecido.');
@@ -262,15 +281,17 @@ const OfflineAPI = (() => {
       ids.add(item.id);
       return {id:item.id,...story};
     });
-    return {stories,aliases:readAssociations(raw.associations,stories)};
+    return {stories,aliases:readAssociations(raw.associations,stories),synonyms:readSynonymPairs(raw.synonyms)};
   }
-  function personalSnapshot(stories=personalStories,aliases=personalAliases){
+  function personalSnapshot(stories=personalStories,aliases=personalAliases,synonyms=personalSynonyms){
     return {format:backupFormat,version:1,stories:stories.map(story=>({...story,clues:story.clues.slice()})),
-      associations:Object.fromEntries(Object.entries(aliases).map(([id,terms])=>[id,terms.slice()]))};
+      associations:Object.fromEntries(Object.entries(aliases).map(([id,terms])=>[id,terms.slice()])),
+      ...(synonyms.length?{synonyms:synonyms.map(pair=>pair.slice())}:{})};
   }
-  async function persistPersonal(stories,aliases){
+  async function persistPersonal(stories,aliases,synonyms=personalSynonyms){
     const engine=compilePersonalStories(stories);
-    await writeCache(personalSnapshot(stories,aliases),personalDataKey);
+    await writeCache(personalSnapshot(stories,aliases,synonyms),personalDataKey);
+    personalSynonyms=synonyms;
     personalStories=stories;
     personalAliases=aliases;
     personalNarratives=engine;
@@ -284,7 +305,8 @@ const OfflineAPI = (() => {
   async function loadPersonalData(){
     const data=await readCache(personalDataKey);
     if(data){
-      const {stories,aliases}=readBackup(data);
+      const {stories,aliases,synonyms}=readBackup(data);
+      personalSynonyms=synonyms;
       personalStories=stories;
       personalAliases=aliases;
       personalNarratives=compilePersonalStories(stories);
@@ -342,8 +364,10 @@ const OfflineAPI = (() => {
       }
     }
     const addedStories=stories.length-personalStories.length;
-    await persistPersonal(stories,readAssociations(aliases,stories));
-    return {addedStories,addedAliases:added,conflicts};
+    const synonyms=readSynonymPairs([...new Map([...personalSynonyms,...incoming.synonyms].map(pair=>[JSON.stringify(pair),pair])).values()]);
+    const addedSynonyms=synonyms.length-personalSynonyms.length;
+    await persistPersonal(stories,readAssociations(aliases,stories),synonyms);
+    return {addedStories,addedAliases:added,conflicts,addedSynonyms};
   }
   function listPersonalStories(){
     return personalStories.map(story=>({...story,clues:story.clues.slice(),personal:true}));
@@ -609,13 +633,97 @@ const OfflineAPI = (() => {
     const topicIds=thematic?new Set(semantic?.interpret(term).direct.map(topic=>topic.id)):new Set();
     return {term,normalized,thematic,topicIds};
   }
+  // Equivalências lexicais explícitas. Relações temáticas do ranking não
+  // satisfazem filtros estritos (por exemplo, ansiedade não é sinônimo de paz).
+  const synonymGroups=[
+    ['oração','prece','súplica'],['orar','rezar','suplicar'],
+    ['paz','tranquilidade','serenidade'],['alegria','júbilo','regozijo','felicidade'],
+    ['tristeza','pesar','melancolia'],['angústia','aflição'],['medo','temor','receio'],
+    ['ajuda','auxílio','socorro'],['ajudar','auxiliar','socorrer'],
+    ['consolo','conforto','alento'],['consolar','confortar'],
+    ['refúgio','abrigo'],['proteção','amparo'],['gratidão','agradecimento'],
+    ['perdão','remissão'],['salvação','redenção'],['caminho','trajeto','rota'],
+    ['casa','morada','habitação'],['cântico','canção'],['tempestade','tormenta'],
+    ['mar','oceano'],['vitória','triunfo'],['união','unidade'],
+    ['compaixão','misericórdia','piedade'],['humildade','modéstia'],
+    ['retorno','volta','regresso'],
+    ['louvar','enaltecer','exaltar'],['fortaleza','fortificação']
+  ].map(group=>group.map(normalizeLyrics));
+  const synonymIndex=new Map(synonymGroups.flatMap(group=>group.map(term=>[term,group.filter(other=>other!==term)])));
+  function filterSynonyms(term,{lexical=false}={}){
+    const key=normalizeLyrics(term);
+    const custom=personalSynonyms.flatMap(pair=>pair.includes(key)?pair.filter(word=>word!==key):[]);
+    return [...new Set([...(synonymIndex.get(key)||[]),...custom,...(lexical&&lexicalPT?lexicalPT.synonyms(key):[])])];
+  }
+  function searchFilters(source){
+    if(!Array.isArray(source))return [];
+    return source.slice(0,12).flatMap(filter=>{
+      const term=typeof filter?.term==='string'?normalizeLyrics(filter.term.slice(0,80)):'';
+      if(!term)return [];
+      const kind=['require','exclude','prefer'].includes(filter.kind)?filter.kind:'require';
+      const field=['title','lyrics'].includes(filter.field)?filter.field:'both';
+      const words=[term,...(filter.synonyms===true?filterSynonyms(term,{lexical:filter.lexical===true}):[])];
+      const patterns=words.map(word=>new RegExp('(?:^| )'+reEscape(word)+'(?=$| )'));
+      return [{kind,field,words,patterns}];
+    });
+  }
+  function matchesFilter(filter,title,lyrics){
+    return filter.patterns.some(pattern=>(filter.field!=='lyrics'&&pattern.test(title))||
+      (filter.field!=='title'&&pattern.test(lyrics)));
+  }
+  // Evidence uses exactly the same compiled patterns as the hard filters.
+  function filterEvidence(filters,title,lyrics){
+    return filters.filter(filter=>filter.kind!=='exclude').flatMap(filter=>{
+      const matches=filter.words.flatMap((word,index)=>{
+        const pattern=filter.patterns[index];
+        const fields=[];
+        if(filter.field!=='lyrics'&&pattern.test(title))fields.push('title');
+        if(filter.field!=='title'&&pattern.test(lyrics))fields.push('lyrics');
+        return fields.length?[{word,via_synonym:index!==0,fields}]:[];
+      });
+      return matches.length?[{term:filter.words[0],kind:filter.kind,matches}]:[];
+    });
+  }
+  // Map normalized character positions back to original UTF-16 offsets.
+  // Accents, punctuation and spacing are preserved in the displayed text.
+  function highlightRanges(value,words){
+    const source=String(value??'');
+    let normalized='',starts=[],ends=[],offset=0;
+    for(const char of source){
+      const start=offset;offset+=char.length;
+      const folded=char.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      if(!folded&&ends.length){ends[ends.length-1]=offset;continue;}
+      for(const unit of folded){
+        const next=/[a-z0-9]/.test(unit)?unit:' ';
+        if(next===' '&&(!normalized||normalized.endsWith(' ')))continue;
+        normalized+=next;starts.push(start);ends.push(offset);
+      }
+    }
+    const found=[];
+    for(const word of new Set(words)){
+      const pattern=new RegExp('(?:^| )('+reEscape(word)+')(?=$| )','g');
+      for(const match of normalized.matchAll(pattern)){
+        const start=match.index+match[0].length-match[1].length;
+        found.push([starts[start],ends[start+word.length-1]]);
+      }
+    }
+    found.sort((a,b)=>a[0]-b[0]||b[1]-a[1]);
+    const merged=[];
+    for(const range of found){
+      const last=merged[merged.length-1];
+      if(last&&range[0]<last[1])last[1]=Math.max(last[1],range[1]);
+      else merged.push(range);
+    }
+    return merged;
+  }
   // Conversão VISUAL heurística não calibrada: NÃO é probabilidade nem confiança estatística.
   function percentage(score, exactNumber=false){
     if(exactNumber)return 100;
     return Math.max(20, Math.min(98, Math.round(30 + 68*(1-Math.exp(-score/22)))));
   }
   function search(payload){
-    let query=String(payload?.query||'').trim();if(!query||query.length>MAX_QUERY_LENGTH)throw Error(`Digite uma consulta de até ${MAX_QUERY_LENGTH} caracteres.`);
+    const filters=searchFilters(payload?.term_filters);
+    let query=String(payload?.query||'').trim();if((!query&&!filters.length)||query.length>MAX_QUERY_LENGTH)throw Error(`Digite uma consulta de até ${MAX_QUERY_LENGTH} caracteres.`);
     const opts=searchOptions(payload?.settings);
     opts.customAliases={...personalAliases,...opts.customAliases};
     const page=Math.max(1,Math.min(100,Number(payload.page)||1));
@@ -629,7 +737,10 @@ const OfflineAPI = (() => {
       .filter(term=>!excludedTerms.has(normalizeLyrics(term)));
     const required=combineRestrictions(ctx.fresh?[]:payload?.require,ctx.required);
     const criteria={effective_query:query,excluded,deprioritized,required,reset_context:ctx.fresh};
-    if(!query)return {results:[],page,page_size:opts.pageSize,total:0,has_more:false,...criteria,used_ai:false,summary:'Nenhum critério positivo informado.'};
+    if(!query&&!filters.length)return {results:[],page,page_size:opts.pageSize,total:0,has_more:false,...criteria,used_ai:false,summary:'Nenhum critério positivo informado.'};
+    const filterOnly=!query;
+    const hardFilters=filters.filter(filter=>filter.kind!=='prefer');
+    const preferred=filters.filter(filter=>filter.kind==='prefer');
     const norm=normalize(query), numberMatch=norm.match(/^(?:(coletanea|principal|avulsos?|cia|criancas|infantil)\s+)?(?:hino\s*|louvor\s*)?(\d{1,4})$/);
     const bible=typeof BibleContext!=='undefined'?BibleContext.lookup(query):null;
     const scripture=opts.scripture&&scriptureIndex?scriptureIndex.lookup(query):null;
@@ -682,7 +793,7 @@ const OfflineAPI = (() => {
     const requiredCriteria=required.map(term=>searchCriterion(term,allowTopics));
     const excludedCriteria=excluded.map(term=>searchCriterion(term,allowTopics));
     const lowerCriteria=deprioritized.map(term=>searchCriterion(term,allowTopics));
-    const snippetPhrases=[...new Set([...requiredCriteria.map(item=>item.normalized).filter(Boolean),...(quoted.length?quoted:exactPhrase.length>=4?[exactPhrase]:[])])];
+    const snippetPhrases=[...new Set([...requiredCriteria.map(item=>item.normalized).filter(Boolean),...filters.filter(item=>item.kind==='require').flatMap(item=>item.words),...(quoted.length?quoted:exactPhrase.length>=4?[exactPhrase]:[])])];
     // A proximidade complementa buscas temáticas livres e preserva a evidência de consultas exatas.
     const usePassages=semanticWeight>0&&!numberMatch&&!quoted.length&&!required.length&&
       !scripture&&!isBiblicalRef&&!storyIntent?.matches.length;
@@ -691,12 +802,13 @@ const OfflineAPI = (() => {
     const vectorHits=vectorEnabled?VectorIndex.topForQuery(payload.vector_query,100):[];
     const vectorScores=new Map(vectorHits.map(h=>[h.id,h.similarity]));
     const ranked=[];
-    for(const song of (graphCtx||quoted.length?hymns:candidateSongs(numberMatch,lexicalCandidates,intent,storyIntent,vectorHits,exactTitles))){
+    for(const song of (graphCtx||quoted.length||filterOnly?hymns:candidateSongs(numberMatch,lexicalCandidates,intent,storyIntent,vectorHits,exactTitles))){
       if(!collectionEnabled(song,opts))continue;
       const indexedText=searchTexts.get(song.id);
       const {title,lyrics,titleWords,words}=indexedText;
       const matchesText=term=>hasWord(title,term)||hasWord(lyrics,term);
       if(quoted.some(phrase=>!matchesText(phrase)))continue;
+      if(hardFilters.some(filter=>matchesFilter(filter,title,lyrics)!==(filter.kind==='require')))continue;
       const matchesTopic=criterion=>song.semantic_profile?.find(topic=>criterion.topicIds.has(topic.id));
       const matchesCriterion=criterion=>criterion.normalized&&(matchesText(criterion.normalized)||
         (criterion.thematic&&(matchesTopic(criterion)||song.topics.some(topic=>normalizeLyrics(topic)===criterion.normalized))));
@@ -708,6 +820,9 @@ const OfflineAPI = (() => {
       if(numberMatch){
         if(!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2])))continue;
         score=100;evidence.push('número exato');
+      }else if(filterOnly){
+        score=7;
+        evidence.push('Atende aos filtros de busca');
       }else{
         const lexicalWeight=opts.mode==='context'?0.7:1;
         // Não premiar um título por conter apenas parte de uma narrativa reconhecida.
@@ -760,6 +875,7 @@ const OfflineAPI = (() => {
         }
       }
       if(score<(semanticResult?.score>0||storyResult?.score>0||graphResult?.score>=7||vectorScores.get(song.id)>0.76||spelling.length?4.7:7))continue;
+      if(!numberMatch)score+=Math.min(12,preferred.filter(filter=>matchesFilter(filter,title,lyrics)).length*4);
       const sharedPassage=passageTopics.size>=2?findSharedPassage(song,indexedText,passageTopics):null;
       if(sharedPassage){
         score+=9*Math.min(semanticWeight,1);
@@ -770,7 +886,7 @@ const OfflineAPI = (() => {
       const matchedTokens=qTokens.filter(x=>words.has(x));
       const reason=numberMatch?'Número exato do hino.':evidence.length?evidence.slice(0,2).join('. ')+'.':matchedTokens.length?'A letra contém termos relacionados: '+matchedTokens.slice(0,3).join(', ')+'.':'Possível relação temática; confira a letra antes de utilizar.';
       const percent=percentage(score,!!numberMatch);
-      if(percent<opts.minAffinity)continue;
+      if(!filterOnly&&percent<opts.minAffinity)continue;
       const explanations=[...(graphResult?.reasons||[]),...(storyResult?.reasons||[]),...(semanticResult?.proof||[])].slice(0,3);
       const selectedRef=numberMatch? song.collectionRefs.find(ref=>Number(ref.number)===Number(numberMatch[2])&&(!namedCollection||ref.id===namedCollection)) : song.collectionRefs.find(ref=>opts.collections[ref.id]!==false);
       ranked.push({id:song.id,number:selectedRef?.number||song.number,title:song.title,collection:selectedRef?.name||song.collection,collection_ids:song.collections.slice(),edition:selectedRef?.edition||song.edition,
@@ -781,7 +897,7 @@ const OfflineAPI = (() => {
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
         _narrativeTier:storyResult?.tier||0,
         vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
-        match_type:numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
+        match_type:filterOnly?'filtro':numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     // Consulta composta: preservar o peso dos outros requisitos; o nível
@@ -820,6 +936,7 @@ const OfflineAPI = (() => {
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
     const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_contextOrder,...hit})=>({...hit,
+      filter_evidence:filters.length?filterEvidence(filters,searchTexts.get(hit.id).title,searchTexts.get(hit.id).lyrics):[],
       snippet:sharedPassage?.text||makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
     const reading=storyIntent?.matches?.map(x=>x.reference?x.label+' ('+x.reference+')':x.label)||[];
     const interpretation=opts.showConcepts?[
@@ -905,10 +1022,13 @@ const OfflineAPI = (() => {
     if(!opts.recBreakdown)for(const h of results.results){delete h.query_percent;delete h.similarity_percent;}
     return results;
   }
-  function hymnDetail(id){
+  function hymnDetail(id,payload){
     const song=hymns.find(s=>s.id===id);if(!song)throw Error('Hino não encontrado.');
     const refs=Array.from(new Set(song.lyrics.match(REFERENCE)||[])).slice(0,15);
-    return {...song,topics:[...new Set([...(song.story_profile||[]).map(x=>x.label),...song.topics])].slice(0,12),references:refs};
+    const filters=searchFilters(payload?.term_filters);
+    const evidence=filterEvidence(filters,normalizeLyrics(song.title),normalizeLyrics(song.lyrics));
+    const words=field=>evidence.flatMap(item=>item.matches.filter(match=>match.fields.includes(field)).map(match=>match.word));
+    return {...song,filter_evidence:evidence,filter_highlights:{title:highlightRanges(song.title,words('title')),lyrics:highlightRanges(song.lyrics,words('lyrics'))},topics:[...new Set([...(song.story_profile||[]).map(x=>x.label),...song.topics])].slice(0,12),references:refs};
   }
   async function downloadRemote(){
     if(window.NativeHinos && typeof window.NativeHinos.downloadCollection==='function'){
@@ -927,7 +1047,7 @@ const OfflineAPI = (() => {
   }
   async function request(url,payload){
     await init();
-    if(url==='/api/status')return {ready:hymns.length>0,hymn_count:hymns.length,vector_count:typeof VectorIndex!=='undefined'?VectorIndex.status().count:0,vector_status:typeof VectorIndex!=='undefined'?VectorIndex.status():null,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,
+    if(url==='/api/status')return {lexical_ready:!!lexicalPT,lexical_terms:lexicalPT?.terms||0,lexical_groups:lexicalPT?.groups||0,ready:hymns.length>0,hymn_count:hymns.length,vector_count:typeof VectorIndex!=='undefined'?VectorIndex.status().count:0,vector_status:typeof VectorIndex!=='undefined'?VectorIndex.status():null,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,
       story_ready:!!narratives,story_count:(narratives?.stories||0)+personalStories.length,story_revision:narratives?.revision||null,
       scripture_ready:!!scriptureIndex,scripture_books:scriptureIndex?.bookCount||0,
       bible_graph_ready:!!bibleGraph,bible_graph_stats:bibleGraph?.stats||null,bible_graph_narratives:bibleGraph?.narrativeCount||0,
@@ -939,6 +1059,17 @@ const OfflineAPI = (() => {
       if(JSON.stringify(payload?.previous)!==JSON.stringify(personalAliases))throw Error('O dicionário mudou. Abra a associação novamente.');
       await persistPersonal(personalStories,readAssociations(payload.associations,personalStories));
       return personalSnapshot().associations;
+    });
+    if(url==='/api/dictionary/synonyms')return {pairs:personalSynonyms.map(pair=>pair.slice()),dictionaryError:personalDataError?.message||''};
+    if(url==='/api/dictionary/synonyms/save')return queuePersonalWrite(async()=>{
+      const pair=readSynonymPairs([payload?.pair])[0];
+      const key=JSON.stringify(pair);
+      const exists=personalSynonyms.some(item=>JSON.stringify(item)===key);
+      if(payload?.remove===true&&!exists)throw Error('Par não encontrado.');
+      const next=payload?.remove===true?personalSynonyms.filter(item=>JSON.stringify(item)!==key):
+        exists?personalSynonyms:readSynonymPairs([...personalSynonyms,pair]);
+      await persistPersonal(personalStories,personalAliases,next);
+      return {pairs:next.map(item=>item.slice())};
     });
     if(url==='/api/dictionary/export'){await personalWrites;if(personalDataError)throw personalDataError;return personalSnapshot();}
     if(url==='/api/dictionary/restore')return queuePersonalWrite(()=>restorePersonalBackup(payload));
@@ -955,8 +1086,8 @@ const OfflineAPI = (() => {
     if(url==='/api/search')return search(payload);
     if(url==='/api/recommend')return recommendRelated(payload);
     const match=url.match(/^\/api\/hymns\/(\d+)$/);
-    if(match)return hymnDetail(Number(match[1]));
+    if(match)return hymnDetail(Number(match[1]),payload);
     throw Error('Operação não reconhecida.');
   }
-   return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions};
+   return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions,filterSynonyms};
 })();

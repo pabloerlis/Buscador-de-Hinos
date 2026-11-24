@@ -12,14 +12,6 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 @media(max-width:560px){.topbar{height:69px;padding:0 18px}.brand{font-size:17px;gap:8px}.brand-icon{width:34px;height:34px;border-radius:9px}.top-actions{gap:4px}.top-state{padding:7px 9px;font-size:10px}.hero{padding:48px 20px 43px}.hero h1{font-size:37px;letter-spacing:-1.3px;margin-top:20px}.hero-subtitle{font-size:14px;line-height:1.7}.search-box{padding:5px 5px 5px 13px;gap:9px}.search-box input{font-size:12px}.search-box button{padding:14px 13px;font-size:12px}.search-box button svg{display:none}.search-icon{height:18px;width:18px}.suggestions>span{width:100%}.suggestions button{padding:7px 11px}.main-content{padding:22px 14px 45px}.welcome-panel{padding:23px 19px}.features-grid{grid-template-columns:1fr;gap:22px;margin-top:25px}.feature{display:grid;grid-template-columns:42px auto;column-gap:13px;align-items:start}.feature-icon{grid-row:span 2;margin:0}.feature h3{margin-top:2px}.welcome-top{align-items:flex-start}.data-count{font-size:10px}.results-heading{align-items:flex-start;gap:12px}.results-heading h2{font-size:26px}.text-action{font-size:11px}.result-card{padding:19px 18px}.result-card h3{font-size:16px}.lyric-quote{font-size:14px}.import-panel{padding:20px;gap:10px}.import-symbol{padding:10px}.import-symbol svg{height:20px;width:20px}.import-buttons{flex-direction:column;align-items:stretch}.import-buttons>*{text-align:center}footer{padding:19px;display:block;line-height:1.8}footer span:last-child{display:block}.modal-layer{padding:7px}.detail-modal,.settings-modal{max-height:95vh;border-radius:14px}.modal-top,.modal-body,.settings-content,.modal-bottom{padding-left:20px;padding-right:20px}.modal-top h2{font-size:24px}.settings-actions>*{flex:1}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important;transition:none!important}}
 
-/* Modelo local GGUF: componentes opcionais, mantendo a busca sem modelo. */
-.gguf-box {margin: 18px 0;padding: 16px;border: 1px solid var(--border, #d6dfdb);border-radius: 14px;background: #f7faf8;}
-.gguf-box h3{margin:0 0 8px;font-size:1.04rem;}
-.gguf-box p{font-size:.88rem;line-height:1.55;}
-.gguf-status{font-weight:600;overflow-wrap:anywhere;}
-.gguf-banner{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:14px 16px;margin:0 0 16px;border:1px solid #b7cdc3;background:#f3f8f5;border-radius:12px;font-size:.87rem;}
-.gguf-banner.hidden{display:none;}
-@media(max-width:540px){.gguf-box .settings-actions{display:flex;flex-direction:column;}.gguf-banner .secondary-btn{width:100%;}}
 /* 1.3 — observabilidade da IA e pontuação contextual */
 .ai-indicator{border:1px solid #bfd1c4;background:#eff7f1;color:#396b4d;border-radius:999px;padding:7px 10px;font-size:10px;font-weight:750;white-space:nowrap}
 .ai-indicator.ai-off{background:#f1f2f1;color:#69746d;border-color:#e1e6e2}
@@ -42,7 +34,6 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 .ai-buttons button{font-size:12px}
 .ai-switch{display:flex;align-items:flex-start;gap:10px;background:#edf5ef;border-radius:10px;padding:13px 11px;font-size:13px;line-height:1.5;color:#2e5a3b;margin:12px 0}
 .ai-switch input{width:18px;height:18px;flex-shrink:0;accent-color:#1e6b41}
-.gguf-phase{color:#537966;font-size:12px;margin:5px 0}
 .ai-interpretation{white-space:pre-wrap;font-size:13px;line-height:1.75;padding:14px;margin-top:12px;background:#f4f9f3;border-left:3px solid #73a784;border-radius:7px;color:#31533d}
 .result-card.ai-selected{border-color:#8ab59b;box-shadow:0 0 0 1px #b9d8c2}
 .ai-recommended{display:inline-block;background:#e9f5ec;color:#247147;font-size:10px;font-weight:700;border-radius:5px;padding:5px 8px;margin-bottom:8px}
@@ -64,7 +55,6 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 .local-badge{font-size:10px;letter-spacing:.5px;color:#226c45;background:#e4f4e7;padding:5px 8px;border-radius:20px;font-weight:800}
 .advanced-settings{margin:18px 0;border:1px solid #dbe4dd;border-radius:12px;padding:12px;background:#fff}
 .advanced-settings summary{font-size:14px;font-weight:700;color:#537060;cursor:pointer;padding:7px}
-.advanced-settings .gguf-box{margin:8px 0 0}
 .alias-list{display:flex;flex-direction:column;gap:7px;font-size:12px;color:#768b7c;margin-top:4px}
 .alias-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eff5ef;padding:9px;border-radius:9px;color:#284d38;overflow-wrap:anywhere}
 .alias-remove{background:#fff;border:1px solid #d7dfd7;border-radius:7px;padding:6px 8px;color:#70554b;cursor:pointer;font-size:11px}
@@ -76,7 +66,7 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 .hero{overflow:clip}
 
 
-/* v1.6: recomendações em cadeia baseadas em letra e contexto inicial, sem GGUF. */
+/* v1.6: recomendações em cadeia baseadas em letra e contexto inicial, sem geração. */
 .related-section{background:#f8fbf8;border:1px solid #d9e7dc;border-radius:14px;padding:17px;margin:12px 0 22px}
 .related-heading{display:flex;align-items:center;gap:12px;margin:0 0 8px;flex-wrap:wrap}
 .related-trail{font-size:11px;color:#6b7c76}
@@ -136,7 +126,7 @@ footer{background:#fff;border-top:1px solid var(--line);padding:21px clamp(22px,
 .knowledge-row small{display:block;color:#687f70}
 .knowledge-empty{font-size:12px;color:#617769;margin:5px 0}
 @media(max-width:560px){.repertoire-modal-status{align-items:stretch}.repertoire-modal-status .repertoire-action{width:100%}.result-card .result-bottom{align-items:stretch}}
-html:not(.with-gguf) [data-gguf-ui],html:not(.with-vector) [data-vector-ui]{display:none!important}
+html:not(.with-vector) [data-vector-ui]{display:none!important}
 .compare-offline{margin:14px 0 10px}
 .conversation:empty{display:none}
 .assistant-message{white-space:pre-line}
@@ -431,3 +421,65 @@ button:focus-visible, summary:focus-visible, a:focus-visible {
 .dictionary-backup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .dictionary-backup-actions :focus-within { outline: 2px solid #2b7767; outline-offset: 2px; }
 .dictionary-backup-actions label:has(input:disabled) { pointer-events: none; opacity: .6; }
+
+/* Editor de termos ao vivo. */
+.live-filters:not([open]) { display: none; }
+.live-filters {
+  width: min(720px, calc(100% - 28px));
+  margin: 9px auto 0;
+  padding: 0 9px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.live-filters > summary {
+  min-height: 36px;
+  padding: 9px 4px;
+  cursor: pointer;
+  color: var(--green);
+  font-weight: 700;
+  font-size: 13px;
+}
+#term-filter-count { margin-left: 7px; color: var(--muted); }
+.term-filters-link { min-height: 38px; }
+#term-filter-rows { display: grid; gap: 6px; max-height: 25vh; overflow-y: auto; }
+.term-filter-row {
+  display: grid;
+  grid-template-columns: minmax(72px, 1fr) minmax(0, 2fr) 40px;
+  gap: 4px;
+  align-items: center;
+  padding: 5px;
+  border-radius: 7px;
+  background: var(--pale);
+}
+.term-filter-row select, .term-filter-row > input {
+  min-width: 0;
+  width: 100%;
+  min-height: 37px;
+  padding: 4px;
+  border: 1px solid #bfd4cf;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+}
+.term-filter-row > input { font-size: 16px; }
+.term-filter-row [data-field="field"] { grid-column: 2 / span 2; }
+.term-filter-row [data-action="remove"] { width: 40px; color: #853c2f; font-size: 20px; }
+.term-synonym { display: flex; align-items: center; gap: 3px; color: var(--green); font-size: 11px; }
+.term-synonym input { accent-color: var(--green); flex-shrink: 0; }
+.term-synonym-preview { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
+.live-filters-actions { display: flex; justify-content: space-between; align-items: center; gap: 7px; padding: 6px 0; }
+.live-filters-actions .secondary-btn { min-height: 37px; padding: 5px 9px; }
+
+/* Evidence of actual lexical filter matches; compact in search, complete in detail. */
+.result-identity .filter-evidence-line{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:0}
+.filter-evidence-detail{font-size:12px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere;margin:0 0 10px}
+.filter-highlight{background:#f9e8a6;color:#2b332a;border-radius:2px;padding:0}
+
+.synonym-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;margin-bottom:8px}.synonym-form input{min-width:0;width:100%}.synonym-form button{padding:10px;font-size:12px}.dictionary-views{flex-wrap:wrap}
+@media(max-width:380px){.synonym-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.synonym-form button{grid-column:1/-1}}
+
+/* Keep the term filter entry point visible even while its body is collapsed. */
+.live-filters:not([open]){display:block}.live-filters>summary{cursor:pointer}.term-filter-row [data-field="lexical"]{grid-column:1/-1;min-width:0}.term-synonym-preview{overflow-wrap:anywhere;max-height:5.5em;overflow-y:auto}.term-filter-row [data-field="lexical"]:disabled{display:none}
