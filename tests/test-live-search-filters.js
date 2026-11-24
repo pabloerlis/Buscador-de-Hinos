@@ -46,7 +46,7 @@ function start(){
     {title:'002 - Canto da tarde',content:'Serenidade e alegria neste dia.'},
     {title:'003 - Canto da noite',content:'Paz com júbilo e felicidade.'},
     {title:'004 - Paz anunciada',content:'Dia de alegria e esperança.'},
-    {title:'005 - Canto de esperança',content:'Ansiedade e alegria neste dia.'},
+    {title:'005 - Canto de esperança',content:'Ansiedade e alegria neste dia de esperança.'},
     {title:'006 - Canto de viagem',content:'Rapaz toma o caminho com alegria.'},
     {title:'007 - Canto ao longe',content:'Paz, alegria e gratidão a Deus.'}
   ]}]});
