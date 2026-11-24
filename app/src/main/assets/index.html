@@ -87,6 +87,15 @@
         </div>
 
         <div id="welcome-panel" class="welcome-panel">
+          <section id="nli-home-card" class="nli-setup-card" aria-labelledby="nli-home-title">
+            <div class="nli-setup-heading"><h2 id="nli-home-title">Modelo de análise Telepatia</h2><span class="local-badge">Offline</span></div>
+            <p id="nli-status-home" class="nli-setup-status" role="status" aria-live="polite">Verificando modelo local…</p>
+            <div class="nli-control-actions">
+              <button id="nli-select-home" data-nli-select type="button" class="primary-btn">Selecionar ZIP do modelo</button>
+              <button id="nli-load-home" data-nli-load type="button" class="secondary-btn" disabled>Carregar</button>
+            </div>
+            <p class="subtle-note">Selecione o ZIP externo do telepatia-ai/laya-pt-es-nli sem descompactar. O modelo não acompanha o APK.</p>
+          </section>
           <div class="welcome-top"><h2>Experimente buscar</h2><span class="data-count" id="data-count">Aguardando biblioteca</span></div>
           <div class="suggestions">
             <button data-suggestion="Gratidão a Deus" type="button">Gratidão</button>
@@ -119,8 +128,8 @@
                   <div class="nli-controls-title"><strong>Telepatia Laya PT/ES NLI</strong><span class="local-badge">Modelo externo</span></div>
                   <p id="nli-status" class="tuner-info" role="status" aria-live="polite">Verificando modelo selecionado…</p>
                   <div class="nli-control-actions">
-                    <button type="button" id="nli-select" class="secondary-btn">Escolher ZIP do modelo</button>
-                    <button type="button" id="nli-load" class="secondary-btn" disabled>Carregar</button>
+                    <button type="button" id="nli-select" data-nli-select class="secondary-btn">Escolher ZIP do modelo</button>
+                    <button type="button" id="nli-load" data-nli-load class="secondary-btn" disabled>Carregar</button>
                   </div>
                   <p class="tuner-info">Analisa a mensagem central dos primeiros candidatos quando o modelo é carregado. Implicação, neutro e contradição não são probabilidades.</p>
                 </div>
@@ -265,8 +274,17 @@
       </section>
       </div>
       <div id="settings-panel-search" role="tabpanel" aria-labelledby="settings-tab-search" tabindex="0" hidden>
+      <section id="nli-settings-card" class="semantic-settings" aria-labelledby="nli-settings-title">
+        <div class="setting-section-heading"><h3 id="nli-settings-title">Modelo Telepatia NLI</h3><span class="local-badge">Modelo externo</span></div>
+        <p id="nli-status-settings" class="nli-setup-status" role="status" aria-live="polite">Verificando modelo local…</p>
+        <div class="settings-actions">
+          <button id="nli-select-settings" data-nli-select type="button" class="primary-btn">Selecionar ZIP do modelo</button>
+          <button id="nli-load-settings" data-nli-load type="button" class="secondary-btn" disabled>Carregar</button>
+        </div>
+        <p class="subtle-note">Baixe o pacote ONNX externo do Telepatia e selecione o ZIP original. Sem LFM3/GGUF e sem necessidade de descompactar.</p>
+      </section>
       <section class="semantic-settings" aria-label="Preferências de busca semântica">
-        <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>
+        <div class="setting-section-heading"><h3>Busca contextual offline</h3><span class="local-badge">E5 + NLI</span></div>
         <label for="search-mode">Prioridade da pesquisa</label>
         <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
         <label for="semantic-power">Força das relações semânticas <strong id="semantic-power-value">75%</strong></label>
