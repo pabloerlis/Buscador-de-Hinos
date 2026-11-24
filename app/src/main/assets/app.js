@@ -59,12 +59,13 @@ function renderHighlighted(element,value,ranges){
   element.append(document.createTextNode(text.slice(offset)));
 }
 function resultCard(hymn,{unlearned=false}={}){
-  const number=hymn.number?`HINO ${escapeHTML(hymn.number)}`:'HINO SEM NÚMERO';
+  const number=hymn.number?escapeHTML(hymn.number):'—';
   const score=Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
   const filterLabel=filterEvidenceLabel(hymn.filter_evidence);
   return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}">
     <button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">
-      <span class="result-identity"><span class="hymn-number">${number} · ${escapeHTML(hymn.collection||'Importados')}</span>
+      <span class="result-index" aria-label="${hymn.number?'Hino '+number:'Hino sem número'}">${number}</span>
+      <span class="result-identity"><span class="hymn-number">${escapeHTML(hymn.collection||'Importados')}</span>
         <span class="result-name">${escapeHTML(hymn.title)}</span>${filterLabel?`<span class="filter-evidence-line" title="${escapeHTML(filterLabel)}">${escapeHTML(filterLabel)}</span>`:''}</span>
       ${hymn.match_type==='filtro'?'':`<span class="relevance" title="Afinidade estimada"><strong>${score}%</strong><span class="sr-only"> de afinidade</span></span>`}
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>

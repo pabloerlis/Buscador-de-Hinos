@@ -51,6 +51,7 @@ for element in ("term-filters-panel", "term-filter-template", "term-filter-rows"
 for field in ("kind", "term", "synonyms", "field", "lexical"):
     require('data-field="' + field + '"' in html, "Controle ausente: " + field)
 require("lexical-pt.js" in page.js, "Motor lexical ausente da interface")
+require('href="polished-ui.css"' in html and (ASSETS/"polished-ui.css").is_file(), "Camada visual ausente")
 require('.live-filters:not([open]){display:block}' in (ASSETS / "style.css").read_text(), "Acesso direto aos filtros ausente")
 
 gradle = (ROOT / "app/build.gradle").read_text(encoding="utf-8")
