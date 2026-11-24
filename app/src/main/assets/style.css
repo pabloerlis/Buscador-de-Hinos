@@ -490,3 +490,6 @@ button:focus-visible, summary:focus-visible, a:focus-visible {
 
 .synonym-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;margin-bottom:8px}.synonym-form input{min-width:0;width:100%}.synonym-form button{padding:10px;font-size:12px}.dictionary-views{flex-wrap:wrap}
 @media(max-width:380px){.synonym-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.synonym-form button{grid-column:1/-1}}
+
+/* Keep the term filter entry point visible even while its body is collapsed. */
+.live-filters:not([open]){display:block}.live-filters>summary{cursor:pointer}.term-filter-row [data-field="lexical"]{grid-column:1/-1;min-width:0}.term-synonym-preview{overflow-wrap:anywhere;max-height:5.5em;overflow-y:auto}.term-filter-row [data-field="lexical"]:disabled{display:none}

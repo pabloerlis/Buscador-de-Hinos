@@ -19,6 +19,7 @@
   <script src="vector-index.js" defer></script>
   <script src="repertoire-store.js" defer></script>
   <script src="context-ranker.js" defer></script>
+  <script src="lexical-pt.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="local-hymn-ai.js" defer></script>
   <script src="about.js" defer></script>
@@ -59,7 +60,7 @@
             <label><input type="checkbox" data-collection="cia" checked> CIA <small id="quick-count-cia">—</small></label>
             <label><input type="checkbox" data-collection="pessoal" checked> Pessoal <small id="quick-count-pessoal">—</small></label>
           </div>
-          <button id="open-term-filters" class="text-action term-filters-link" type="button">Termos da busca</button>
+          <button id="open-term-filters" class="text-action term-filters-link" type="button">Abrir filtros de palavras</button>
           <label class="quick-rank"><input id="quick-context-rank" type="checkbox"> Ordem contextual <small>Experimental</small></label>
           </div>
           </details>
@@ -67,7 +68,7 @@
       </section>
 
       <details id="term-filters-panel" class="live-filters">
-        <summary><span>Termos da busca</span><span id="term-filter-count"></span></summary>
+        <summary><span>Filtros de palavras · obrigatórias e sinônimos</span><span id="term-filter-count"></span></summary>
         <div class="live-filters-body">
           <div id="term-filter-rows"></div>
           <div class="live-filters-actions">
@@ -91,6 +92,7 @@
             <option value="title">Só no título</option>
             <option value="lyrics">Só na letra</option>
           </select>
+          <select data-field="lexical" aria-label="Fonte dos sinônimos" disabled><option value="full">Base lexical completa + pessoal</option><option value="curated">Apenas curados + pessoais</option></select>
           <small class="term-synonym-preview" hidden></small>
         </div>
       </template>
@@ -415,6 +417,7 @@
         <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
       </section></details>
       <p class="subtle-note">Fontes das relações: Bible Topics Dataset (NEUU, CC BY 4.0) e Bible Cross-References Dataset (NEUU/OpenBible, CC BY 4.0), com curadoria de nomes narrativos em português. Fontes: <a href="https://github.com/neuu-org/bible-topics-dataset">Temas</a> e <a href="https://github.com/neuu-org/bible-crossrefs-dataset">Referências cruzadas</a>. Texto bíblico: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
+       <p class="subtle-note">Base lexical: <a href="https://github.com/own-pt/openWordnet-PT/releases/tag/v1.0.0">OpenWordnet-PT 1.0.0</a> — Alexandre Rademaker, Valeria de Paiva, Fredson Aguiar e colaboradores. Licença <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; baseada no Princeton WordNet 3.0 (<a href="https://wordnet.princeton.edu/wordnet/license/">licença</a>). Adaptação: lemas normalizados e agrupados por sentido compartilhado.</p>
       <p class="setting-warning">As classificações automáticas são sugestões e não representam validação doutrinária oficial. Verifique os direitos das letras antes de redistribuí-las.</p></div>
     </section>
   </div>

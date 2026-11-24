@@ -71,6 +71,7 @@ const OfflineAPI = (() => {
   let scriptureIndex=null;
   let bibleGraph=null;
   let bridge=null;
+  let lexicalPT=null;
   let queryRankingCache=new Map();
   const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,contextRerank:false,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   const validStoryId=id=>/^[a-z0-9_]{2,45}$/.test(id)&&!Object.prototype.hasOwnProperty.call(Object.prototype,id);
@@ -177,6 +178,11 @@ const OfflineAPI = (() => {
     return [...new Set((Array.isArray(hints)?hints:[]).map(h=>allowed.get(normalize(h))).filter(Boolean))].slice(0,4);
   }
   async function loadSemantic(){
+    if(typeof LexicalPT!=='undefined')try{
+      const response=await fetch('lexical-pt.json');
+      if(!response.ok)throw Error('Base lexical indisponível');
+      lexicalPT=LexicalPT.create(await response.json());
+    }catch(error){console.warn('OpenWordnet-PT indisponível:',error.message);}
     if(typeof SemanticEngine!=='undefined')try{
       const response=await fetch('semantic-db.json');
       if(!response.ok)throw Error('Base semântica indisponível');
@@ -644,10 +650,10 @@ const OfflineAPI = (() => {
     ['louvar','enaltecer','exaltar'],['fortaleza','fortificação']
   ].map(group=>group.map(normalizeLyrics));
   const synonymIndex=new Map(synonymGroups.flatMap(group=>group.map(term=>[term,group.filter(other=>other!==term)])));
-  function filterSynonyms(term){
+  function filterSynonyms(term,{lexical=false}={}){
     const key=normalizeLyrics(term);
     const custom=personalSynonyms.flatMap(pair=>pair.includes(key)?pair.filter(word=>word!==key):[]);
-    return [...new Set([...(synonymIndex.get(key)||[]),...custom])];
+    return [...new Set([...(synonymIndex.get(key)||[]),...custom,...(lexical&&lexicalPT?lexicalPT.synonyms(key):[])])];
   }
   function searchFilters(source){
     if(!Array.isArray(source))return [];
@@ -656,7 +662,7 @@ const OfflineAPI = (() => {
       if(!term)return [];
       const kind=['require','exclude','prefer'].includes(filter.kind)?filter.kind:'require';
       const field=['title','lyrics'].includes(filter.field)?filter.field:'both';
-      const words=[term,...(filter.synonyms===true?filterSynonyms(term):[])];
+      const words=[term,...(filter.synonyms===true?filterSynonyms(term,{lexical:filter.lexical===true}):[])];
       const patterns=words.map(word=>new RegExp('(?:^| )'+reEscape(word)+'(?=$| )'));
       return [{kind,field,words,patterns}];
     });
@@ -1041,7 +1047,7 @@ const OfflineAPI = (() => {
   }
   async function request(url,payload){
     await init();
-    if(url==='/api/status')return {ready:hymns.length>0,hymn_count:hymns.length,vector_count:typeof VectorIndex!=='undefined'?VectorIndex.status().count:0,vector_status:typeof VectorIndex!=='undefined'?VectorIndex.status():null,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,
+    if(url==='/api/status')return {lexical_ready:!!lexicalPT,lexical_terms:lexicalPT?.terms||0,lexical_groups:lexicalPT?.groups||0,ready:hymns.length>0,hymn_count:hymns.length,vector_count:typeof VectorIndex!=='undefined'?VectorIndex.status().count:0,vector_status:typeof VectorIndex!=='undefined'?VectorIndex.status():null,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,
       story_ready:!!narratives,story_count:(narratives?.stories||0)+personalStories.length,story_revision:narratives?.revision||null,
       scripture_ready:!!scriptureIndex,scripture_books:scriptureIndex?.bookCount||0,
       bible_graph_ready:!!bibleGraph,bible_graph_stats:bibleGraph?.stats||null,bible_graph_narratives:bibleGraph?.narrativeCount||0,

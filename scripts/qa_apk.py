@@ -41,8 +41,18 @@ with zipfile.ZipFile(APK) as archive:
     for required in ("assets/index.html","assets/app.js","assets/about.js",
                      "assets/offline-api.js","assets/story-engine.js",
                      "assets/scripture-pt.json","assets/bible-graph.json",
-                     "assets/bible-narratives.json","AndroidManifest.xml"):
+                     "assets/bible-narratives.json","assets/lexical-pt.json","assets/lexical-pt.js","AndroidManifest.xml"):
         check(required in files,"Asset essencial ausente: "+required)
+    if "assets/lexical-pt.json" in files:
+        lex=json.loads(archive.read("assets/lexical-pt.json"))
+        check(lex.get("source")=="OpenWordnet-PT 1.0.0" and lex.get("license")=="CC BY 4.0","Fonte lexical ausente ou incompatível")
+        check(len(lex.get("groups",[]))>=5000 and lex.get("stats",{}).get("terms",0)>=10000,"Base lexical incompleta")
+    if "assets/index.html" in files:
+        html=archive.read("assets/index.html").decode("utf-8")
+        for marker in ('id="term-filters-panel"','id="term-filter-template"','data-field="synonyms"','data-field="lexical"','id="view-synonyms"'):
+            check(marker in html,"Controle de filtro ausente do APK: "+marker)
+    if "assets/style.css" in files:
+        check(b".live-filters:not([open]){display:block}" in archive.read("assets/style.css"),"Acesso direto aos filtros ausente do APK")
     for name in files:
         lowered = name.lower()
         check(not (lowered.endswith((".gguf",".onnx",".tflite")) or

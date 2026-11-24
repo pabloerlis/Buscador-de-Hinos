@@ -46,6 +46,13 @@ require("about-app" in page.ids, "Configurações sem seção Sobre")
 for element in ("about-developer", "about-version", "about-code", "about-commit", "about-date"):
     require(element in page.ids, "Campo Sobre ausente: " + element)
 
+for element in ("term-filters-panel", "term-filter-template", "term-filter-rows", "term-filter-add", "view-synonyms"):
+    require(element in page.ids, "Filtro de palavras ausente: " + element)
+for field in ("kind", "term", "synonyms", "field", "lexical"):
+    require('data-field="' + field + '"' in html, "Controle ausente: " + field)
+require("lexical-pt.js" in page.js, "Motor lexical ausente da interface")
+require('.live-filters:not([open]){display:block}' in (ASSETS / "style.css").read_text(), "Acesso direto aos filtros ausente")
+
 gradle = (ROOT / "app/build.gradle").read_text(encoding="utf-8")
 activity = (ROOT / "app/src/main/java/br/com/buscadordehinos/app/MainActivity.java").read_text(encoding="utf-8")
 about = (ASSETS / "about.js").read_text(encoding="utf-8")

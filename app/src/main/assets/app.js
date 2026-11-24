@@ -261,7 +261,7 @@ const LiveSearch=(()=>{
       const term=q('[data-field="term"]',row).value.trim();
       if(!/[a-z0-9]/.test(OfflineAPI.normalize(term)))return [];
       return [{term,kind:q('[data-field="kind"]',row).value,field:q('[data-field="field"]',row).value,
-        synonyms:q('[data-field="synonyms"]',row).checked}];
+        synonyms:q('[data-field="synonyms"]',row).checked,lexical:q('[data-field="lexical"]',row).value==='full'}];
     });
   }
   function refreshControls(){
@@ -311,10 +311,13 @@ const LiveSearch=(()=>{
     if(!row)return;
     const preview=q('.term-synonym-preview',row);
     const term=q('[data-field="term"]',row).value.trim();
-    preview.hidden=!term||!q('[data-field="synonyms"]',row).checked;
+    const enabled=q('[data-field="synonyms"]',row).checked;
+    q('[data-field="lexical"]',row).disabled=!enabled;
+    preview.hidden=!term||!enabled;
     if(!preview.hidden){
-      const synonyms=OfflineAPI.filterSynonyms(term);
-      preview.textContent=synonyms.length?'Também aceita: '+synonyms.join(', '):'Sem equivalências para este termo.';
+      const wide=q('[data-field="lexical"]',row).value==='full';
+      const synonyms=OfflineAPI.filterSynonyms(term,{lexical:wide});
+      preview.textContent=(wide&&!state.status?.lexical_ready?'Base ampla indisponível. ':'')+(synonyms.length?'Aceita ('+synonyms.length+'): '+synonyms.join(', '):'Sem equivalências para este termo.');
     }
   }
   rows.addEventListener('input',event=>{refreshPreview(event.target.closest('.term-filter-row'));schedule(true);});
