@@ -143,9 +143,10 @@
           <button id="story-new" class="primary-btn" type="button" hidden disabled>+ Nova narrativa</button>
           <button id="alias-new" class="primary-btn" type="button" disabled>+ Nova associação</button>
         </div>
-        <div class="dictionary-views" role="group" aria-label="Exibir no dicionário">
+        <div class="dictionary-views" role="group" aria-label="Opções do dicionário">
           <button id="view-aliases" type="button" aria-controls="dictionary-aliases" aria-pressed="true">Associações</button>
           <button id="view-stories" type="button" aria-controls="dictionary-stories" aria-pressed="false">Narrativas</button>
+          <button id="dictionary-backup" type="button" class="dictionary-backup">Backup</button>
         </div>
         <div id="dictionary-aliases">
         <p id="alias-state" class="dictionary-state" role="status">Carregando narrativas…</p>
@@ -175,6 +176,26 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <div id="dictionary-backup-layer" class="modal-layer hidden" aria-hidden="true">
+    <div class="modal-scrim" data-close="dictionary-backup"></div>
+    <section class="detail-modal dictionary-editor" role="dialog" aria-modal="true" aria-labelledby="backup-title">
+      <div class="modal-top">
+        <h2 id="backup-title">Backup do dicionário</h2>
+        <button class="icon-button" type="button" data-close="dictionary-backup" aria-label="Fechar backup">×</button>
+      </div>
+      <div class="modal-body dictionary-form">
+        <p class="dictionary-state">Exporte narrativas e associações em um arquivo JSON. A restauração combina o backup com os cadastros do aparelho.</p>
+        <div class="dictionary-backup-actions">
+          <button id="dictionary-export" class="primary-btn" type="button">Exportar JSON</button>
+          <label id="dictionary-import-label" class="secondary-btn file-upload">Restaurar JSON
+            <input id="dictionary-import" type="file" class="sr-only" accept=".json,application/json,application/octet-stream">
+          </label>
+        </div>
+        <p id="dictionary-backup-status" class="dictionary-state" role="status" hidden></p>
+      </div>
+    </section>
   </div>
 
   <div id="personal-story-layer" class="modal-layer hidden" aria-hidden="true">

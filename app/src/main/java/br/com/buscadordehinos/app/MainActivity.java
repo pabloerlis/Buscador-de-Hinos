@@ -29,6 +29,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -40,6 +41,8 @@ public final class MainActivity extends Activity {
     private static final int MAX_JSON_BYTES = 12_000_000;
     private static final int PICK_FILE = 1205;
     private static final int PICK_GGUF = 1206;
+    private static final int CREATE_DICTIONARY_BACKUP = 1207;
+    private static final int MAX_DICTIONARY_BACKUP_BYTES = 256_000;
     private static final String PREFS = "hinos_local_llm";
     private static final String MODEL_URI_KEY = "model_uri";
     private static final String MODEL_DISPLAY_NAME_KEY = "model_display_name";
@@ -74,6 +77,7 @@ public final class MainActivity extends Activity {
     private static native void nativeUnload();
     private WebView web;
     private ValueCallback<Uri[]> pendingFile;
+    private byte[] pendingDictionaryBackup;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -174,6 +178,28 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data){
         super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode==CREATE_DICTIONARY_BACKUP){
+            byte[] bytes=pendingDictionaryBackup;
+            pendingDictionaryBackup=null;
+            Uri uri=resultCode==RESULT_OK&&data!=null?data.getData():null;
+            if(uri==null){
+                dictionaryBackupEvent("Exportação cancelada.");
+            }else if(bytes==null){
+                dictionaryBackupEvent("Abra o dicionário e tente exportar novamente.");
+            }else{
+                new Thread(()->{
+                    try(OutputStream output=getContentResolver().openOutputStream(uri,"wt")){
+                        if(output==null)throw new IOException("Arquivo indisponível.");
+                        output.write(bytes);
+                    }catch(Exception error){
+                        dictionaryBackupEvent("Não foi possível gravar o backup.");
+                        return;
+                    }
+                    dictionaryBackupEvent("Backup salvo.");
+                },"hinos-dictionary-export").start();
+            }
+            return;
+        }
         if(requestCode==PICK_FILE && pendingFile!=null){
             pendingFile.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode,data));
             pendingFile=null;
@@ -457,7 +483,38 @@ public final class MainActivity extends Activity {
         }
     }
 
+    private void dictionaryBackupEvent(String message){
+        runOnUiThread(()->{
+            if(!isDestroyed())web.evaluateJavascript(
+                "window.DictionaryBackup?.complete("+JSONObject.quote(message)+")",null);
+        });
+    }
+
     public class ImportBridge {
+        @JavascriptInterface public void saveDictionaryBackup(String json){
+            if(json==null||json.length()>MAX_DICTIONARY_BACKUP_BYTES){
+                dictionaryBackupEvent("Backup acima de 256 KB.");
+                return;
+            }
+            byte[] bytes=json.getBytes(StandardCharsets.UTF_8);
+            if(bytes.length>MAX_DICTIONARY_BACKUP_BYTES){
+                dictionaryBackupEvent("Backup acima de 256 KB.");
+                return;
+            }
+            runOnUiThread(()->{
+                if(pendingDictionaryBackup!=null)return;
+                Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("application/json")
+                    .putExtra(Intent.EXTRA_TITLE,"Buscador-de-Hinos-Dicionario.json");
+                pendingDictionaryBackup=bytes;
+                try{startActivityForResult(intent,CREATE_DICTIONARY_BACKUP);}
+                catch(Exception error){
+                    pendingDictionaryBackup=null;
+                    dictionaryBackupEvent("O seletor de arquivos do Android está indisponível.");
+                }
+            });
+        }
         /** Metadados da própria instalação, sem depender de serviços ou do catálogo. */
         @JavascriptInterface public String buildInfo(){
             try{

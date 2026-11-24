@@ -4,6 +4,7 @@ const q = (s,root=document) => root.querySelector(s);
 const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:[],deprioritize:[],requiredTerms:[],semanticHints:[],page:0,total:0,hasMore:false,busy:false,activeModal:null,lastResults:[],aiContext:null,exactNumber:false,repertoirePending:false,currentHymn:null,searchRootQuery:'',hymnTrail:[],modalSequence:0,vectorQuery:null,searchEpoch:0,
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
+delete state.searchSettings.customAliases;
 if(!window.NativeVector)state.searchSettings.vectorMode='off';
 document.documentElement.classList.toggle('with-gguf',Boolean(window.NativeGGUF));
 document.documentElement.classList.toggle('with-vector',Boolean(window.NativeVector));
@@ -249,6 +250,7 @@ const SearchPreferences=(()=>{
   }
   function save(){
     state.searchSettings=readInputs();
+    delete state.searchSettings.customAliases;
     localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
     fill();
   }
@@ -267,7 +269,8 @@ const SearchPreferences=(()=>{
     save();refreshSearch();
   };
   $('settings-search-reset').onclick=()=>{
-    state.searchSettings=OfflineAPI.searchOptions({...defaults,customAliases:state.searchSettings.customAliases});
+    state.searchSettings=OfflineAPI.searchOptions(defaults);
+    delete state.searchSettings.customAliases;
     localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
     fill();refreshSearch();toast('Configurações restauradas.');
   };
@@ -311,6 +314,7 @@ const PersonalDictionary=(()=>{
   const list=$('alias-list');
   const feedback=$('alias-feedback');
   let stories=[];
+  let aliases={};
   let currentPage=1;
   let visible=[];
   let editing=null;
@@ -322,11 +326,13 @@ const PersonalDictionary=(()=>{
   async function loadStories(){
     const data=await jsonRequest('/api/stories');
     stories=(data.stories||[]).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
-    $('story-new').disabled=false;
+    aliases=data.associations||{};
+    $('story-new').disabled=Boolean(data.dictionaryError);
     if(stories.length)$('settings-stories').textContent=`${stories.length} narrativas locais`;
-    $('alias-new').disabled=!stories.length;
+    $('alias-new').disabled=!stories.length||Boolean(data.dictionaryError);
     render();
     renderPersonalStories();
+    if(data.dictionaryError){$('alias-state').textContent=data.dictionaryError;$('story-state').textContent=data.dictionaryError;}
   }
   function renderPersonalStories(){
     const personal=stories.filter(story=>story.personal);
@@ -413,7 +419,7 @@ const PersonalDictionary=(()=>{
 
   function entries(){
     const byId=new Map(stories.map(story=>[story.id,story]));
-    return Object.entries(state.searchSettings.customAliases).flatMap(([id,terms])=>
+    return Object.entries(aliases).flatMap(([id,terms])=>
       terms.map(term=>({id,term,story:byId.get(id)}))
     ).sort((a,b)=>a.term.localeCompare(b.term,'pt-BR'));
   }
@@ -468,14 +474,11 @@ const PersonalDictionary=(()=>{
     notify();
     openLayer('alias');
   }
-  function save(items){
-    const aliases={};
-    for(const {id,term} of items)(aliases[id]??=[]).push(term);
-    const settings=OfflineAPI.searchOptions({...state.searchSettings,customAliases:aliases});
-    try{localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(settings));}
+  async function save(items){
+    const next={};
+    for(const {id,term} of items)(next[id]??=[]).push(term);
+    try{aliases=await jsonRequest('/api/dictionary/aliases',{previous:aliases,associations:next});return true;}
     catch(error){return false;}
-    state.searchSettings=settings;
-    return true;
   }
   function complete(message){
     closeLayer();
@@ -498,7 +501,7 @@ const PersonalDictionary=(()=>{
       searchTerm(term);
     }
   });
-  $('alias-form').addEventListener('submit',event=>{
+  $('alias-form').addEventListener('submit',async event=>{
     event.preventDefault();
     const term=input.value.trim();
     const id=picker.value;
@@ -515,7 +518,13 @@ const PersonalDictionary=(()=>{
       notify('Limite de 50 associações no total e 15 por narrativa.');
       return;
     }
-    if(!save([...remaining,{id,term}])){
+    const button=$('alias-add');
+    button.disabled=true;
+    $('alias-remove').disabled=true;
+    const stored=await save([...remaining,{id,term}]);
+    button.disabled=false;
+    $('alias-remove').disabled=false;
+    if(!stored){
       notify('Não foi possível salvar neste aparelho.');
       return;
     }
@@ -524,21 +533,81 @@ const PersonalDictionary=(()=>{
     currentPage=Math.floor(entries().findIndex(entry=>entry.id===id&&entry.term===term)/pageSize)+1;
     complete(editing?'Associação atualizada.':'Associação salva.');
   });
-  $('alias-remove').addEventListener('click',()=>{
+  $('alias-remove').addEventListener('click',async()=>{
     if(!editing)return;
     const remaining=entries().filter(entry=>entry.id!==editing.id||entry.term!==editing.term);
-    if(!save(remaining)){notify('Não foi possível remover neste aparelho.');return;}
+    $('alias-remove').disabled=true;
+    $('alias-add').disabled=true;
+    const stored=await save(remaining);
+    $('alias-remove').disabled=false;
+    $('alias-add').disabled=false;
+    if(!stored){notify('Não foi possível remover neste aparelho.');return;}
     removed=editing;
     complete();
   });
-  $('alias-undo').addEventListener('click',()=>{
+  $('alias-undo').addEventListener('click',async()=>{
     if(!removed)return;
-    if(!save([...entries(),removed])){toast('Não foi possível restaurar a associação.');return;}
+    $('alias-undo').disabled=true;
+    const stored=await save([...entries(),removed]);
+    $('alias-undo').disabled=false;
+    if(!stored){toast('Não foi possível restaurar a associação.');return;}
     removed=null;
     filter.value='';
     currentPage=1;
     complete('Associação restaurada.');
   });
+  const backupInput=$('dictionary-import');
+  const exportButton=$('dictionary-export');
+  const backupStatus=$('dictionary-backup-status');
+  function setBackupStatus(message,busy=false){
+    backupStatus.textContent=message;
+    backupStatus.hidden=!message;
+    backupInput.disabled=busy;
+    exportButton.disabled=busy;
+  }
+  $('dictionary-backup').onclick=()=>openLayer('dictionary-backup');
+  window.DictionaryBackup={
+    complete(message){setBackupStatus(message);}
+  };
+  exportButton.onclick=async()=>{
+    setBackupStatus('Preparando arquivo…',true);
+    try{
+      const data=await jsonRequest('/api/dictionary/export');
+      const json=JSON.stringify(data,null,2)+'\n';
+      if(typeof window.NativeHinos?.saveDictionaryBackup==='function'){
+        window.NativeHinos.saveDictionaryBackup(json);
+        return;
+      }
+      const url=URL.createObjectURL(new Blob([json],{type:'application/json'}));
+      const link=document.createElement('a');
+      link.href=url;
+      link.download='Buscador-de-Hinos-Dicionario.json';
+      link.click();
+      setTimeout(()=>URL.revokeObjectURL(url),1500);
+      setBackupStatus('Arquivo preparado para download.');
+    }catch(error){setBackupStatus(error.message);}
+  };
+  backupInput.onchange=async()=>{
+    const file=backupInput.files?.[0];
+    backupInput.value='';
+    if(!file)return;
+    if(file.size>256000){setBackupStatus('Arquivo maior que o limite de 256 KB.');return;}
+    setBackupStatus('Lendo backup…',true);
+    try{
+      let data;
+      try{data=JSON.parse(await file.text());}
+      catch(error){throw Error('O arquivo escolhido não contém um JSON válido.');}
+      const result=await jsonRequest('/api/dictionary/restore',data);
+      removed=null;
+      filter.value='';
+      currentPage=storyPage=1;
+      await loadStories();
+      SearchPreferences.refreshSearch();
+      const summary=`Restaurado: ${result.addedStories} narrativa(s) e ${result.addedAliases} associação(ões).`;
+      const conflicts=result.conflicts?` ${result.conflicts} expressão(ões) já vinculada(s) no aparelho foi(foram) mantida(s).`:'';
+      setBackupStatus(summary+conflicts);
+    }catch(error){setBackupStatus(error.message);}
+  };
   loadStories().catch(()=>{render();renderPersonalStories();});
 })();
 

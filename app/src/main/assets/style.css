@@ -427,3 +427,7 @@ button:focus-visible, summary:focus-visible, a:focus-visible {
   .dictionary-list { gap: 3px; }
   .dictionary-row { min-height: 48px; padding-block: 1px; }
 }
+.dictionary-views .dictionary-backup { margin-left: auto; }
+.dictionary-backup-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dictionary-backup-actions :focus-within { outline: 2px solid #2b7767; outline-offset: 2px; }
+.dictionary-backup-actions label:has(input:disabled) { pointer-events: none; opacity: .6; }
