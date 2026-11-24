@@ -195,6 +195,23 @@ jobs:
             qa-report/telepatia-independent-review.json
           retention-days: 30
           if-no-files-found: error
+      - name: Publicar o MESMO ZIP do modelo instalado no Android offline
+        if: success()
+        run: |
+          set -euo pipefail
+          cd .tmp/device-transfer
+          sha256sum telepatia.zip > telepatia.zip.sha256
+      - name: Disponibilizar ZIP de instalacao testado sem reempacotar o modelo
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Telepatia-modelo-ZIP-instalação-testada
+          path: |
+            .tmp/device-transfer/telepatia.zip
+            .tmp/device-transfer/telepatia.zip.sha256
+          compression-level: 0
+          retention-days: 30
+          if-no-files-found: error
       - name: APK candidato APENAS se inferencia real offline aprovou
         if: success()
         uses: actions/upload-artifact@v4
