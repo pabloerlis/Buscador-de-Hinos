@@ -175,6 +175,7 @@
         <div class="dictionary-views" role="group" aria-label="Opções do dicionário">
           <button id="view-aliases" type="button" aria-controls="dictionary-aliases" aria-pressed="true">Associações</button>
           <button id="view-stories" type="button" aria-controls="dictionary-stories" aria-pressed="false">Narrativas</button>
+          <button id="view-synonyms" type="button" aria-controls="dictionary-synonyms" aria-pressed="false">Sinônimos</button>
           <button id="dictionary-backup" type="button" class="dictionary-backup">Backup</button>
         </div>
         <div id="dictionary-aliases">
@@ -203,6 +204,20 @@
             <button id="story-next" class="load-more" type="button" aria-label="Próxima página de narrativas">›</button>
           </nav>
         </div>
+        <div id="dictionary-synonyms" hidden>
+          <p id="synonym-state" class="dictionary-state" role="status">Carregando sinônimos…</p>
+          <form id="synonym-form" class="synonym-form">
+            <input id="synonym-term-a" class="dictionary-input" maxlength="80" aria-label="Primeiro termo" placeholder="Termo" required>
+            <input id="synonym-term-b" class="dictionary-input" maxlength="80" aria-label="Segundo termo" placeholder="Sinônimo" required>
+            <button id="synonym-save" class="primary-btn" type="submit" disabled>Adicionar</button>
+          </form>
+          <ul id="synonym-list" class="dictionary-list"></ul>
+          <nav id="synonym-pages" class="load-more-wrap" aria-label="Páginas de sinônimos" hidden>
+            <button id="synonym-previous" class="load-more" type="button" aria-label="Página anterior">‹</button>
+            <span id="synonym-page-status"></span>
+            <button id="synonym-next" class="load-more" type="button" aria-label="Próxima página">›</button>
+          </nav>
+        </div>
       </section>
     </main>
   </div>
@@ -215,7 +230,7 @@
         <button class="icon-button" type="button" data-close="dictionary-backup" aria-label="Fechar backup">×</button>
       </div>
       <div class="modal-body dictionary-form">
-        <p class="dictionary-state">Exporte narrativas e associações em um arquivo JSON. A restauração combina o backup com os cadastros do aparelho.</p>
+        <p class="dictionary-state">Exporte narrativas, associações e sinônimos em um arquivo JSON. A restauração combina o backup com os cadastros do aparelho.</p>
         <div class="dictionary-backup-actions">
           <button id="dictionary-export" class="primary-btn" type="button">Exportar JSON</button>
           <label id="dictionary-import-label" class="secondary-btn file-upload">Restaurar JSON

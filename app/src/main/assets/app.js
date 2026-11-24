@@ -307,8 +307,8 @@ const LiveSearch=(()=>{
   };
   $('term-filter-add').onclick=()=>add();
   $('term-filter-clear').onclick=()=>{rows.replaceChildren();add(false);schedule(true);};
-  rows.addEventListener('input',event=>{
-    const row=event.target.closest('.term-filter-row');
+  function refreshPreview(row){
+    if(!row)return;
     const preview=q('.term-synonym-preview',row);
     const term=q('[data-field="term"]',row).value.trim();
     preview.hidden=!term||!q('[data-field="synonyms"]',row).checked;
@@ -316,8 +316,8 @@ const LiveSearch=(()=>{
       const synonyms=OfflineAPI.filterSynonyms(term);
       preview.textContent=synonyms.length?'Também aceita: '+synonyms.join(', '):'Sem equivalências para este termo.';
     }
-    schedule(true);
-  });
+  }
+  rows.addEventListener('input',event=>{refreshPreview(event.target.closest('.term-filter-row'));schedule(true);});
   rows.addEventListener('click',event=>{
     const button=event.target.closest('[data-action="remove"]');
     if(!button)return;
@@ -330,6 +330,7 @@ const LiveSearch=(()=>{
   // Busca por atalhos inicia sem usar uma pesquisa que ficou na fila da digitação.
   return {
     submit:()=>run(false),
+    synonymsChanged(){[...rows.children].forEach(refreshPreview);schedule(true);},
     clear(){clearTimeout(timer);appliedInput=null;rows.replaceChildren();panel.open=false;refreshControls();}
   };
 })();
@@ -436,6 +437,9 @@ const PersonalDictionary=(()=>{
   let storyPage=1;
   let visibleStories=[];
   let editingStory=null;
+  let synonymPairs=[];
+  let synonymPage=1;
+  let synonymBusy=false;
 
   async function loadStories(){
     const data=await jsonRequest('/api/stories');
@@ -446,6 +450,7 @@ const PersonalDictionary=(()=>{
     $('alias-new').disabled=!stories.length||Boolean(data.dictionaryError);
     render();
     renderPersonalStories();
+    await loadSynonyms();
     if(data.dictionaryError){$('alias-state').textContent=data.dictionaryError;$('story-state').textContent=data.dictionaryError;}
   }
   function renderPersonalStories(){
@@ -472,14 +477,53 @@ const PersonalDictionary=(()=>{
     $('story-next').disabled=storyPage===pages;
     $('story-page-status').textContent=`Página ${storyPage} de ${pages}`;
   }
-  function showStories(show){
-    $('view-aliases').setAttribute('aria-pressed',String(!show));
-    $('view-stories').setAttribute('aria-pressed',String(show));
-    $('dictionary-aliases').hidden=show;
-    $('dictionary-stories').hidden=!show;
-    $('alias-new').hidden=show;
-    $('story-new').hidden=!show;
+  function showDictionary(view){
+    for(const name of ['aliases','stories','synonyms']){
+      $('view-'+name).setAttribute('aria-pressed',String(view===name));
+      $('dictionary-'+name).hidden=view!==name;
+    }
+    $('alias-new').hidden=view!=='aliases';
+    $('story-new').hidden=view!=='stories';
   }
+  function renderSynonyms(){
+    const pages=Math.max(1,Math.ceil(synonymPairs.length/5));
+    synonymPage=Math.min(pages,Math.max(1,synonymPage));
+    $('synonym-list').replaceChildren();
+    for(const pair of synonymPairs.slice((synonymPage-1)*5,synonymPage*5)){
+      const row=document.createElement('li');row.className='dictionary-row';
+      const label=document.createElement('strong');label.className='dictionary-entry';label.textContent=pair.join(' ↔ ');
+      const button=document.createElement('button');button.type='button';button.className='text-action';button.textContent='Remover';
+      button.disabled=synonymBusy||$('synonym-save').disabled;
+      button.onclick=()=>saveSynonym(pair,true);
+      row.append(label,button);$('synonym-list').append(row);
+    }
+    $('synonym-page-status').textContent=synonymPage+' / '+pages;
+    $('synonym-pages').hidden=pages===1;
+    $('synonym-previous').disabled=synonymPage===1;
+    $('synonym-next').disabled=synonymPage===pages;
+  }
+  async function loadSynonyms(){
+    const data=await jsonRequest('/api/dictionary/synonyms');
+    synonymPairs=data.pairs||[];
+    $('synonym-save').disabled=Boolean(data.dictionaryError);
+    $('synonym-state').textContent=data.dictionaryError||synonymPairs.length+' pares personalizados. Só valem quando os sinônimos estão ativados no filtro.';
+    renderSynonyms();
+  }
+  async function saveSynonym(pair,remove=false){
+    if(synonymBusy||$('synonym-save').disabled)return;
+    synonymBusy=true;$('synonym-save').disabled=true;renderSynonyms();
+    try{
+      await jsonRequest('/api/dictionary/synonyms/save',{pair,remove});
+      if(!remove)$('synonym-form').reset();
+      await loadSynonyms();
+      LiveSearch.synonymsChanged();
+    }catch(error){$('synonym-state').textContent=error.message;}
+    finally{synonymBusy=false;$('synonym-save').disabled=false;renderSynonyms();}
+  }
+  $('view-synonyms').onclick=()=>showDictionary('synonyms');
+  $('synonym-form').onsubmit=event=>{event.preventDefault();saveSynonym([$ ('synonym-term-a').value,$('synonym-term-b').value]);};
+  $('synonym-previous').onclick=()=>{synonymPage--;renderSynonyms();};
+  $('synonym-next').onclick=()=>{synonymPage++;renderSynonyms();};
   function editStory(story=null){
     editingStory=story;
     $('story-editor-title').textContent=story?'Editar narrativa':'Nova narrativa';
@@ -494,8 +538,8 @@ const PersonalDictionary=(()=>{
     $('search-input').value=term;
     LiveSearch.submit();
   }
-  $('view-aliases').onclick=()=>showStories(false);
-  $('view-stories').onclick=()=>showStories(true);
+  $('view-aliases').onclick=()=>showDictionary('aliases');
+  $('view-stories').onclick=()=>showDictionary('stories');
   $('story-new').onclick=()=>editStory();
   $('story-previous').onclick=()=>{storyPage--;renderPersonalStories();};
   $('story-next').onclick=()=>{storyPage++;renderPersonalStories();};
@@ -717,7 +761,8 @@ const PersonalDictionary=(()=>{
       currentPage=storyPage=1;
       await loadStories();
       SearchPreferences.refreshSearch();
-      const summary=`Restaurado: ${result.addedStories} narrativa(s) e ${result.addedAliases} associação(ões).`;
+      LiveSearch.synonymsChanged();
+      const summary=`Restaurado: ${result.addedStories} narrativa(s), ${result.addedAliases} associação(ões) e ${result.addedSynonyms||0} par(es) de sinônimos.`;
       const conflicts=result.conflicts?` ${result.conflicts} expressão(ões) já vinculada(s) no aparelho foi(foram) mantida(s).`:'';
       setBackupStatus(summary+conflicts);
     }catch(error){setBackupStatus(error.message);}

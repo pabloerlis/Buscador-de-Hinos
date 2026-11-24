@@ -61,6 +61,7 @@ const OfflineAPI = (() => {
   let personalStories=[];
   let personalNarratives=null;
   let personalAliases={};
+  let personalSynonyms=[];
   let personalWrites=Promise.resolve();
   let personalDataError=null;
   const personalDataKey='personal-dictionary-v1';
@@ -248,6 +249,18 @@ const OfflineAPI = (() => {
     }
     return aliases;
   }
+  // Explicit bidirectional pairs, never transitive: A↔B and B↔C do not imply A↔C.
+  function readSynonymPairs(raw=[]){
+    if(!Array.isArray(raw)||raw.length>200)throw Error('Limite de 200 pares de sinônimos.');
+    const unique=new Map();
+    for(const pair of raw){
+      if(!Array.isArray(pair)||pair.length!==2||pair.some(word=>typeof word!=='string'||word.length>80))throw Error('Par de sinônimos inválido.');
+      const words=pair.map(normalizeLyrics).sort();
+      if(!words[0]||!words[1]||words[0]===words[1])throw Error('Informe dois termos diferentes.');
+      unique.set(JSON.stringify(words),words);
+    }
+    return [...unique.values()].sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b),'pt-BR'));
+  }
   function readBackup(raw){
     if(raw?.format!==backupFormat||raw.version!==1||!Array.isArray(raw.stories)||raw.stories.length>maxPersonalStories)
       throw Error('Formato ou versão de backup do dicionário não reconhecido.');
@@ -262,15 +275,17 @@ const OfflineAPI = (() => {
       ids.add(item.id);
       return {id:item.id,...story};
     });
-    return {stories,aliases:readAssociations(raw.associations,stories)};
+    return {stories,aliases:readAssociations(raw.associations,stories),synonyms:readSynonymPairs(raw.synonyms)};
   }
-  function personalSnapshot(stories=personalStories,aliases=personalAliases){
+  function personalSnapshot(stories=personalStories,aliases=personalAliases,synonyms=personalSynonyms){
     return {format:backupFormat,version:1,stories:stories.map(story=>({...story,clues:story.clues.slice()})),
-      associations:Object.fromEntries(Object.entries(aliases).map(([id,terms])=>[id,terms.slice()]))};
+      associations:Object.fromEntries(Object.entries(aliases).map(([id,terms])=>[id,terms.slice()])),
+      ...(synonyms.length?{synonyms:synonyms.map(pair=>pair.slice())}:{})};
   }
-  async function persistPersonal(stories,aliases){
+  async function persistPersonal(stories,aliases,synonyms=personalSynonyms){
     const engine=compilePersonalStories(stories);
-    await writeCache(personalSnapshot(stories,aliases),personalDataKey);
+    await writeCache(personalSnapshot(stories,aliases,synonyms),personalDataKey);
+    personalSynonyms=synonyms;
     personalStories=stories;
     personalAliases=aliases;
     personalNarratives=engine;
@@ -284,7 +299,8 @@ const OfflineAPI = (() => {
   async function loadPersonalData(){
     const data=await readCache(personalDataKey);
     if(data){
-      const {stories,aliases}=readBackup(data);
+      const {stories,aliases,synonyms}=readBackup(data);
+      personalSynonyms=synonyms;
       personalStories=stories;
       personalAliases=aliases;
       personalNarratives=compilePersonalStories(stories);
@@ -342,8 +358,10 @@ const OfflineAPI = (() => {
       }
     }
     const addedStories=stories.length-personalStories.length;
-    await persistPersonal(stories,readAssociations(aliases,stories));
-    return {addedStories,addedAliases:added,conflicts};
+    const synonyms=readSynonymPairs([...new Map([...personalSynonyms,...incoming.synonyms].map(pair=>[JSON.stringify(pair),pair])).values()]);
+    const addedSynonyms=synonyms.length-personalSynonyms.length;
+    await persistPersonal(stories,readAssociations(aliases,stories),synonyms);
+    return {addedStories,addedAliases:added,conflicts,addedSynonyms};
   }
   function listPersonalStories(){
     return personalStories.map(story=>({...story,clues:story.clues.slice(),personal:true}));
@@ -626,7 +644,11 @@ const OfflineAPI = (() => {
     ['louvar','enaltecer','exaltar'],['fortaleza','fortificação']
   ].map(group=>group.map(normalizeLyrics));
   const synonymIndex=new Map(synonymGroups.flatMap(group=>group.map(term=>[term,group.filter(other=>other!==term)])));
-  function filterSynonyms(term){return (synonymIndex.get(normalizeLyrics(term))||[]).slice();}
+  function filterSynonyms(term){
+    const key=normalizeLyrics(term);
+    const custom=personalSynonyms.flatMap(pair=>pair.includes(key)?pair.filter(word=>word!==key):[]);
+    return [...new Set([...(synonymIndex.get(key)||[]),...custom])];
+  }
   function searchFilters(source){
     if(!Array.isArray(source))return [];
     return source.slice(0,12).flatMap(filter=>{
@@ -1031,6 +1053,17 @@ const OfflineAPI = (() => {
       if(JSON.stringify(payload?.previous)!==JSON.stringify(personalAliases))throw Error('O dicionário mudou. Abra a associação novamente.');
       await persistPersonal(personalStories,readAssociations(payload.associations,personalStories));
       return personalSnapshot().associations;
+    });
+    if(url==='/api/dictionary/synonyms')return {pairs:personalSynonyms.map(pair=>pair.slice()),dictionaryError:personalDataError?.message||''};
+    if(url==='/api/dictionary/synonyms/save')return queuePersonalWrite(async()=>{
+      const pair=readSynonymPairs([payload?.pair])[0];
+      const key=JSON.stringify(pair);
+      const exists=personalSynonyms.some(item=>JSON.stringify(item)===key);
+      if(payload?.remove===true&&!exists)throw Error('Par não encontrado.');
+      const next=payload?.remove===true?personalSynonyms.filter(item=>JSON.stringify(item)!==key):
+        exists?personalSynonyms:readSynonymPairs([...personalSynonyms,pair]);
+      await persistPersonal(personalStories,personalAliases,next);
+      return {pairs:next.map(item=>item.slice())};
     });
     if(url==='/api/dictionary/export'){await personalWrites;if(personalDataError)throw personalDataError;return personalSnapshot();}
     if(url==='/api/dictionary/restore')return queuePersonalWrite(()=>restorePersonalBackup(payload));

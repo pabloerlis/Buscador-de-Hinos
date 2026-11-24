@@ -487,3 +487,6 @@ button:focus-visible, summary:focus-visible, a:focus-visible {
 .result-identity .filter-evidence-line{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:0}
 .filter-evidence-detail{font-size:12px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere;margin:0 0 10px}
 .filter-highlight{background:#f9e8a6;color:#2b332a;border-radius:2px;padding:0}
+
+.synonym-form{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:6px;align-items:center;margin-bottom:8px}.synonym-form input{min-width:0;width:100%}.synonym-form button{padding:10px;font-size:12px}.dictionary-views{flex-wrap:wrap}
+@media(max-width:380px){.synonym-form{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.synonym-form button{grid-column:1/-1}}
