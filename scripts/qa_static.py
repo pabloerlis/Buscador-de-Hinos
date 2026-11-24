@@ -52,6 +52,9 @@ for field in ("kind", "term", "synonyms", "field", "lexical"):
     require('data-field="' + field + '"' in html, "Controle ausente: " + field)
 require("lexical-pt.js" in page.js, "Motor lexical ausente da interface")
 require("appearance.js" in page.js and (ASSETS/"appearance.css").is_file(), "Personalização ausente")
+appearance_css = (ASSETS/"appearance.css").read_text(encoding="utf-8")
+require("#search-form:focus-within{border-color:var(--line);box-shadow:var(--shadow);outline:none}" in appearance_css, "Contorno externo de foco voltou à busca")
+require("#search-input:focus,#search-input:focus-visible{outline:none;box-shadow:none;caret-color:var(--ink)}" in appearance_css, "Contorno de foco do campo de busca voltou")
 for element in ("open-appearance","appearance-layer","appearance-palettes","appearance-preview","appearance-reset"):
     require(element in page.ids, "Controle de aparência ausente: " + element)
 for element in ("active-filter-summary", "term-filter-done", "lyric-smaller", "lyric-larger", "lyric-size", "reader-evidence"):

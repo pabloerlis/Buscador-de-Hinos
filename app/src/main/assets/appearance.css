@@ -85,3 +85,7 @@ input[type="checkbox"],input[type="range"]{accent-color:var(--action)}
 @media(prefers-reduced-motion:reduce){.modal-layer>section,.modal-layer .modal-scrim,.animate-demo,.tab-enter{animation:none!important}}
 @media(max-width:380px){.topbar{padding-inline:10px;height:61px}.brand-copy{font-size:15px}.brand-copy small{font-size:9px}.topbar .icon-button{width:36px;height:36px}.topbar .brand-icon{width:32px;height:32px}.topbar .top-actions{gap:4px}.appearance-content{padding:10px 11px}.palette-option{gap:5px;padding:5px}.palette-sample{width:35px}}
 @media(max-height:650px){.topbar{height:55px}.appearance-content{gap:9px}.palette-option{min-height:44px}.appearance-options button{min-height:38px}}
+
+/* Busca: mantém a aparência normal ao editar; somente o cursor indica foco. */
+#search-form:focus-within{border-color:var(--line);box-shadow:var(--shadow);outline:none}
+#search-input:focus,#search-input:focus-visible{outline:none;box-shadow:none;caret-color:var(--ink)}
