@@ -1,0 +1,69 @@
+name: Experimental contextual full-lyric neural retrieval
+on:
+  push:
+    branches: [experiment/contextual-full-lyrics-neural-20261124]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  neural_gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Recuperar E5 auditado recente (fallback se expirou)
+        id: e5_artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 45294250230
+          name: e5-stanza-assets-qa
+          github-token: ${{ github.token }}
+          path: app/src/main/assets
+      - name: Recuperar indices biblicos auditados recentes (fallback se expirou)
+        id: bible_artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 45294250230
+          name: bible-indexes-qa
+          github-token: ${{ github.token }}
+          path: app/src/main/assets
+      - name: Recriar offline assets de fontes fixadas se artefatos expiraram
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -s app/src/main/assets/scripture-pt.json ] || [ ! -s app/src/main/assets/bible-graph.json ]; then
+            python3 scripts/build_scripture_index.py
+            python3 scripts/build_bible_graph.py
+            python3 scripts/qa_sources.py
+          fi
+          if [ ! -s app/src/main/assets/e5-model.onnx ] || [ ! -s app/src/main/assets/e5-vocab.bin ] || [ ! -s app/src/main/assets/e5-index.json ]; then
+            python3 -m pip install --disable-pip-version-check -q "numpy==1.26.4" "onnxruntime==1.20.1" "tokenizers==0.20.3" "huggingface_hub==0.27.1" requests
+            python3 scripts/build_e5_assets.py
+            python3 scripts/qa_e5_android_tokenizer.py
+            python3 scripts/qa_e5.py
+          fi
+          test -s app/src/main/assets/scripture-pt.json
+          test -s app/src/main/assets/bible-graph.json
+          test -s app/src/main/assets/e5-model.onnx
+          test -s app/src/main/assets/e5-vocab.bin
+          test -s app/src/main/assets/e5-index.json
+      - name: Run neural scene retrieval and full-lyric reranking
+        run: |
+          python3 -m pip install --disable-pip-version-check -q "numpy==1.26.4" "onnxruntime==1.20.1" "tokenizers==0.20.3" "huggingface_hub==0.27.1" requests
+          python3 scripts/qa_contextual_neural.py
+      - name: Publish experimental quality report even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-full-lyrics-neural-report
+          path: qa-report/contextual-full-lyrics-neural.json
+          if-no-files-found: warn
