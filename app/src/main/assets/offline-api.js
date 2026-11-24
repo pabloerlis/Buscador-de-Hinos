@@ -58,6 +58,10 @@ const OfflineAPI = (() => {
   let initialized;
   let semantic=null;
   let narratives=null;
+  let personalStories=[];
+  let personalNarratives=null;
+  const personalStoryKey='hinos-narrativas-pessoais-v1';
+  const maxPersonalStories=50;
   let recommender=null;
   let scriptureIndex=null;
   let bibleGraph=null;
@@ -194,6 +198,74 @@ const OfflineAPI = (() => {
     }catch(error){console.warn('Índice de temas e referências cruzadas indisponível:',error.message);}
   }
 
+  function readPersonalStory(raw){
+    const label=String(raw?.label??'').trim().replace(/\s+/g,' ');
+    const reference=String(raw?.reference??'').trim();
+    const source=Array.isArray(raw?.clues)?raw.clues:[];
+    const unique=new Map(source.map(value=>{
+      const clue=String(value??'').trim().replace(/\s+/g,' ');
+      return [normalizeLyrics(clue),clue];
+    }));
+    unique.delete('');
+    const clues=[...unique.values()];
+    if(label.length<4||label.length>90||!/[a-z]/.test(normalizeLyrics(label))||
+      (typeof ScriptureIndex!=='undefined'&&ScriptureIndex.parse(label)))throw Error('Informe um nome de 4 a 90 caracteres. Use o campo próprio para a referência.');
+    if(source.length>5||clues.some(clue=>clue.length<3||clue.length>60))throw Error('Informe até cinco pistas de 3 a 60 caracteres.');
+    const passage=reference&&scriptureIndex?.lookup(reference);
+    const validEnd=passage&&(!passage.reference.includes(':')||
+      scriptureIndex.lookup(passage.reference.split(':')[0]+':'+passage.to));
+    if(reference&&(!validEnd||passage.residual||reference.length>80))throw Error('Informe uma referência bíblica válida, como Lucas 15:11-32.');
+    if(clues.length<2&&(!passage||clues.length))throw Error('Informe uma referência ou pelo menos duas pistas diferentes.');
+    return {label,reference:passage?.reference||'',clues};
+  }
+  function compilePersonalStories(rows){
+    return rows.length?StoryEngine.create({schema_version:1,revision:'personal-v1',stories:rows.map(story=>({
+      ...story,aliases:[],phrases:[],groups:story.clues.length?story.clues.map(clue=>[clue]):[[],[]]
+    }))}):null;
+  }
+  function loadPersonalStories(){
+    if(typeof StoryEngine==='undefined'||typeof localStorage==='undefined')return;
+    try{
+      const saved=JSON.parse(localStorage.getItem(personalStoryKey)||'[]');
+      if(!Array.isArray(saved))return;
+      const ids=new Set();
+      const rows=[];
+      for(const item of saved.slice(0,maxPersonalStories)){
+        if(!/^local_story_[1-9]\d*$/.test(item?.id)||ids.has(item.id))continue;
+        try{
+          rows.push({id:item.id,...readPersonalStory(item)});
+          ids.add(item.id);
+        }catch(error){console.warn('Narrativa pessoal inválida:',error.message);}
+      }
+      personalNarratives=compilePersonalStories(rows);
+      personalStories=rows;
+    }catch(error){console.warn('Narrativas pessoais indisponíveis:',error.message);}
+  }
+  function listPersonalStories(){
+    return personalStories.map(story=>({...story,clues:story.clues.slice(),personal:true}));
+  }
+  function savePersonalStory(raw){
+    if(typeof StoryEngine==='undefined')throw Error('Busca por narrativas indisponível.');
+    const current=raw?.id?personalStories.find(story=>story.id===raw.id):null;
+    if(raw?.id&&!current)throw Error('Narrativa pessoal não encontrada.');
+    if(!current&&personalStories.length>=maxPersonalStories)throw Error('Limite de 50 narrativas pessoais.');
+    const story=readPersonalStory(raw);
+    const label=normalizeLyrics(story.label);
+    if([...(narratives?.list()||[]),...personalStories].some(item=>item.id!==current?.id&&normalizeLyrics(item.label)===label))
+      throw Error('Já existe uma narrativa com esse nome.');
+    let nextId=1;
+    while(personalStories.some(item=>item.id==='local_story_'+nextId))nextId++;
+    const entry={id:current?.id||'local_story_'+nextId,...story};
+    const next=current?personalStories.map(item=>item.id===current.id?entry:item):[...personalStories,entry];
+    const engine=compilePersonalStories(next);
+    try{localStorage.setItem(personalStoryKey,JSON.stringify(next));}
+    catch(error){throw Error('Não foi possível salvar a narrativa neste aparelho.');}
+    personalStories=next;
+    personalNarratives=engine;
+    queryRankingCache.clear();
+    return {...entry,clues:entry.clues.slice(),personal:true};
+  }
+
   function plainText(content) {
     let html = String(content??'').replace(/\\n/g,'\n');
     html=html.replace(/<br\s*\/?>/gi,'\n').replace(/<\/(p|div|li|section|h[1-6])\s*>/gi,'\n');
@@ -253,7 +325,7 @@ const OfflineAPI = (() => {
     }finally{db.close();}
   }
   async function init(){
-    if (!initialized)initialized=(async()=>{await loadSemantic();const cache=await readCache();if(cache&&Array.isArray(cache.hymns)){hymns=cache.hymns;metadata=cache.metadata||metadata;const migrated=hymns.some(h=>!Array.isArray(h.collections)||!h.collectionRefs?.length);for(const h of hymns)populateReferences(h);if((semantic&&cache.semantic_revision!==semantic.revision)||(narratives&&cache.story_revision!==narratives.revision)){
+    if (!initialized)initialized=(async()=>{await loadSemantic();loadPersonalStories();const cache=await readCache();if(cache&&Array.isArray(cache.hymns)){hymns=cache.hymns;metadata=cache.metadata||metadata;const migrated=hymns.some(h=>!Array.isArray(h.collections)||!h.collectionRefs?.length);for(const h of hymns)populateReferences(h);if((semantic&&cache.semantic_revision!==semantic.revision)||(narratives&&cache.story_revision!==narratives.revision)){
       for(let i=0;i<hymns.length;i++){
         const song=hymns[i];if(semantic){song.semantic_profile=semantic.indexHymn(song.title,song.lyrics);song.topics=song.semantic_profile.slice(0,12).map(t=>t.label);}
         if(narratives) song.story_profile=narratives.indexHymn(song.title,song.lyrics);
@@ -460,12 +532,26 @@ const OfflineAPI = (() => {
     const norm=normalize(query), numberMatch=norm.match(/^(?:(coletanea|principal|avulsos?|cia|criancas|infantil)\s+)?(?:hino\s*|louvor\s*)?(\d{1,4})$/);
     const bible=typeof BibleContext!=='undefined'?BibleContext.lookup(query):null;
     const scripture=opts.scripture&&scriptureIndex?scriptureIndex.lookup(query):null;
-    const graphCtx=opts.scripture&&opts.bibleGraph&&opts.mode!=='literal'&&bibleGraph&&!numberMatch?bibleGraph.resolve(query,opts):null;
     const isBiblicalRef=typeof BibleContext!=='undefined' && BibleContext.looksLikeReference(query);
     const hints=opts.mode==='literal'?[]:validateHints(payload?.semantic_hints);
     const quoted=[...query.matchAll(QUOTED_TEXT)].map(match=>normalizeLyrics(match[1]||match[2])).filter(Boolean);
     const exactTitles=titleIndex.get(normalizeLyrics(query))||new Set();
-    const storyIntent=opts.mode!=='literal'&&opts.narratives&&narratives&&!numberMatch?narratives.interpret(query,opts.customAliases):null;
+    const storyEnabled=opts.mode!=='literal'&&opts.narratives&&!numberMatch;
+    const personalIntent=storyEnabled&&!quoted.length?personalNarratives?.interpret(query,opts.customAliases):null;
+    const baseIntent=storyEnabled?narratives?.interpret(personalIntent?.matches.length?personalIntent.residual:query,opts.customAliases):null;
+    const storyIntent=personalIntent?.matches.length?{
+      matches:[...personalIntent.matches,...(baseIntent?.matches||[])].slice(0,4),
+      residual:baseIntent?.residual??personalIntent.residual
+    }:baseIntent;
+    const graphEnabled=opts.scripture&&opts.bibleGraph&&opts.mode!=='literal'&&bibleGraph&&!numberMatch;
+    let graphCtx=graphEnabled?bibleGraph.resolve(query,opts):null;
+    const personalMatches=new Set(personalIntent?.matches.map(match=>match.id)||[]);
+    const personalClues=new Set(personalStories.filter(story=>personalMatches.has(story.id)&&story.clues.length).map(story=>story.id));
+    const references=new Set(personalIntent?.matches.map(match=>match.reference).filter(Boolean)||[]);
+    if(graphEnabled&&!graphCtx&&references.size===1){
+      const linked=bibleGraph.resolve([...references][0],opts);
+      if(linked)graphCtx={...linked,residual:storyIntent.residual};
+    }
     // Subtrair o alias reconhecido: a palavra genérica "filho" não vira evidência de Filho Pródigo.
     const lexicalQuery=storyIntent?.matches?.length?storyIntent.residual:query;
     const analysisText=opts.mode==='literal'?query:[graphCtx?.residual??scripture?.residual??lexicalQuery,bible?.theme||'',...hints].filter(Boolean).join(' ');
@@ -566,7 +652,8 @@ const OfflineAPI = (() => {
           if(graphResult.reasons.length)evidence.unshift(...graphResult.reasons.slice(0,2));
         }
         if(storyIntent?.matches.length){
-          storyResult=narratives.evaluate(song.story_profile||[],storyIntent);
+          const personalProfile=personalClues.size?personalNarratives.indexHymn(song.title,song.lyrics,personalClues).filter(item=>item.localCoverage>=2):[];
+          storyResult=(narratives||personalNarratives).evaluate([...(song.story_profile||[]),...personalProfile],storyIntent);
           score+=storyResult.score*semanticWeight;
           if(storyResult.reasons.length)evidence.unshift(...storyResult.reasons);
         }
@@ -633,7 +720,7 @@ const OfflineAPI = (() => {
     const from=(page-1)*opts.pageSize;
     const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_contextOrder,...hit})=>({...hit,
       snippet:sharedPassage?.text||makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
-    const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
+    const reading=storyIntent?.matches?.map(x=>x.reference?x.label+' ('+x.reference+')':x.label)||[];
     const interpretation=opts.showConcepts?[
       ...(vectorEnabled?['Embeddings E5: '+VectorIndex.status().count+' hinos indexados']:[]),
       ...reading.map(t=>'Narrativa: '+t),
@@ -740,12 +827,13 @@ const OfflineAPI = (() => {
   async function request(url,payload){
     await init();
     if(url==='/api/status')return {ready:hymns.length>0,hymn_count:hymns.length,vector_count:typeof VectorIndex!=='undefined'?VectorIndex.status().count:0,vector_status:typeof VectorIndex!=='undefined'?VectorIndex.status():null,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,
-      story_ready:!!narratives,story_count:narratives?.stories||0,story_revision:narratives?.revision||null,
+      story_ready:!!narratives,story_count:(narratives?.stories||0)+personalStories.length,story_revision:narratives?.revision||null,
       scripture_ready:!!scriptureIndex,scripture_books:scriptureIndex?.bookCount||0,
       bible_graph_ready:!!bibleGraph,bible_graph_stats:bibleGraph?.stats||null,bible_graph_narratives:bibleGraph?.narrativeCount||0,
       bridge_ready:!!bridge,bridge_entries:bridge?.entries||0,collections:libraryCounts(),
       collection:metadata.collection,edition:metadata.edition,ai_configured:false,source_url:SOURCE,chat_mode:narratives?'Narrativas bíblicas + temas offline':'Busca contextual local'};
-    if(url==='/api/stories')return {stories:narratives?.list()||[]};
+    if(url==='/api/stories')return {stories:[...(narratives?.list()||[]),...listPersonalStories()]};
+    if(url==='/api/stories/save')return savePersonalStory(payload);
     if(url==='/api/repertoire')return {count:RepertoireStore.marked(hymns).length,
       not_learned:RepertoireStore.marked(hymns).map(song=>({id:song.id,title:song.title,number:song.number,collection:song.collection}))};
     if(url==='/api/repertoire/mark'){

@@ -140,8 +140,14 @@
       <section id="dictionary-tab-panel" class="main-content dictionary-panel" role="tabpanel" aria-labelledby="tab-dictionary" hidden>
         <div class="dictionary-heading">
           <h1>Dicionário pessoal</h1>
+          <button id="story-new" class="primary-btn" type="button" hidden disabled>+ Nova narrativa</button>
           <button id="alias-new" class="primary-btn" type="button" disabled>+ Nova associação</button>
         </div>
+        <div class="dictionary-views" role="group" aria-label="Exibir no dicionário">
+          <button id="view-aliases" type="button" aria-controls="dictionary-aliases" aria-pressed="true">Associações</button>
+          <button id="view-stories" type="button" aria-controls="dictionary-stories" aria-pressed="false">Narrativas</button>
+        </div>
+        <div id="dictionary-aliases">
         <p id="alias-state" class="dictionary-state" role="status">Carregando narrativas…</p>
         <div id="alias-directory" hidden>
           <label class="sr-only" for="alias-filter">Filtrar associações</label>
@@ -157,8 +163,41 @@
           <span role="status">Associação removida.</span>
           <button id="alias-undo" class="text-action" type="button">Desfazer</button>
         </div>
+        </div>
+        <div id="dictionary-stories" hidden>
+          <p id="story-state" class="dictionary-state" role="status"></p>
+          <ul id="story-list" class="dictionary-list"></ul>
+          <nav id="story-pages" class="load-more-wrap" aria-label="Páginas de narrativas" hidden>
+            <button id="story-previous" class="load-more" type="button" aria-label="Página anterior de narrativas">‹</button>
+            <span id="story-page-status" aria-live="polite"></span>
+            <button id="story-next" class="load-more" type="button" aria-label="Próxima página de narrativas">›</button>
+          </nav>
+        </div>
       </section>
     </main>
+  </div>
+
+  <div id="personal-story-layer" class="modal-layer hidden" aria-hidden="true">
+    <div class="modal-scrim" data-close="personal-story"></div>
+    <section class="detail-modal dictionary-editor" role="dialog" aria-modal="true" aria-labelledby="story-editor-title">
+      <div class="modal-top">
+        <h2 id="story-editor-title">Nova narrativa</h2>
+        <button class="icon-button" type="button" data-close="personal-story" aria-label="Fechar narrativa">×</button>
+      </div>
+      <form id="personal-story-form" class="modal-body dictionary-form">
+        <label for="personal-story-label">Nome da narrativa</label>
+        <input id="personal-story-label" class="dictionary-input" maxlength="90" minlength="4" placeholder="Ex.: Rute acompanha Noemi" required>
+        <label for="personal-story-reference">Referência bíblica</label>
+        <input id="personal-story-reference" class="dictionary-input" maxlength="80" placeholder="Ex.: Rute 1:16-18" aria-describedby="personal-story-help">
+        <label for="personal-story-clues">Pistas nas letras</label>
+        <textarea id="personal-story-clues" class="dictionary-input" rows="2" maxlength="307" placeholder="Ex.: Rute; Noemi; teu povo" aria-describedby="personal-story-help"></textarea>
+        <p id="personal-story-help" class="dictionary-state">Informe a referência, duas ou mais pistas separadas por ponto e vírgula, ou ambos.</p>
+        <p id="personal-story-feedback" class="dictionary-feedback" role="status" hidden></p>
+        <div class="dictionary-form-actions">
+          <button id="personal-story-save" class="primary-btn" type="submit">Salvar narrativa</button>
+        </div>
+      </form>
+    </section>
   </div>
 
   <div id="alias-layer" class="modal-layer hidden" aria-hidden="true">
