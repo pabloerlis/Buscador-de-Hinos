@@ -62,11 +62,11 @@ def main():
             "Instrumentação contém falha")
     packageinfo="app/build.gradle"
     gradle=Path(packageinfo).read_text()
-    require("versionCode 40" in gradle and "versionName '2.6.21'" in gradle,
+    require("versionCode 41" in gradle and "versionName '2.6.22'" in gradle,
             "Versão Android da integração está divergente")
     report={"status":"approved_in_emulator_only","model":"telepatia-ai/laya-pt-es-nli",
             "apk_sha256":actual,"apk_bytes":APK.stat().st_size,"emulator":"x86_64",
-            "version":"2.6.21","version_code":40,
+            "version":"2.6.22","version_code":41,
             "weights_embedded":False,"legacy_gguf_present":False,
             "source":"GitHub Actions+real Android emulator",
             "limitations":[
