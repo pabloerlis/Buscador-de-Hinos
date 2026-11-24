@@ -50,7 +50,8 @@
     const baseNarrative=clamp(Math.max(narrative*3.8,biblical*2.2,tier*18));
     // Ordem categórica de decisão NLI (NÃO probabilidade), aplicada apenas
     // quando o modelo foi realmente executado e devolveu um rótulo válido.
-    const nliLevels={entailment:100,neutral:50,contradiction:0};
+    // Neutro preserva a evidência anterior e a escala dos candidatos ainda sem NLI.
+    const nliLevels={entailment:100,contradiction:0};
     const nli=Object.prototype.hasOwnProperty.call(nliLevels,item?.nli_label)
       ?nliLevels[item.nli_label]:null;
     const narrativeScore=nli===null?baseNarrative:clamp(.35*baseNarrative+.65*nli);
@@ -67,9 +68,15 @@
     if(total===0)return Math.round(clamp(item.relevance_percent));
     return Math.round((s.topic*cfg.topic+s.narrative*narrativeWeight+s.events*eventsWeight)/total);
   }
+  function usesSearchOrder(cfg){
+    return ['topic','narrative','events'].every(key=>cfg[key]===presets.balanced[key]);
+  }
   function rank(pool,raw){
     const cfg=config(raw);
     if(!Array.isArray(pool))return [];
+    if(usesSearchOrder(cfg)){
+      return pool.filter(item=>clamp(item.relevance_percent)>=cfg.min);
+    }
     const evidence=pool.map(signals);
     const available={narrative:evidence.some(s=>s.narrative>0),events:evidence.some(s=>s.events>0)};
     return pool.map((item,i)=>({...item,tuner_score:score(item,cfg,available),tuner_rank_baseline:i}))
@@ -93,5 +100,5 @@
     const text=typeof query==='string'?query.trim().replace(/\s+/g,' ').slice(0,500):'';
     return history([text,...history(old)]);
   }
-  return {STORAGE_KEY,HISTORY_KEY,LIMIT,HISTORY_LIMIT,presets,config,signals,score,rank,history,addHistory};
+  return {STORAGE_KEY,HISTORY_KEY,LIMIT,HISTORY_LIMIT,presets,config,signals,score,usesSearchOrder,rank,history,addHistory};
 });

@@ -471,6 +471,12 @@ const OfflineAPI = (() => {
     const exactTitles=titleIndex.get(normalizeLyrics(query))||new Set();
     const storyIntent=opts.mode!=='literal'&&opts.narratives&&narratives&&!numberMatch?narratives.interpret(query,opts.customAliases):null;
     // Subtrair o alias reconhecido: a palavra genérica "filho" não vira evidência de Filho Pródigo.
+    // O alias sai da pontuação lexical. Preserve o assunto explícito quando uma
+    // palavra distintiva do nome da narrativa aparece no título e na letra.
+    const distinctiveSubjects=(storyIntent?.matches||[]).flatMap(story=>
+      tokens(story.label).filter(term=>/^[a-z]{4,}$/.test(term)&&
+        (wordIndex.get(term)?.size||Infinity)<=Math.max(1,hymns.length*.01))
+        .map(term=>({term,label:story.label})));
     const lexicalQuery=storyIntent?.matches?.length?storyIntent.residual:query;
     const analysisText=opts.mode==='literal'?query:[graphCtx?.residual??scripture?.residual??lexicalQuery,bible?.theme||'',...hints].filter(Boolean).join(' ');
     const bridgeIntent=opts.bridge&&bridge&&opts.mode!=='literal'?bridge.interpret(analysisText):null;
@@ -611,6 +617,14 @@ const OfflineAPI = (() => {
         }
         if(storyIntent?.matches.length){
           storyResult=narratives.evaluate(song.story_profile||[],storyIntent);
+          if(storyResult.score>0&&storyResult.tier<1){
+            const subject=distinctiveSubjects.find(({term,label})=>storyResult.matched.includes(label)&&
+              titleWords.has(term)&&hasWord(lyrics,term));
+            if(subject){
+              storyResult.tier=1;
+              storyResult.reasons.unshift('Título e letra identificam o assunto da narrativa: '+subject.term);
+            }
+          }
           narrativeSignal=Math.max(0,storyResult.score*semanticWeight);
           score+=storyResult.score*semanticWeight;
           if(storyResult.reasons.length)evidence.unshift(...storyResult.reasons);

@@ -12,7 +12,8 @@
     let pool=[],baseData=null,visibleCount=10;
     const store=()=>{try{localStorage.setItem(SemanticTuner.STORAGE_KEY,JSON.stringify(cfg));}catch(error){console.warn('Configuração não persistida',error.message);}};
     const isDirect=()=>cfg.enabled;
-    const isActive=()=>cfg.enabled&&pool.length>0&&!state.exactNumber;
+    const isActive=()=>cfg.enabled&&pool.length>0&&!state.exactNumber&&
+      (!SemanticTuner.usesSearchOrder(cfg)||cfg.min>0);
     function sync(){
       byId('tuner-enabled').checked=cfg.enabled;
       for(const [key,id] of Object.entries(inputs)){
@@ -47,13 +48,14 @@
       const status=byId('tuner-status');
       if(!baseData){status.textContent='Pesquise para ajustar resultados.';return;}
       if(!isActive()){
-        const normal=baseData.results||[];
+        state.page=baseData.page;
+        const normal=(baseData.results||[]).map(hit=>pool.find(item=>item.id===hit.id)||hit);
         state.lastResults=normal.slice();
         byId('results-list').innerHTML=normal.length?normal.map(card).join(''):'<div class="empty-results"><h3>Nenhum hino encontrado</h3><p>Tente uma pesquisa mais ampla.</p></div>';
         byId('results-subtitle').textContent=state.exactNumber?'Resultado por número: ordem preservada.':baseData.total+' resultados · classificação padrão';
         byId('load-more').classList.toggle('hidden',!baseData.has_more);
         byId('load-more').textContent='Carregar mais '+baseData.page_size+' hinos';
-        status.textContent=state.exactNumber?'Pesquisa por número não é reordenada.':cfg.enabled?'Nenhum candidato disponível para o painel.':'Classificação padrão ativada.';
+        status.textContent=state.exactNumber?'Pesquisa por número não é reordenada.':'Ordem da busca contextual. Ajuste os pesos para personalizar.';
         return;
       }
       const ranked=SemanticTuner.rank(pool,cfg);
@@ -83,7 +85,15 @@
       const item=pool.find(r=>r.id===id);if(!item)return false;
       item.nli_label=kind;
       item.nli_model_revision=modelRevision;
-      render();
+      if(isActive())render();
+      else{
+        const index=state.lastResults.findIndex(hit=>hit.id===id);
+        if(index>=0){
+          state.lastResults[index]=item;
+          const existing=byId('results-list').querySelector('[data-card-id="'+id+'"]');
+          if(existing)existing.outerHTML=card(item);
+        }
+      }
       return true;
     }
     function clearPool(){pool=[];baseData=null;visibleCount=10;sync();byId('tuner-status').textContent='Pesquise para ajustar resultados.';}

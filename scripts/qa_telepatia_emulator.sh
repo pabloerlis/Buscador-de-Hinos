@@ -12,6 +12,7 @@ adb install -r app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk
 adb shell am start -n br.com.buscadordehinos.app/.MainActivity
 sleep 3
 adb shell mkdir -p /sdcard/Android/data/br.com.buscadordehinos.app/files
+adb push "$RUNNER_TEMP/coletanea.json" /sdcard/Android/data/br.com.buscadordehinos.app/files/coletanea.json
 adb push .tmp/device-transfer/telepatia.zip /sdcard/Android/data/br.com.buscadordehinos.app/files/telepatia.zip
 adb push .tmp/device-transfer/telepatia-golden.json /sdcard/Android/data/br.com.buscadordehinos.app/files/telepatia-golden.json
 adb shell ls -lh /sdcard/Android/data/br.com.buscadordehinos.app/files/
