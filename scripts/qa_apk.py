@@ -46,7 +46,8 @@ with zipfile.ZipFile(APK) as archive:
     if "assets/lexical-pt.json" in files:
         lex=json.loads(archive.read("assets/lexical-pt.json"))
         check(lex.get("source")=="OpenWordnet-PT 1.0.0" and lex.get("license")=="CC BY 4.0","Fonte lexical ausente ou incompatível")
-        check(len(lex.get("groups",[]))>=5000 and lex.get("stats",{}).get("terms",0)>=10000,"Base lexical incompleta")
+        check(len(lex.get("groups",[]))==15372 and lex.get("stats",{}).get("terms",0)==26129,"Base lexical incompleta")
+        check(lex.get("archive_sha256")=="207c2c9066396ccec0884ac6b2de2aada6b6475fe2b5b21ef71455b84c90506e","Origem lexical diverge do hash fixado")
     if "assets/index.html" in files:
         html=archive.read("assets/index.html").decode("utf-8")
         for marker in ('id="term-filters-panel"','id="term-filter-template"','data-field="synonyms"','data-field="lexical"','id="view-synonyms"'):

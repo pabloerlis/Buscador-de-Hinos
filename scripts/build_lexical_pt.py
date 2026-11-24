@@ -13,6 +13,7 @@ import xml.etree.ElementTree as ET
 
 URL = "https://github.com/own-pt/openWordnet-PT/releases/download/v1.0.0/own-pt.tar.gz"
 ARCHIVE_BYTES = 3161610
+ARCHIVE_SHA256 = "207c2c9066396ccec0884ac6b2de2aada6b6475fe2b5b21ef71455b84c90506e"
 ASSETS = Path(__file__).resolve().parents[1] / "app/src/main/assets"
 
 def normalize(value):
@@ -42,6 +43,8 @@ def extract_groups(xml):
 def build(archive):
     if len(archive) != ARCHIVE_BYTES:
         raise ValueError("Unexpected archive size")
+    if hashlib.sha256(archive).hexdigest() != ARCHIVE_SHA256:
+        raise ValueError("OpenWordnet-PT source SHA-256 mismatch")
     with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
         members = [m for m in tar.getmembers() if m.isfile() and m.name.endswith("/own-pt-lmf.xml")]
         if len(members) != 1 or not 0 < members[0].size <= 100_000_000:
@@ -49,7 +52,7 @@ def build(archive):
         xml = tar.extractfile(members[0]).read()
     groups = extract_groups(xml)
     vocabulary = {word for group in groups for word in group}
-    if len(groups) < 5000 or len(vocabulary) < 10000:
+    if len(groups) != 15372 or len(vocabulary) != 26129:
         raise ValueError("Incomplete lexical coverage")
     return {"schema_version":1, "source":"OpenWordnet-PT 1.0.0",
             "source_url":URL, "archive_sha256":hashlib.sha256(archive).hexdigest(),
