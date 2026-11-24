@@ -1,0 +1,41 @@
+name: Harrier - prova de compatibilidade e qualidade
+on:
+  push:
+    branches: [feat/harrier-embeddings]
+    paths:
+      - 'scripts/validate_harrier.py'
+      - '.github/workflows/harrier-validation.yml'
+      - 'tests/test_harrier_metrics.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {model: e5, variant: q4f16}
+          - {model: harrier, variant: q4f16}
+          - {model: harrier, variant: q4}
+    runs-on: ubuntu-latest
+    timeout-minutes: 22
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Dependencias (mesma versao ONNX Runtime do Android atual)
+        run: pip install 'numpy<2' 'onnxruntime==1.20.0' 'huggingface-hub>=0.30,<2' 'tokenizers>=0.21,<0.23'
+      - name: Testar metricas
+        run: python3 -m unittest discover -s tests -p test_harrier_metrics.py
+      - name: Executar pesos reais em CPU
+        run: python3 scripts/validate_harrier.py --model ${{ matrix.model }} --variant ${{ matrix.variant }} --directory /tmp/model --report qa-report/harrier-${{ matrix.model }}-${{ matrix.variant }}.json
+      - name: Guardar relatorio, nunca pesos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: harrier-${{ matrix.model }}-${{ matrix.variant }}
+          path: qa-report/harrier-*.json
+          retention-days: 30
+          if-no-files-found: error
