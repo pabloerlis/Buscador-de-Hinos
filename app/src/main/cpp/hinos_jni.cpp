@@ -204,7 +204,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         const char* tmpl=llama_model_chat_template(g_model,nullptr);
         llama_chat_message message={"user",prompt.c_str()};
         int formattedSize=llama_chat_apply_template(tmpl,&message,1,true,nullptr,0);
-        if(formattedSize>0&&formattedSize<11000){
+        if(formattedSize>0&&formattedSize<48000){
             std::vector<char> formatted(formattedSize+1,0);
             int used=llama_chat_apply_template(tmpl,&message,1,true,formatted.data(),formattedSize+1);
             if(used>0&&used<=(int)formattedSize)prompt.assign(formatted.data(),used);
@@ -212,14 +212,14 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         const llama_vocab* vocab=llama_model_get_vocab(g_model);
         int n_tokens=llama_tokenize(vocab,prompt.c_str(),prompt.size(),nullptr,0,true,true);
         if(n_tokens<0)n_tokens=-n_tokens;
-        if(n_tokens<=0||n_tokens>1000){javaException(env,"A consulta ultrapassou 1000 tokens para o contexto econômico. Reduza o texto.");return nullptr;}
+        if(n_tokens<=0||n_tokens>3500){javaException(env,"A consulta ultrapassou 3500 tokens para o contexto econômico. Reduza o texto.");return nullptr;}
         std::vector<llama_token> tokens(n_tokens);
         int count=llama_tokenize(vocab,prompt.c_str(),prompt.size(),tokens.data(),n_tokens,true,true);
         if(count<0){javaException(env,"Falha na tokenização do prompt.");return nullptr;}
         g_prompt_tokens.store(count);
-        const int predict=std::clamp(static_cast<int>(tokenLimit),1,120);
+        const int predict=std::clamp(static_cast<int>(tokenLimit),1,256);
         llama_context_params cp=llama_context_default_params();
-        cp.n_ctx=1280;
+        cp.n_ctx=4096;
         cp.n_batch=96;
         cp.n_ubatch=96;
         cp.n_seq_max=1;
@@ -228,7 +228,7 @@ Java_br_com_buscadordehinos_app_MainActivity_nativeGenerate(JNIEnv* env,jclass,j
         cp.n_threads=std::min(4,std::max(1,(int)std::thread::hardware_concurrency()));
         cp.n_threads_batch=cp.n_threads;
         if(!g_context)g_context=llama_init_from_model(g_model,cp);
-        if(!g_context){javaException(env,"Não foi possível alocar contexto de 1280 tokens. A RAM efetivamente disponível para este processo pode ser menor que a exibida no sistema.");return nullptr;}
+        if(!g_context){javaException(env,"Não foi possível alocar contexto de 4096 tokens. A RAM efetivamente disponível para este processo pode ser menor que a exibida no sistema.");return nullptr;}
         // O callback aponta para um deadline desta chamada: nunca o deixe pendurado no contexto em cache.
         llama_set_abort_callback(g_context,shouldCancel,&deadline);
         struct AbortScope {llama_context* context; ~AbortScope(){llama_set_abort_callback(context,nullptr,nullptr);} } abortScope{g_context};
