@@ -14,6 +14,13 @@ Este projeto utiliza **agentes automatizados do GitHub Actions** (jobs independe
 
 A compilação `build_apk` depende de `sources`, `static`, `regressions` e `relevance` concluídos com sucesso. O artefato **aprovado** só existe se `audit_apk` também passar. Nunca adicionar `continue-on-error`, `|| true` para testes, nem remover `needs`.
 
+## Assinatura e atualização dos APKs distribuídos
+
+- Manter o mesmo `applicationId` e assinar os APKs distribuídos com a mesma chave e o mesmo certificado entre versões. Incrementar o `versionCode` a cada entrega. Usar um keystore persistente e protegido, com backup e acesso via segredos do CI. Proibir a publicação de APKs assinados por uma chave de depuração gerada pelo runner.
+- Antes da primeira entrega que implementar esta regra, verificar se a chave privada correspondente ao APK de referência está disponível. Para a 2.6.1-agentes-QA original (build 20), o SHA-256 do certificado é `cf07bce9b5f581a50beb7817e390d0393b46cc2dc771bf54df4cc03537c0c511`. Se a chave estiver indisponível, registrar que a atualização direta a partir desse APK é inviável, definir a migração para uma chave persistente e informar o usuário antes da entrega.
+- No CI, verificar a assinatura com `apksigner verify --print-certs`, comparar o SHA-256 do certificado com o da versão de referência da mesma linha de distribuição e bloquear a publicação em caso de divergência. Manter a impressão digital pública versionada e a chave privada fora do repositório.
+- Antes de publicar, instalar o APK anterior e atualizar com o candidato via `adb install -r`. Confirmar a nova versão e a preservação dos dados do aplicativo, incluindo a coletânea importada e as marcações do repertório.
+
 ## Regras para cada funcionalidade futura
 
 - Uma funcionalidade por etapa, com novo `versionCode` crescente, `versionName` identificável e um APK distinto.
