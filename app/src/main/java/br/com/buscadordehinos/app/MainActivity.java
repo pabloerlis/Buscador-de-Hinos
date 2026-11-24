@@ -143,7 +143,7 @@ public final class MainActivity extends Activity {
             web.addJavascriptInterface(new VectorBridge(), "NativeVector");
         }
         // Telepatia utiliza apenas ONNX Runtime e arquivos externos. Nunca carrega GGUF.
-        if(BuildConfig.ENABLE_LOCAL_EMBEDDINGS) {
+        if(BuildConfig.ENABLE_LOCAL_EMBEDDINGS && !BuildConfig.ENABLE_LOCAL_MODELS) {
             nliEngine=new TelepatiaNliEngine(this);
             web.addJavascriptInterface(new NliBridge(), "NativeNLI");
             if(nliEngine.isInstalled())nliPhase="selected";
