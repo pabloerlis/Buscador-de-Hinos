@@ -33,3 +33,7 @@ Por solicitação expressa do responsável pelo projeto, em 24/11/2026, a corres
 - Manter branches/PRs em rascunho até aprovação dos gates, sem merge automático em `main`.
 
 **Diagnóstico manual:** os logs e relatórios JSON dos jobs são a evidência. Aprovação do pipeline não equivale a validação semântica exaustiva.
+
+## Backlog de produto
+
+Consultar `docs/roadmap.md` ao planejar próximas versões. Funcionalidades registradas ali não devem ser tratadas como implementadas. A inclusão manual e por arquivo de novas letras, com indexação incremental local, é requisito futuro solicitado pelo responsável em 24/11/2026.
