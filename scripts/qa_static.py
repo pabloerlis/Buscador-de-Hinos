@@ -51,6 +51,9 @@ for element in ("term-filters-panel", "term-filter-template", "term-filter-rows"
 for field in ("kind", "term", "synonyms", "field", "lexical"):
     require('data-field="' + field + '"' in html, "Controle ausente: " + field)
 require("lexical-pt.js" in page.js, "Motor lexical ausente da interface")
+require("appearance.js" in page.js and (ASSETS/"appearance.css").is_file(), "Personalização ausente")
+for element in ("open-appearance","appearance-layer","appearance-palettes","appearance-preview","appearance-reset"):
+    require(element in page.ids, "Controle de aparência ausente: " + element)
 for element in ("active-filter-summary", "term-filter-done", "lyric-smaller", "lyric-larger", "lyric-size", "reader-evidence"):
     require(element in page.ids, "Controle de interface ausente: " + element)
 require('href="polished-ui.css"' in html and (ASSETS/"polished-ui.css").is_file(), "Camada visual ausente")

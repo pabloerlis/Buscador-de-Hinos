@@ -42,7 +42,7 @@ with zipfile.ZipFile(APK) as archive:
     for required in ("assets/index.html","assets/app.js","assets/about.js",
                      "assets/offline-api.js","assets/story-engine.js",
                      "assets/scripture-pt.json","assets/bible-graph.json",
-                     "assets/bible-narratives.json","assets/lexical-pt.json","assets/lexical-pt.js","assets/polished-ui.css","AndroidManifest.xml"):
+                     "assets/bible-narratives.json","assets/lexical-pt.json","assets/lexical-pt.js","assets/polished-ui.css","assets/appearance.css","assets/appearance.js","AndroidManifest.xml"):
         check(required in files,"Asset essencial ausente: "+required)
     if "assets/lexical-pt.json" in files:
         lex=json.loads(archive.read("assets/lexical-pt.json"))

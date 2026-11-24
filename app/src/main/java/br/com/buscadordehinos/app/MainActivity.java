@@ -491,6 +491,17 @@ public final class MainActivity extends Activity {
     }
 
     public class ImportBridge {
+        @JavascriptInterface public void appearanceBars(String status,String navigation,boolean dark){
+            if(status==null||navigation==null||!status.matches("#[0-9a-fA-F]{6}")||!navigation.matches("#[0-9a-fA-F]{6}"))return;
+            runOnUiThread(()->{
+                getWindow().setStatusBarColor(Color.parseColor(status));
+                getWindow().setNavigationBarColor(Color.parseColor(navigation));
+                int flags=getWindow().getDecorView().getSystemUiVisibility();
+                flags &= ~android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+                if(Build.VERSION.SDK_INT>=26){if(dark)flags &= ~android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;else flags |= android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;}
+                getWindow().getDecorView().setSystemUiVisibility(flags);
+            });
+        }
         @JavascriptInterface public void saveDictionaryBackup(String json){
             if(json==null||json.length()>MAX_DICTIONARY_BACKUP_BYTES){
                 dictionaryBackupEvent("Backup acima de 256 KB.");
