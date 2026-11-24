@@ -24,7 +24,6 @@
   <script src="context-ranker.js" defer></script>
   <script src="lexical-pt.js" defer></script>
   <script src="offline-api.js" defer></script>
-  <script src="local-hymn-ai.js" defer></script>
   <script src="about.js" defer></script>
   <script src="app.js" defer></script>
 </head>
@@ -36,7 +35,7 @@
         <span class="brand-copy"><span>Buscador<span class="brand-light"> de Hinos</span></span><small>Pesquisa &amp; repertório</small></span>
       </a>
       <div class="top-actions">
-        <span class="top-state" id="collection-label">Biblioteca de hinos</span><button id="ai-indicator" data-gguf-ui type="button" class="ai-indicator ai-off" aria-label="Ver estado da IA local">IA: inativa</button>
+        <span class="top-state" id="collection-label">Biblioteca de hinos</span>
         <button id="open-appearance" class="icon-button" type="button" title="Aparência" aria-label="Personalizar aparência"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a9 9 0 1 0 0 18h1.5a2 2 0 0 0 1.5-3.3 1.5 1.5 0 0 1 1.1-2.7H18a3 3 0 0 0 3-3 9 9 0 0 0-9-9Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="6.8" r="1"/><circle cx="15.5" cy="7" r="1"/></svg></button>
         <button id="open-settings" class="icon-button" title="Configurações e informações" aria-label="Configurações e informações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a1.9 1.9 0 0 0 .4 2.1l-2 2a1.9 1.9 0 0 0-2.1-.4 1.9 1.9 0 0 0-1.2 1.7h-2.9a1.9 1.9 0 0 0-1.2-1.7 1.9 1.9 0 0 0-2.1.4l-2-2A1.9 1.9 0 0 0 6.6 15a1.9 1.9 0 0 0-1.7-1.2v-2.9A1.9 1.9 0 0 0 6.6 9.7a1.9 1.9 0 0 0-.4-2.1l2-2a1.9 1.9 0 0 0 2.1.4 1.9 1.9 0 0 0 1.2-1.7h2.9A1.9 1.9 0 0 0 15.6 6a1.9 1.9 0 0 0 2.1-.4l2 2a1.9 1.9 0 0 0-.4 2.1 1.9 1.9 0 0 0 1.7 1.2v2.9a1.9 1.9 0 0 0-1.6 1.2z"/></svg></button>
       </div>
@@ -143,16 +142,6 @@
               <div class="evidence-panel">
               <div id="notice" class="notice hidden" role="status"></div>
               <div id="search-diagnostics" class="semantic-interpret hidden"><strong>Como o índice interpretou a busca</strong><div id="search-concepts" class="concept-list"></div></div>
-              <div id="ai-workspace" data-gguf-ui class="ai-workspace hidden" aria-live="polite">
-                <div class="ai-workspace-head"><strong id="ai-state-badge" class="ai-stage">IA não carregada</strong><span id="ai-timer" class="ai-timer"></span></div>
-                <div id="ai-task" class="ai-task">Busca local disponível.</div>
-                <p id="ai-detail" class="ai-detail">O GGUF pode sugerir temas, comparar trechos e pedir uma busca complementar na coletânea.</p>
-                <button id="ai-cancel" class="secondary-btn hidden" type="button">Interromper IA</button><div id="ai-activity" class="ai-activity hidden"><span class="ai-spinner"></span><span id="ai-progress">Preparando...</span></div>
-                <p id="ai-last" class="ai-last"></p>
-              </div>
-              <div id="gguf-banner" data-gguf-ui class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
-                <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar com IA</button></div></div>
-              <div id="gguf-comparison" class="ai-interpretation hidden"><div id="gguf-comparison-text" role="status" aria-live="polite"></div><div id="gguf-comparison-actions" class="ai-buttons"></div></div>
               </div></details>
               <div id="results-list" class="results-list" aria-live="polite"></div>
               <nav class="load-more-wrap hidden" id="result-pages" aria-label="Paginação de hinos">
@@ -300,7 +289,7 @@
       <div class="modal-top"><h2 id="refine-title">Refinar busca</h2><button class="icon-button" data-close="refine" aria-label="Fechar refinamento">×</button></div>
             <div class="refine-panel modal-body">
               <p id="refine-mode" class="sr-only">Busca contextual</p>
-              <button id="gguf-compare" class="secondary-btn compare-offline" type="button" disabled>Comparar resultados</button>
+              <button id="offline-compare" class="secondary-btn compare-offline" type="button" disabled>Comparar resultados</button>
               <div id="conversation" class="conversation" aria-live="polite"></div>
               <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
               <p class="privacy-note">Use “apenas os de vigilância” para exigir um tema, “sem alegria” para excluir, “sem foco em alegria” para reduzir a prioridade ou “nova busca por esperança” para limpar o contexto.</p>
@@ -332,7 +321,7 @@
           <p class="related-method">As porcentagens são índices de afinidade estimada, não probabilidades nem avaliação teológica oficial.</p>
         </section>
         <div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
-      <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
+      <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local.</p><button id="modal-summary-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-summary-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
       <div class="modal-bottom"><span id="modal-edition"></span><button class="secondary-btn" data-close="modal">Fechar</button></div>
     </section>
   </div>
@@ -372,7 +361,7 @@
           </div>
           <p class="subtle-note">Informações obtidas diretamente do APK instalado; data exibida em UTC. Estes dados não dependem da conexão com a internet.</p>
         </div>
-      </details><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span data-gguf-ui>Modelo GGUF</span><strong id="settings-ai" data-gguf-ui>Não carregado</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      </details><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
       <section class="semantic-settings" aria-label="Coleções e importação">
         <div class="setting-section-heading"><h3>Biblioteca unificada</h3><span class="local-badge">Offline</span></div>
         <p class="subtle-note">Escolha onde pesquisar. Hinos idênticos em várias coleções aparecem uma única vez, preservando suas referências de origem.</p>
@@ -426,18 +415,6 @@
         <label class="setting-check"><input id="rec-breakdown" type="checkbox" checked>Mostrar porcentagens separadas de letra e contexto</label>
         <p class="subtle-note">Afinidade é uma pontuação heurística. Associações são sugeridas a partir de evidências da letra, não são avaliação teológica oficial.</p>
         <div class="settings-actions"><button id="settings-search-save" class="primary-btn" type="button">Aplicar preferências</button><button id="settings-search-reset" class="secondary-btn" type="button">Restaurar padrões</button></div>
-      </section></details>
-      <details class="advanced-settings" data-gguf-ui><summary>IA local experimental (GGUF)</summary><section class="gguf-box" aria-label="Modelo de IA local">
-        <h3>IA local (GGUF)</h3>
-        <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. O modelo pode sugerir temas, comparar até cinco trechos e solicitar uma busca complementar na coletânea. Use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
-        <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
-        <p id="gguf-phase" class="gguf-phase">Estado: verificando</p><p id="gguf-model-meta" class="subtle-note">Nenhum modelo foi carregado na memória.</p>
-        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Usar IA automaticamente para sugerir palavras-chave (desativado por padrão). A busca offline sempre aparece primeiro.</span></label>
-        <p id="gguf-last" class="gguf-phase" aria-live="polite">Última execução: nenhuma</p>
-        <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
-        <div class="settings-actions"><button id="gguf-test" class="secondary-btn" type="button" disabled>Testar modelo</button><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div>
-        <p id="gguf-test-result" class="subtle-note" role="status" aria-live="polite">Carregue o GGUF para testar a geração no aparelho.</p>
-        <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
       </section></details>
       <p class="subtle-note">Fontes das relações: Bible Topics Dataset (NEUU, CC BY 4.0) e Bible Cross-References Dataset (NEUU/OpenBible, CC BY 4.0), com curadoria de nomes narrativos em português. Fontes: <a href="https://github.com/neuu-org/bible-topics-dataset">Temas</a> e <a href="https://github.com/neuu-org/bible-crossrefs-dataset">Referências cruzadas</a>. Texto bíblico: Bíblia Livre (BLIVRE), Copyright © 2018 Diego Santos, Mario Sérgio e Marco Teles, licenciada sob CC BY 4.0 Brasil. Dados distribuídos por <a href="https://github.com/midvash/bible-data">Midvash Bible Data</a>. A licença exige atribuição. O dicionário contextual é uma curadoria própria, não uma transcrição integral de outras bases.</p>
        <p class="subtle-note">Base lexical: <a href="https://github.com/own-pt/openWordnet-PT/releases/tag/v1.0.0">OpenWordnet-PT 1.0.0</a> — Alexandre Rademaker, Valeria de Paiva, Fredson Aguiar e colaboradores. Licença <a href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a>; baseada no Princeton WordNet 3.0 (<a href="https://wordnet.princeton.edu/wordnet/license/">licença</a>). Adaptação: lemas normalizados e agrupados por sentido compartilhado.</p>

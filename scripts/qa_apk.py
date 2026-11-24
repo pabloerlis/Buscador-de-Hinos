@@ -57,6 +57,7 @@ with zipfile.ZipFile(APK) as archive:
         check(b".live-filters:not([open]){display:block}" in archive.read("assets/style.css"),"Acesso direto aos filtros ausente do APK")
     for name in files:
         lowered = name.lower()
+        check(not re.search(r"local-hymn-ai|hinosllm|llama",lowered),"Motor de geração descontinuado incluído: "+name)
         check(not (lowered.endswith((".gguf",".onnx",".tflite")) or
                    re.search(r"/lib(?:onnxruntime|hinosllm)[^/]*\.so$",lowered)),
               "Modelo de IA não autorizado no APK padrão: "+name)

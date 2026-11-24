@@ -51,6 +51,9 @@ for element in ("term-filters-panel", "term-filter-template", "term-filter-rows"
 for field in ("kind", "term", "synonyms", "field", "lexical"):
     require('data-field="' + field + '"' in html, "Controle ausente: " + field)
 require("lexical-pt.js" in page.js, "Motor lexical ausente da interface")
+for path in (ASSETS/"app.js", ASSETS/"index.html", ASSETS/"style.css", ASSETS/"appearance.css", ROOT/"app/build.gradle", ROOT/"app/src/main/java/br/com/buscadordehinos/app/MainActivity.java"):
+    require(not re.search(r"gguf|llama\.cpp|NativeGGUF|hinosllm|local-hymn-ai", path.read_text(encoding="utf-8"), re.I), "Referência a geração de texto em " + str(path))
+require(not (ASSETS/"local-hymn-ai.js").exists(), "Motor de geração descontinuado ainda presente")
 require("appearance.js" in page.js and (ASSETS/"appearance.css").is_file(), "Personalização ausente")
 appearance_css = (ASSETS/"appearance.css").read_text(encoding="utf-8")
 require("#search-form:focus-within{border-color:var(--line);box-shadow:var(--shadow);outline:none}" in appearance_css, "Contorno externo de foco voltou à busca")
