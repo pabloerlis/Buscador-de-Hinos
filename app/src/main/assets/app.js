@@ -225,22 +225,6 @@ const SearchPreferences=(()=>{
     narratives:'story-toggle',related:'related-toggle',scripture:'scripture-toggle',bridge:'bridge-toggle',bibleGraph:'bible-graph-toggle',bibleLinks:'bible-links-toggle',contextRerank:'context-rank-toggle',bibleDepth:'bible-depth',showReasons:'explain-toggle',showConcepts:'concepts-toggle',
     recWeight:'rec-weight',recCount:'rec-count',recContext:'rec-context',recAvoidVisited:'rec-visited',recBreakdown:'rec-breakdown'};
   const defaults=OfflineAPI.searchOptions();
-  let stories=[];
-  function renderAliases(){
-    const container=$('alias-list');container.replaceChildren();let count=0;
-    for(const story of stories){
-      for(const term of state.searchSettings.customAliases?.[story.id]||[]){
-        count++;
-        const row=document.createElement('div');row.className='alias-row';
-        const label=document.createElement('span');label.textContent='“'+term+'” → '+story.label;
-        const remove=document.createElement('button');remove.textContent='Remover';remove.className='alias-remove';remove.type='button';
-        remove.onclick=()=>{const aliases=state.searchSettings.customAliases;
-          aliases[story.id]=(aliases[story.id]||[]).filter(t=>t!==term);save();renderAliases();};
-        row.append(label,remove);container.appendChild(row);
-      }
-    }
-    if(!count)container.textContent='Nenhuma associação pessoal cadastrada.';
-  }
   function fill(){
     const cfg=state.searchSettings;
     for(const [key,id] of Object.entries(ids)){
@@ -253,7 +237,6 @@ const SearchPreferences=(()=>{
       $('collection-'+id).checked=cfg.collections[id]!==false;
       const quick=document.querySelector('[data-collection="'+id+'"]');if(quick)quick.checked=cfg.collections[id]!==false;
     }
-    renderAliases();
   }
   function readInputs(){
     const options={...state.searchSettings};
@@ -284,27 +267,190 @@ const SearchPreferences=(()=>{
     save();refreshSearch();
   };
   $('settings-search-reset').onclick=()=>{
-    state.searchSettings=OfflineAPI.searchOptions(defaults);localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
+    state.searchSettings=OfflineAPI.searchOptions({...defaults,customAliases:state.searchSettings.customAliases});
+    localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));
     fill();refreshSearch();toast('Configurações restauradas.');
   };
-  $('alias-add').onclick=()=>{
-    const term=$('alias-term').value.trim();const id=$('alias-story').value;
-    if(term.length<4||term.length>90||!id){toast('Informe uma expressão de 4 a 90 caracteres e uma narrativa.');return;}
-    if(!stories.some(s=>s.id===id)){toast('Narrativa indisponível.');return;}
-    const aliases=state.searchSettings.customAliases||{};
-    if(Object.values(aliases).flat().length>=50){toast('Limite de 50 associações pessoais.');return;}
-    aliases[id]=[...new Set([...(aliases[id]||[]),term])];state.searchSettings.customAliases=aliases;
-    save();$('alias-term').value='';renderAliases();toast('Associação adicionada.');
-  };
-  async function initialize(){
-    try{const data=await jsonRequest('/api/stories');stories=data.stories||[];
-      const select=$('alias-story');select.replaceChildren();
-      for(const item of stories){const opt=document.createElement('option');opt.value=item.id;opt.textContent=item.label;select.appendChild(opt);}
-    }catch(error){console.warn('Dicionário de narrativas indisponível:',error.message);}
-    fill();
+  fill();
+  return {refreshSearch};
+})();
+
+const AppTabs=(()=>{
+  const tabs=[$('tab-search'),$('tab-dictionary')];
+  function select(tab,{focus=false}={}){
+    for(const item of tabs){
+      const selected=item===tab;
+      item.setAttribute('aria-selected',String(selected));
+      item.tabIndex=selected?0:-1;
+      $(item.getAttribute('aria-controls')).hidden=!selected;
+    }
+    if(focus)tab.focus();
   }
-  initialize();
-  return {fill};
+  for(const tab of tabs){
+    tab.addEventListener('click',()=>select(tab));
+    tab.addEventListener('keydown',event=>{
+      const index=tabs.indexOf(tab);
+      const target={ArrowLeft:tabs[1-index],ArrowRight:tabs[1-index],Home:tabs[0],End:tabs[1]}[event.key];
+      if(!target)return;
+      event.preventDefault();
+      select(target,{focus:true});
+    });
+  }
+  return {showSearch:()=>select(tabs[0])};
+})();
+
+const PersonalDictionary=(()=>{
+  const pageSize=4;
+  const maxEntries=50;
+  const maxPerStory=15;
+  const normalize=value=>OfflineAPI.normalize(value).replace(/[^a-z0-9]+/g,' ').trim();
+  const input=$('alias-term');
+  const picker=$('alias-story');
+  const storyFilter=$('alias-story-filter');
+  const filter=$('alias-filter');
+  const list=$('alias-list');
+  const feedback=$('alias-feedback');
+  let stories=[];
+  let currentPage=1;
+  let visible=[];
+  let editing=null;
+  let removed=null;
+
+  function entries(){
+    const byId=new Map(stories.map(story=>[story.id,story]));
+    return Object.entries(state.searchSettings.customAliases).flatMap(([id,terms])=>
+      terms.map(term=>({id,term,story:byId.get(id)}))
+    ).sort((a,b)=>a.term.localeCompare(b.term,'pt-BR'));
+  }
+  function render(){
+    const all=entries();
+    const query=normalize(filter.value);
+    const filtered=all.filter(({term,story})=>normalize([term,story?.label,story?.reference].join(' ')).includes(query));
+    const pages=Math.max(1,Math.ceil(filtered.length/pageSize));
+    currentPage=Math.min(currentPage,pages);
+    visible=filtered.slice((currentPage-1)*pageSize,currentPage*pageSize);
+    $('alias-directory').hidden=!all.length;
+    $('alias-state').textContent=all.length
+      ? filtered.length===0?'Nenhuma associação encontrada.':`${all.length} ${all.length===1?'associação salva':'associações salvas'}`
+      : stories.length?'Salve suas expressões para encontrar narrativas bíblicas.':'Narrativas indisponíveis.';
+    list.innerHTML=visible.map(({term,story},index)=>`
+      <li class="dictionary-row">
+        <div class="dictionary-entry">
+          <strong>${escapeHTML(term)}</strong>
+          <span>${escapeHTML(story?.label||'Narrativa indisponível')}${story?.reference?' · '+escapeHTML(story.reference):''}</span>
+        </div>
+        <div class="dictionary-row-actions">
+          <button type="button" class="text-action" data-alias-test="${index}">Buscar</button>
+          <button type="button" class="text-action" data-alias-edit="${index}">Editar</button>
+        </div>
+      </li>`).join('');
+    $('alias-pages').hidden=pages===1;
+    $('alias-previous').disabled=currentPage===1;
+    $('alias-next').disabled=currentPage===pages;
+    $('alias-page-status').textContent=`Página ${currentPage} de ${pages}`;
+    $('alias-undo-panel').hidden=!removed;
+  }
+  function notify(message=''){
+    feedback.textContent=message;
+    feedback.hidden=!message;
+  }
+  function renderStories(selected){
+    const query=normalize(storyFilter.value);
+    const matches=stories.filter(story=>normalize(story.label+' '+story.reference).includes(query));
+    const placeholder=new Option(matches.length?'Selecione uma narrativa':'Nenhuma narrativa encontrada','');
+    placeholder.disabled=true;
+    picker.replaceChildren(placeholder,...matches.map(story=>new Option(story.label+' · '+story.reference,story.id)));
+    picker.value=matches.some(story=>story.id===selected)?selected:'';
+    $('alias-add').disabled=!matches.length;
+  }
+  function edit(entry=null){
+    editing=entry;
+    $('alias-title').textContent=entry?'Editar associação':'Nova associação';
+    $('alias-remove').hidden=!entry;
+    input.value=entry?.term||'';
+    storyFilter.value='';
+    renderStories(entry?.id);
+    notify();
+    openLayer('alias');
+  }
+  function save(items){
+    const aliases={};
+    for(const {id,term} of items)(aliases[id]??=[]).push(term);
+    const settings=OfflineAPI.searchOptions({...state.searchSettings,customAliases:aliases});
+    try{localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(settings));}
+    catch(error){return false;}
+    state.searchSettings=settings;
+    return true;
+  }
+  function complete(message){
+    closeLayer();
+    render();
+    $('alias-new').focus();
+    if(message)toast(message);
+    SearchPreferences.refreshSearch();
+  }
+  $('alias-new').addEventListener('click',()=>edit());
+  storyFilter.addEventListener('input',()=>renderStories(picker.value));
+  filter.addEventListener('input',()=>{currentPage=1;render();});
+  $('alias-previous').addEventListener('click',()=>{currentPage--;render();});
+  $('alias-next').addEventListener('click',()=>{currentPage++;render();});
+  list.addEventListener('click',event=>{
+    const button=event.target.closest('[data-alias-edit],[data-alias-test]');
+    if(!button)return;
+    if(button.hasAttribute('data-alias-edit'))edit(visible[Number(button.dataset.aliasEdit)]);
+    else{
+      const {term}=visible[Number(button.dataset.aliasTest)];
+      AppTabs.showSearch();
+      $('search-input').value=term;
+      performSearch(term);
+    }
+  });
+  $('alias-form').addEventListener('submit',event=>{
+    event.preventDefault();
+    const term=input.value.trim();
+    const id=picker.value;
+    if(term.length<4||!normalize(term)||!stories.some(story=>story.id===id)){
+      notify('Informe uma expressão de 4 a 90 caracteres e selecione a narrativa.');
+      return;
+    }
+    const remaining=entries().filter(entry=>entry.id!==editing?.id||entry.term!==editing.term);
+    if(remaining.some(entry=>normalize(entry.term)===normalize(term))){
+      notify('Esta expressão já está cadastrada. Edite a associação existente.');
+      return;
+    }
+    if(remaining.length>=maxEntries||remaining.filter(entry=>entry.id===id).length>=maxPerStory){
+      notify('Limite de 50 associações no total e 15 por narrativa.');
+      return;
+    }
+    if(!save([...remaining,{id,term}])){
+      notify('Não foi possível salvar neste aparelho.');
+      return;
+    }
+    removed=null;
+    filter.value='';
+    currentPage=Math.floor(entries().findIndex(entry=>entry.id===id&&entry.term===term)/pageSize)+1;
+    complete(editing?'Associação atualizada.':'Associação salva.');
+  });
+  $('alias-remove').addEventListener('click',()=>{
+    if(!editing)return;
+    const remaining=entries().filter(entry=>entry.id!==editing.id||entry.term!==editing.term);
+    if(!save(remaining)){notify('Não foi possível remover neste aparelho.');return;}
+    removed=editing;
+    complete();
+  });
+  $('alias-undo').addEventListener('click',()=>{
+    if(!removed)return;
+    if(!save([...entries(),removed])){toast('Não foi possível restaurar a associação.');return;}
+    removed=null;
+    filter.value='';
+    currentPage=1;
+    complete('Associação restaurada.');
+  });
+  jsonRequest('/api/stories').then(data=>{
+    stories=(data.stories||[]).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
+    $('alias-new').disabled=!stories.length;
+    render();
+  }).catch(()=>render());
 })();
 
 
