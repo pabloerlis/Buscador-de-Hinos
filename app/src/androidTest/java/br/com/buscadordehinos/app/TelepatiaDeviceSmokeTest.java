@@ -82,6 +82,22 @@ public final class TelepatiaDeviceSmokeTest {
                 Thread.sleep(1000);
             }
             assertTrue("Telepatia WebView client not loaded",ready);
+            assertEquals("Seleção do ZIP não está visível na tela inicial","true",
+                eval(view.get(),"(()=>{const welcome=document.getElementById('welcome-panel');"
+                    +"const picker=document.getElementById('nli-select-home');"
+                    +"const settings=document.getElementById('nli-select-settings');"
+                    +"const results=document.getElementById('results-panel');"
+                    +"return !!welcome&&!!picker&&!!settings&&!!results"
+                    +"&&!welcome.classList.contains('hidden')"
+                    +"&&results.classList.contains('hidden')"
+                    +"&&window.getComputedStyle(picker).display!=='none'"
+                    +"&&picker.getAttribute('data-nli-select')!==null"
+                    +"&&settings.getAttribute('data-nli-select')!==null"
+                    +"&&!picker.disabled})()"));
+            assertEquals("Status do Telepatia não aparece antes da pesquisa","true",
+                eval(view.get(),"(()=>{const a=document.getElementById('nli-status-home');"
+                    +"const b=document.getElementById('nli-status-settings');"
+                    +"return !!a&&!!b&&a.textContent.length>5&&a.textContent===b.textContent})()"));
             assertEquals("Legacy GGUF runtime must be disabled","true",
                 eval(view.get(),"!Boolean(window.NativeGGUF)"));
             assertEquals("NLI bridge status invalid","true",
