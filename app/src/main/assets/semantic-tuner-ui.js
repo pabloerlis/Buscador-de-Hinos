@@ -11,6 +11,8 @@
     let history=SemanticTuner.history(read(SemanticTuner.HISTORY_KEY,[]));
     let pool=[],baseData=null,visibleCount=10;
     const store=()=>{try{localStorage.setItem(SemanticTuner.STORAGE_KEY,JSON.stringify(cfg));}catch(error){console.warn('Configuração não persistida',error.message);}};
+    const authority=()=>state.curated?.epoch===state.searchEpoch?state.curated:null;
+    const hasAuthority=()=>['pending','final'].includes(authority()?.status);
     const isDirect=()=>cfg.enabled;
     const isActive=()=>cfg.enabled&&pool.length>0&&!state.exactNumber&&
       (!SemanticTuner.usesSearchOrder(cfg)||cfg.min>0);
@@ -19,7 +21,7 @@
       for(const [key,id] of Object.entries(inputs)){
         byId(id).value=cfg[key];
         byId(id+'-value').textContent=cfg[key]+(key==='min'?'':'%');
-        byId(id).disabled=!cfg.enabled;
+        byId(id).disabled=!cfg.enabled||hasAuthority();
       }
       document.documentElement.classList.toggle('semantic-direct-mode',cfg.enabled);
       for(const button of document.querySelectorAll('[data-tuner-preset]')){
@@ -46,13 +48,26 @@
     function render(){
       sync();
       const status=byId('tuner-status');
+      const ai=authority();
+      if(hasAuthority()){
+        const rows=ai.status==='final'?ai.rows:[];
+        state.lastResults=rows.slice();state.total=rows.length;state.page=1;state.hasMore=false;
+        byId('load-more').classList.add('hidden');
+        byId('results-title').textContent=ai.status==='pending'?'Qwen3 avaliando hinos':'Hinos recomendados pelo Qwen3';
+        byId('results-list').innerHTML=ai.status==='pending'?'<div class="empty-results"><h3>Avaliando letras com IA local</h3><p>O ranking final será exibido após a curadoria.</p></div>':rows.length?rows.map(card).join(''):'<div class="empty-results"><h3>Nenhum hino aprovado pelo Qwen3</h3><p>Nenhum candidato atingiu a relevância exigida nas duas avaliações.</p></div>';
+        const detail=ai.status==='pending'?ai.message:rows.length+' aprovados · '+ai.reviewed+'/'+ai.candidates+' letras avaliadas · '+ai.failed+' falhas · '+ai.seconds+' s';
+        byId('results-subtitle').textContent=detail;
+        status.textContent='Ranking definido pelo Qwen3. Sliders não alteram a decisão da IA.';
+        return;
+      }
       if(!baseData){status.textContent='Pesquise para ajustar resultados.';return;}
       if(!isActive()){
-        state.page=baseData.page;
+        state.page=baseData.page;state.total=baseData.total;state.hasMore=baseData.has_more;
         const normal=(baseData.results||[]).map(hit=>pool.find(item=>item.id===hit.id)||hit);
         state.lastResults=normal.slice();
         byId('results-list').innerHTML=normal.length?normal.map(card).join(''):'<div class="empty-results"><h3>Nenhum hino encontrado</h3><p>Tente uma pesquisa mais ampla.</p></div>';
-        byId('results-subtitle').textContent=state.exactNumber?'Resultado por número: ordem preservada.':baseData.total+' resultados · classificação padrão';
+        byId('results-title').textContent=state.exactNumber?'Hino encontrado':'Resultados do índice local';
+        byId('results-subtitle').textContent=state.exactNumber?'Resultado por número: ordem preservada.':baseData.total+' resultados · sem curadoria LLM'+(ai?.status==='fallback'?' · '+ai.message:'');
         byId('load-more').classList.toggle('hidden',!baseData.has_more);
         byId('load-more').textContent='Carregar mais '+baseData.page_size+' hinos';
         status.textContent=state.exactNumber?'Pesquisa por número não é reordenada.':'Ordem da busca contextual. Ajuste os pesos para personalizar.';
@@ -60,12 +75,13 @@
       }
       const ranked=SemanticTuner.rank(pool,cfg);
       const visible=ranked.slice(0,visibleCount);
-      state.lastResults=visible.slice();
+      state.lastResults=visible.slice();state.total=ranked.length;state.hasMore=visibleCount<ranked.length;
+      byId('results-title').textContent='Resultados do índice local';
       byId('results-list').innerHTML=visible.length?visible.map(card).join(''):'<div class="empty-results"><h3>Nenhum candidato atingiu o mínimo</h3><p>Reduza o índice mínimo ou altere os pesos.</p></div>';
       byId('load-more').classList.toggle('hidden',visibleCount>=ranked.length);
       byId('load-more').textContent='Ver mais '+Math.min(10,ranked.length-visibleCount)+' candidatos';
       const limit=baseData.total>pool.length?' · até '+pool.length+' candidatos iniciais':'';
-      byId('results-subtitle').textContent=ranked.length+' candidatos com índice suficiente'+limit;
+      byId('results-subtitle').textContent=ranked.length+' candidatos com índice suficiente'+limit+' · sem curadoria LLM'+(ai?.status==='fallback'?' · '+ai.message:'');
       status.textContent=ranked.length+' de '+pool.length+' candidatos no painel. Pesos recalculados instantaneamente; nenhuma nova inferência foi executada.';
     }
     function accept(data){
@@ -74,7 +90,8 @@
       visibleCount=10;
       render();
     }
-    function more(){if(!isActive())return false;visibleCount+=10;render();return true;}
+    function setAuthority(value){if(!value||value.epoch!==state.searchEpoch)return false;state.curated=value;render();return true;}
+    function more(){if(hasAuthority())return true;if(!isActive())return false;visibleCount+=10;render();return true;}
     function candidates(limit=6){
       if(!cfg.enabled||!pool.length||state.exactNumber)return [];
       return SemanticTuner.rank(pool,{...cfg,min:0}).slice(0,Math.max(0,Math.min(12,limit)))
@@ -114,7 +131,7 @@
       renderHistory();
     }));
     sync();renderHistory();
-    return {accept,more,candidates,updateNli,record,clearPool,isDirect,isActive};
+    return {accept,more,candidates,updateNli,record,clearPool,isDirect,isActive,setAuthority,hasAuthority};
   }
   if(root)root.createSearchTuner=createSearchTuner;
 })(typeof window==='object'?window:null);
