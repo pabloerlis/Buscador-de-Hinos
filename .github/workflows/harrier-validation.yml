@@ -15,18 +15,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - {model: e5, variant: q4f16}
-          - {model: harrier, variant: q4f16}
-          - {model: harrier, variant: q4}
-    runs-on: ubuntu-latest
+          - {model: e5, variant: q4f16, runner: ubuntu-latest, arch: x86_64}
+          - {model: harrier, variant: q4f16, runner: ubuntu-latest, arch: x86_64}
+          - {model: harrier, variant: q4, runner: ubuntu-latest, arch: x86_64}
+          - {model: harrier, variant: q4f16, runner: ubuntu-24.04-arm, arch: arm64}
+          - {model: harrier, variant: q4, runner: ubuntu-24.04-arm, arch: arm64}
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 22
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Dependencias (mesma versao ONNX Runtime do Android atual)
-        run: pip install 'numpy<2' 'onnxruntime==1.20.0' 'huggingface-hub>=0.30,<2' 'tokenizers>=0.21,<0.23'
+      - name: Dependencias fixadas para teste do novo runtime
+        run: pip install 'numpy==2.2.6' 'onnxruntime==1.31.1' 'huggingface-hub>=0.30,<2' 'tokenizers>=0.21,<0.23'
       - name: Testar metricas
         run: python3 -m unittest discover -s tests -p test_harrier_metrics.py
       - name: Executar pesos reais em CPU
@@ -35,7 +37,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: harrier-${{ matrix.model }}-${{ matrix.variant }}
+          name: harrier-${{ matrix.model }}-${{ matrix.variant }}-${{ matrix.arch }}
           path: qa-report/harrier-*.json
           retention-days: 30
           if-no-files-found: error

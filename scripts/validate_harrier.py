@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 import math
+import platform
 import resource
 import time
 from pathlib import Path
@@ -75,7 +76,7 @@ def normalize(v, dim):
 
 def encode(session, tok, texts, dim, e5=False):
     import numpy as np
-    result, times = [], []
+    result, times, fixtures = [], [], []
     for text in texts:
         start = time.perf_counter()
         enc = tok.encode(text, add_special_tokens=True)
@@ -98,9 +99,13 @@ def encode(session, tok, texts, dim, e5=False):
         elif len(outputs) == 1 and outputs[0].ndim == 3:
             v = outputs[0].mean(axis=1) if e5 else outputs[0][:,-1,:]
         else: raise ValueError("Unknown outputs "+str(names))
-        result.append(normalize(v, dim))
+        normalized = normalize(v, dim)
+        result.append(normalized)
         times.append((time.perf_counter()-start)*1000)
-    return np.stack(result), times
+        # A small, original-text conformance fixture for the future Android tokenizer.
+        if len(fixtures) < 3:
+            fixtures.append({"text": text, "ids": enc.ids, "embedding": normalized.tolist()})
+    return np.stack(result), times, fixtures
 
 def run(model, target, variant):
     import numpy as np
@@ -131,11 +136,12 @@ def run(model, target, variant):
     queries = [q for q, _ in CASES]
     qtexts = [("query: " if e5 else PROMPT)+q for q in queries]
     dtexts = [("passage: " if e5 else "")+d for d in documents]
-    vectors, times = encode(session, tok, qtexts+dtexts, dim, e5)
+    vectors, times, fixtures = encode(session, tok, qtexts+dtexts, dim, e5)
     scores = vectors[:len(queries)] @ vectors[len(queries):].T
     qtimes = times[1:len(queries)]
     return {"model":model, "variant":variant, "repo":repo,"revision":rev,"dimension":dim,
-            "runtime":ort.__version__,"providers":session.get_providers(),
+            "runtime":ort.__version__,"architecture":platform.machine(),"providers":session.get_providers(),
+            "conformance_fixtures": fixtures,
             "inputs":[{"name":i.name,"type":i.type,"shape":i.shape} for i in session.get_inputs()],
             "outputs":[{"name":i.name,"type":i.type,"shape":i.shape} for i in session.get_outputs()],
             "tokenizer_type":json.loads((target/"tokenizer.json").read_text())["model"]["type"],
@@ -157,7 +163,7 @@ def main():
         report["passed"]=True
         print(json.dumps(report,ensure_ascii=False,indent=2),flush=True)
     except Exception as exc:
-        report={"model":args.model,"variant":args.variant,"passed":False,"error":str(exc)}
+        report={"model":args.model,"variant":args.variant,"architecture":platform.machine(),"passed":False,"error":str(exc)}
         raise
     finally:
         args.report.write_text(json.dumps(report,ensure_ascii=False,indent=2)+"\n",encoding="utf8")

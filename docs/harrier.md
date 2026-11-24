@@ -6,3 +6,9 @@ Modelo MIT de embeddings Microsoft. Exportação ONNX Community fixada no commit
 A saída Harrier é 1024D; BPE, last-token pooling, L2 e prefixo instrucional somente na consulta. E5 é 384D, Unigram e mean pooling. É proibido misturar os índices. O teste H1 compara a mesma coleção de 24 textos sintéticos originais (16 positivos e 8 distratores) com 16 consultas em português. Mede Recall@1/5, MRR e nDCG@10, latência, pico RSS e compatibilidade ORT 1.20 CPU x86. Não prova superioridade na coletânea nem compatibilidade Android.
 
 H2: selecionar variante operacional, conferir tokenização e vetores contra referência, gerar índice com mesmo checkpoint e pipeline; verificar em ARM64, incluindo RAM, cold/warm, latência e corpus real. H3: gerenciador de pacote externo com manifesto de tamanho/hash fixos, download explícito, cancelamento, instalação atômica, armazenamento privado e remoção; busca atual sempre disponível. Não ativar ranking vetorial sem índice compatível. APK padrão continua sem pesos. Nenhum modelo generativo.
+
+## H2 — compatibilidade de runtime
+
+H1 (run 45473665680): E5 / ORT 1.20.0 aprovado, Recall@1 0.5, Recall@5 0.6875, MRR 0.6094004953379952, nDCG@10 0.6450240236419504. Latência mediana 1.798 ms em CPU x86; RSS de processo 685612 KiB. Ambos Harrier falharam antes da inferência: atributo bits não reconhecido em GatherBlockQuantized. Não houve medição de qualidade do Harrier.
+
+H2 fixa ORT 1.31.1 (disponível em PyPI e Maven Android), testa E5 e as duas variantes em CPU x86 e Harrier em CPU ARM64 Linux. O benchmark sintético, pesos, prefixos e métricas permanecem idênticos. Os relatórios incluem três fixtures com IDs e vetores completos para futura conferência Android. Linux ARM64 não é Android: não implica compatibilidade JNI nem prova desempenho em smartphone. A dependência Gradle da linha estável não muda até a validação. O índice, gerenciador e APK de integração ainda não existem.
