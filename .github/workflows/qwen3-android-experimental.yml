@@ -73,6 +73,8 @@ jobs:
           node tests/qa-qwen3-interface.js
           node tests/test-semantic-tuner.js
           node tests/test-telepatia-sequence.js
+          npm install --no-save --package-lock=false --ignore-scripts jsdom@26.1.0
+          node tests/qa-qwen3-ranking-ui.js
       - name: Build ARM64 and x86_64 APK with GGUF and E5
         run: |
           set -euo pipefail
@@ -80,8 +82,8 @@ jobs:
           "$SDKMANAGER" 'platforms;android-35' 'build-tools;35.0.0' 'ndk;27.2.12479018' 'cmake;3.22.1'
           gradle --no-daemon --stacktrace assembleDebug -PenableLocalEmbeddings=true -PenableLocalModels=true
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/Buscador-de-Hinos-v2.6.37-Qwen3-Experimental.apk
-          APK=dist/Buscador-de-Hinos-v2.6.37-Qwen3-Experimental.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/Buscador-de-Hinos-v2.6.38-Qwen3-Experimental.apk
+          APK=dist/Buscador-de-Hinos-v2.6.38-Qwen3-Experimental.apk
           test -s "$APK"
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify "$APK"
           unzip -l "$APK" | grep 'lib/arm64-v8a/libhinosllm.so'
@@ -91,7 +93,7 @@ jobs:
       - name: Upload experimental APK
         uses: actions/upload-artifact@v4
         with:
-          name: Buscador-Hinos-v2.6.37-Qwen3-Experimental
+          name: Buscador-Hinos-v2.6.38-Qwen3-Experimental
           path: dist/
           retention-days: 30
           if-no-files-found: error
@@ -100,5 +102,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          TAG=v2.6.37-qwen3-exp-${GITHUB_SHA:0:8}
-          gh release create "$TAG" dist/*.apk dist/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "Buscador de Hinos 2.6.37 — Qwen3 experimental" --notes "Compilação experimental para testes manuais. Inclui motor GGUF e E5; Qwen3-4B-Instruct-2507 Q4_K_M é externo. Interface exclusiva GGUF, sem seletor ZIP Laya. Curadoria da letra integral de até 18 candidatos em duas passagens. Não validado em aparelho físico. Sem aprovação semântica final."
+          TAG=v2.6.38-qwen3-exp-${GITHUB_SHA:0:8}
+          gh release create "$TAG" dist/*.apk dist/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease --title "Buscador de Hinos 2.6.38 — Qwen3 experimental" --notes "Compilação experimental para testes manuais. Inclui motor GGUF e E5; Qwen3-4B-Instruct-2507 Q4_K_M é externo. Interface exclusiva GGUF, sem seletor ZIP Laya. Qwen3 governa automaticamente o ranking principal. Gate de interface com ponte de teste controlada: exclusão, mudança de ordem, abstenção, E5 tardio, sliders, paginação e cancelamento. Curadoria integral de até 18 candidatos em duas passagens. Não validado em aparelho físico. Sem aprovação semântica final."
