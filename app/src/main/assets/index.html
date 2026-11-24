@@ -36,7 +36,12 @@
         <button id="open-settings" class="icon-button" title="Configurações e informações" aria-label="Configurações e informações"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM19.4 15a1.9 1.9 0 0 0 .4 2.1l-2 2a1.9 1.9 0 0 0-2.1-.4 1.9 1.9 0 0 0-1.2 1.7h-2.9a1.9 1.9 0 0 0-1.2-1.7 1.9 1.9 0 0 0-2.1.4l-2-2A1.9 1.9 0 0 0 6.6 15a1.9 1.9 0 0 0-1.7-1.2v-2.9A1.9 1.9 0 0 0 6.6 9.7a1.9 1.9 0 0 0-.4-2.1l2-2a1.9 1.9 0 0 0 2.1.4 1.9 1.9 0 0 0 1.2-1.7h2.9A1.9 1.9 0 0 0 15.6 6a1.9 1.9 0 0 0 2.1-.4l2 2a1.9 1.9 0 0 0-.4 2.1 1.9 1.9 0 0 0 1.7 1.2v2.9a1.9 1.9 0 0 0-1.6 1.2z"/></svg></button>
       </div>
     </header>
+    <nav class="app-tabs" role="tablist" aria-label="Áreas do aplicativo">
+      <button id="tab-search" type="button" role="tab" aria-controls="search-tab-panel" aria-selected="true">Buscar</button>
+      <button id="tab-dictionary" type="button" role="tab" aria-controls="dictionary-tab-panel" aria-selected="false" tabindex="-1">Dicionário</button>
+    </nav>
     <main>
+      <div id="search-tab-panel" role="tabpanel" aria-labelledby="tab-search">
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-inner">
           <h1 id="hero-title" class="sr-only">Pesquisar hinos</h1>
@@ -131,7 +136,52 @@
           </div>
         </div>
       </section>
+      </div>
+      <section id="dictionary-tab-panel" class="main-content dictionary-panel" role="tabpanel" aria-labelledby="tab-dictionary" hidden>
+        <div class="dictionary-heading">
+          <h1>Dicionário pessoal</h1>
+          <button id="alias-new" class="primary-btn" type="button" disabled>+ Nova associação</button>
+        </div>
+        <p id="alias-state" class="dictionary-state" role="status">Carregando narrativas…</p>
+        <div id="alias-directory" hidden>
+          <label class="sr-only" for="alias-filter">Filtrar associações</label>
+          <input id="alias-filter" class="dictionary-input" type="search" placeholder="Filtrar expressão ou narrativa" autocomplete="off">
+          <ul id="alias-list" class="dictionary-list"></ul>
+          <nav id="alias-pages" class="load-more-wrap" aria-label="Páginas do dicionário" hidden>
+            <button id="alias-previous" class="load-more" type="button" aria-label="Página anterior do dicionário">‹</button>
+            <span id="alias-page-status" aria-live="polite"></span>
+            <button id="alias-next" class="load-more" type="button" aria-label="Próxima página do dicionário">›</button>
+          </nav>
+        </div>
+        <div id="alias-undo-panel" class="dictionary-undo" hidden>
+          <span role="status">Associação removida.</span>
+          <button id="alias-undo" class="text-action" type="button">Desfazer</button>
+        </div>
+      </section>
     </main>
+  </div>
+
+  <div id="alias-layer" class="modal-layer hidden" aria-hidden="true">
+    <div class="modal-scrim" data-close="alias"></div>
+    <section class="detail-modal dictionary-editor" role="dialog" aria-modal="true" aria-labelledby="alias-title">
+      <div class="modal-top">
+        <h2 id="alias-title">Nova associação</h2>
+        <button class="icon-button" type="button" data-close="alias" aria-label="Fechar associação">×</button>
+      </div>
+      <form id="alias-form" class="modal-body dictionary-form">
+        <label for="alias-term">Expressão que você pesquisa</label>
+        <input id="alias-term" class="dictionary-input" type="text" minlength="4" maxlength="90" placeholder="Ex.: reencontro com meu pai" required>
+        <label for="alias-story-filter">Filtrar narrativas bíblicas</label>
+        <input id="alias-story-filter" class="dictionary-input" type="search" placeholder="Ex.: Filho Pródigo ou Lucas 15" autocomplete="off">
+        <label for="alias-story">Narrativa</label>
+        <select id="alias-story" class="dictionary-input" required></select>
+        <p id="alias-feedback" class="dictionary-feedback" role="status" hidden></p>
+        <div class="dictionary-form-actions">
+          <button id="alias-remove" class="secondary-btn" type="button" hidden>Remover</button>
+          <button id="alias-add" class="primary-btn" type="submit">Salvar associação</button>
+        </div>
+      </form>
+    </section>
   </div>
 
   <div id="refine-layer" class="modal-layer hidden" aria-hidden="true">
@@ -246,14 +296,6 @@
         <label class="setting-check"><input id="rec-breakdown" type="checkbox" checked>Mostrar porcentagens separadas de letra e contexto</label>
         <p class="subtle-note">Afinidade é uma pontuação heurística. Associações são sugeridas a partir de evidências da letra, não são avaliação teológica oficial.</p>
         <div class="settings-actions"><button id="settings-search-save" class="primary-btn" type="button">Aplicar preferências</button><button id="settings-search-reset" class="secondary-btn" type="button">Restaurar padrões</button></div>
-      </section></details>
-      <details class="advanced-settings"><summary>Dicionário pessoal</summary><section class="semantic-settings" aria-label="Dicionário de sinônimos pessoal">
-        <h3>Dicionário personalizado</h3>
-        <p class="subtle-note">Associe expressões que você costuma pesquisar às narrativas conhecidas. Isso muda a interpretação da consulta, sem alterar a letra dos hinos.</p>
-        <label for="alias-term">Expressão ou sinônimo</label><input id="alias-term" type="text" maxlength="90" placeholder="Ex.: reencontro com meu pai">
-        <label for="alias-story">Relacionar à narrativa</label><select id="alias-story"></select>
-        <div class="settings-actions"><button id="alias-add" class="secondary-btn" type="button">Adicionar associação</button></div>
-        <div id="alias-list" class="alias-list" aria-live="polite"></div>
       </section></details>
       <details class="advanced-settings" data-gguf-ui><summary>IA local experimental (GGUF)</summary><section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (GGUF)</h3>
