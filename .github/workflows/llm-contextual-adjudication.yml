@@ -9,7 +9,14 @@ permissions:
 jobs:
   llm_gate:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 100
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3]
+    env:
+      QA_SHARD: ${{ matrix.shard }}
+      QA_SHARDS: 4
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,6 +63,10 @@ jobs:
           test -s app/src/main/assets/e5-model.onnx
           test -s app/src/main/assets/e5-vocab.bin
           test -s app/src/main/assets/e5-index.json
+      - name: Check Python and JS syntax
+        run: |
+          python3 -m py_compile scripts/qa_contextual_llm.py
+          node --check tests/qa-llm-candidate-pool.js
       - name: Prepare pinned CPU engine and quantized Qwen3 4B
         shell: bash
         run: |
@@ -89,6 +100,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: llm-contextual-adjudication-report
+          name: llm-contextual-adjudication-report-${{ matrix.shard }}
           path: qa-report/llm-contextual-adjudication.json
           if-no-files-found: warn
