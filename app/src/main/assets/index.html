@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#113b35">
+  <meta name="theme-color" content="#153a36">
   <meta name="description" content="Encontre hinos por tema, significado, contexto, número ou trecho da letra.">
   <title>Buscador de Hinos — Encontre pelo significado</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -18,6 +18,7 @@
   <script src="recommendation-engine.js" defer></script>
   <script src="vector-index.js" defer></script>
   <script src="repertoire-store.js" defer></script>
+  <script src="context-ranker.js" defer></script>
   <script src="offline-api.js" defer></script>
   <script src="local-hymn-ai.js" defer></script>
   <script src="about.js" defer></script>
@@ -38,74 +39,68 @@
     <main>
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-inner">
-          <div class="eyebrow"><span class="eyebrow-dot"></span> UMA NOVA FORMA DE ENCONTRAR HINOS</div>
-          <h1 id="hero-title">A mensagem certa.<br><em>O hino que você procura.</em></h1>
-          <p class="hero-subtitle">Encontre hinos pelo tema, pelo significado ou pelo contexto. Mesmo quando você não lembra das palavras exatas.</p>
+          <h1 id="hero-title" class="sr-only">Pesquisar hinos</h1>
           <form id="search-form" class="search-box" role="search">
             <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="7"/><path d="m16 16 5 5"/></svg>
             <label class="sr-only" for="search-input">Pesquisar hinos</label>
-            <input id="search-input" type="search" maxlength="500" autocomplete="off" placeholder="Tema, contexto ou passagem bíblica…" required>
+            <input id="search-input" type="search" maxlength="500" autocomplete="off" placeholder="Título, tema ou referência" required>
             <button type="submit" id="search-button">Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           </form>
+          <details class="quick-filters"><summary>Filtros</summary>
+          <div class="filter-panel">
           <div class="collection-quick" id="quick-collections" aria-label="Filtrar coleções">
-            <span>Pesquisar em:</span>
             <label><input type="checkbox" data-collection="principal" checked> Coletânea 2018 <small id="quick-count-principal">—</small></label>
             <label><input type="checkbox" data-collection="avulsos" checked> Avulsos <small id="quick-count-avulsos">—</small></label>
             <label><input type="checkbox" data-collection="cia" checked> CIA <small id="quick-count-cia">—</small></label>
             <label><input type="checkbox" data-collection="pessoal" checked> Pessoal <small id="quick-count-pessoal">—</small></label>
           </div>
-          <div class="suggestions"><span>Sugestões:</span>
-            <button data-suggestion="Gratidão a Deus" type="button">Gratidão</button>
-            <button data-suggestion="Consolo nos momentos difíceis" type="button">Consolo</button>
-            <button data-suggestion="Salvação pela graça" type="button">Salvação</button>
-            <button data-suggestion="Volta de Jesus e vigilância" type="button">Volta de Jesus</button>
-            <button data-suggestion="Salmo 23" type="button">Salmo 23</button><button data-suggestion="Filipenses 4:6" type="button">Fp 4:6</button>
-            <button data-suggestion="Filho Pródigo" type="button">Filho Pródigo</button>
+          <label class="quick-rank"><input id="quick-context-rank" type="checkbox"> Ordem contextual <small>Experimental</small></label>
           </div>
+          </details>
         </div>
-        <div class="hero-accent" aria-hidden="true"><span>♪</span><span>♫</span><span>♪</span></div>
       </section>
 
       <section class="main-content" aria-label="Pesquisa e resultados">
         <div id="upgrade-panel" class="import-panel hidden" role="region" aria-label="Ampliar biblioteca de hinos">
           <div class="import-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></div>
-          <div class="import-content"><h2>Novas coletâneas disponíveis</h2>
-            <p>Complete sua biblioteca com os Avulsos 2018 e os louvores CIA 2018. Hinos já importados serão preservados e duplicados não serão repetidos.</p>
+          <div class="import-content"><h2>Amplie sua coletânea</h2>
             <div class="import-buttons"><button id="upgrade-import" class="primary-btn" type="button">Adicionar Avulsos e CIA</button></div>
-            <p class="import-note">Necessita internet apenas nesta importação. Depois a busca é offline.</p>
           </div>
         </div>
         <div id="import-panel" class="import-panel hidden">
           <div class="import-symbol"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-5-5 5 5 5-5M4 17v3h16v-3"/></svg></div>
           <div class="import-content">
-            <h2>Importe as três coletâneas</h2>
-            <p>O aplicativo importa Coletânea 2018, Avulsos 2018 e CIA 2018 diretamente do JSON público, ou de um JSON do seu aparelho. A importação fica armazenada apenas neste dispositivo.</p>
+            <h2>Importe sua coletânea</h2>
+            <p>Depois da importação, a busca funciona offline.</p>
             <div class="import-buttons">
               <button id="import-remote" class="primary-btn">Importar as 3 coleções</button>
               <label class="secondary-btn file-upload">Escolher arquivo JSON<input id="import-file" type="file" accept=".json,application/json" hidden></label>
             </div>
-            <p class="import-note">Depois de importar, a busca local funciona sem internet e sem servidor Python.</p>
           </div>
         </div>
 
         <div id="welcome-panel" class="welcome-panel">
-          <div class="welcome-top"><span class="section-kicker">COMO VOCÊ PODE PESQUISAR</span><span class="data-count" id="data-count">Aguardando base</span></div>
-          <div class="features-grid">
-            <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m16 16 4 4"/></svg></div><h3>Palavras e trechos</h3><p>Digite um número, título ou parte da letra de um hino.</p></div>
-            <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c5 4 8 7 8 11a8 8 0 1 1-16 0c0-4 3-7 8-11zM8 14c0 2 2 4 4 4"/></svg></div><h3>Temas e sentimentos</h3><p>Busque por fé, gratidão, esperança e outros conceitos.</p></div>
-            <div class="feature"><div class="feature-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16v12H4zM8 10h8M8 14h5"/></svg></div><h3>Contexto e ocasião</h3><p>Descreva o que deseja transmitir e refine os resultados.</p></div>
+          <p id="data-count" class="data-count" role="status">Aguardando coletânea</p>
+          <div class="suggestions" aria-label="Exemplos de pesquisa">
+            <button data-suggestion="Gratidão a Deus" type="button">Gratidão</button>
+            <button data-suggestion="Salmo 23" type="button">Salmo 23</button>
+            <button data-suggestion="Filho Pródigo" type="button">Filho Pródigo</button>
           </div>
         </div>
 
         <div id="results-panel" class="results-panel hidden">
           <div class="results-heading">
-            <div><span class="section-kicker">RESULTADOS DA PESQUISA</span><h2 id="results-title">Hinos encontrados</h2><p id="results-subtitle"></p></div>
-            <button id="new-search" class="text-action" type="button">Nova pesquisa <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 1 0 2-5M4 4v4h4"/></svg></button>
+            <div><h2 id="results-title">Hinos encontrados</h2><p id="results-subtitle" role="status"></p></div>
+            <div class="results-actions">
+              <button id="open-refine" class="text-action" type="button">Refinar</button>
+              <button id="new-search" class="icon-button" type="button" title="Nova pesquisa" aria-label="Nova pesquisa"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+            </div>
           </div>
-          <p class="score-method">Afinidade estimada por evidências da letra, relações semânticas e embeddings E5 Small, quando disponíveis. Percentuais não são probabilidades.</p>
           <p id="vector-results-state" data-vector-ui class="vector-live" role="status" aria-live="polite"></p>
           <div class="results-layout">
             <div class="results-main">
+              <details class="results-evidence" id="results-evidence"><summary>Sobre a busca</summary>
+              <div class="evidence-panel">
               <div id="notice" class="notice hidden" role="status"></div>
               <div id="search-diagnostics" class="semantic-interpret hidden"><strong>Como o índice interpretou a busca</strong><div id="search-concepts" class="concept-list"></div></div>
               <div id="ai-workspace" data-gguf-ui class="ai-workspace hidden" aria-live="polite">
@@ -118,8 +113,13 @@
               <div id="gguf-banner" data-gguf-ui class="gguf-banner hidden"><span id="gguf-banner-text">Modelo local pronto.</span>
                 <div class="ai-buttons"><button id="gguf-improve" class="secondary-btn" type="button">Sugerir palavras com IA</button><button id="gguf-compare-model" class="secondary-btn" type="button">Comparar com IA</button></div></div>
               <div id="gguf-comparison" class="ai-interpretation hidden"><div id="gguf-comparison-text" role="status" aria-live="polite"></div><div id="gguf-comparison-actions" class="ai-buttons"></div></div>
-        <div id="results-list" class="results-list" aria-live="polite"></div>
-              <div class="load-more-wrap"><button id="load-more" class="load-more hidden" type="button">Carregar mais 5 hinos <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button></div>
+              </div></details>
+              <div id="results-list" class="results-list" aria-live="polite"></div>
+              <nav class="load-more-wrap hidden" id="result-pages" aria-label="Paginação de hinos">
+                <button id="previous-page" class="load-more" type="button" aria-label="Página anterior">‹</button>
+                <span id="page-status" aria-live="polite"></span>
+                <button id="load-more" class="load-more" type="button" aria-label="Próxima página">›</button>
+              </nav>
               <details id="not-learned-search" class="unlearned-drawer hidden">
                 <summary><span>Não aprendidos nesta pesquisa</span><strong id="not-learned-search-count">0</strong></summary>
                 <p class="subtle-note">Ficam fora das sugestões principais, mas continuam acessíveis e mantêm seus percentuais.</p>
@@ -127,18 +127,25 @@
                 <button id="not-learned-more" class="secondary-btn hidden" type="button">Ver mais não aprendidos</button>
               </details>
             </div>
-            <aside class="refine-panel">
-              <div class="refine-header"><span class="refine-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v4m0 10v4M3 12h4m10 0h4M6 6l3 3m6 6 3 3M6 18l3-3m6-6 3-3"/></svg></span><div><h3>Refinar com contexto</h3><p id="refine-mode">Busca contextual</p></div></div>
-              <button id="gguf-compare" class="secondary-btn compare-offline" type="button" disabled>Comparar resultados</button>
-              <div id="conversation" class="conversation" aria-live="polite"></div>
-              <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
-              <p class="privacy-note">Use “apenas os de vigilância” para exigir um tema, “sem alegria” para excluir, “sem foco em alegria” para reduzir a prioridade ou “nova busca por esperança” para limpar o contexto.</p>
-            </aside>
+
           </div>
         </div>
       </section>
     </main>
-    <footer><span>Buscador de Hinos <span class="footer-dot">·</span> Três coleções 2018</span><span>Encontre pelo significado, confirme pela letra.</span></footer>
+  </div>
+
+  <div id="refine-layer" class="modal-layer hidden" aria-hidden="true">
+    <div class="modal-scrim" data-close="refine"></div>
+    <section class="detail-modal refine-modal" role="dialog" aria-modal="true" aria-labelledby="refine-title">
+      <div class="modal-top"><h2 id="refine-title">Refinar busca</h2><button class="icon-button" data-close="refine" aria-label="Fechar refinamento">×</button></div>
+            <div class="refine-panel modal-body">
+              <p id="refine-mode" class="sr-only">Busca contextual</p>
+              <button id="gguf-compare" class="secondary-btn compare-offline" type="button" disabled>Comparar resultados</button>
+              <div id="conversation" class="conversation" aria-live="polite"></div>
+              <form id="refine-form" class="refine-form"><label for="refine-input" class="sr-only">Refinar resultados</label><input id="refine-input" placeholder="Ex.: apenas os de vigilância" maxlength="500" required><button id="refine-send" aria-label="Enviar refinamento" type="submit"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 5 16 7-16 7 3-7-3-7zM7 12h13"/></svg></button></form>
+              <p class="privacy-note">Use “apenas os de vigilância” para exigir um tema, “sem alegria” para excluir, “sem foco em alegria” para reduzir a prioridade ou “nova busca por esperança” para limpar o contexto.</p>
+            </div>
+    </section>
   </div>
 
   <div id="modal-layer" class="modal-layer hidden" aria-hidden="true">
@@ -147,6 +154,8 @@
       <div class="modal-top"><div><span class="modal-overline" id="modal-number">HINO</span><h2 id="modal-title">Detalhes do hino</h2></div><button class="icon-button" data-close="modal" aria-label="Fechar detalhes">×</button></div>
       <div class="modal-body">
         <div class="modal-section repertoire-modal-status"><strong id="modal-repertoire-status">Disponível para indicação</strong><button id="modal-repertoire-toggle" class="secondary-btn" type="button">Marcar como não aprendido</button></div>
+        <p id="modal-match-reason" class="match-reason hidden"></p>
+        <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div>
         <div class="related-heading"><button class="secondary-btn hidden" id="related-back" type="button">← Voltar ao hino anterior</button><span id="related-trail" class="related-trail"></span></div>
         <section class="modal-section related-section" id="related-section" aria-label="Recomendações de hinos semelhantes">
           <div class="related-top"><div><span class="section-kicker">DESCUBRA MAIS HINOS</span><h3>Hinos semelhantes a este</h3></div><span class="local-badge">100% offline</span></div>
@@ -158,7 +167,7 @@
           </details>
           <p class="related-method">As porcentagens são índices de afinidade estimada, não probabilidades nem avaliação teológica oficial.</p>
         </section>
-        <div class="modal-section"><h3>Letra do hino</h3><div id="modal-lyrics" class="hymn-lyrics"></div></div><div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
+        <div class="modal-section"><h3>Temas identificados</h3><div id="modal-topics" class="topic-list"></div></div><div class="modal-section"><h3>Referências bíblicas</h3><div id="modal-references"></div><p class="subtle-note">São exibidas somente referências explicitamente identificadas na fonte.</p></div>
       <div class="modal-section ai-modal-section"><h3>Resumo de temas offline</h3><p class="subtle-note">Temas identificados pelo índice local.</p><button id="modal-ai-ask" class="secondary-btn" type="button">Ver resumo offline</button><div id="modal-ai-output" class="ai-interpretation hidden" aria-live="polite"></div></div></div>
       <div class="modal-bottom"><span id="modal-edition"></span><button class="secondary-btn" data-close="modal">Fechar</button></div>
     </section>
@@ -201,7 +210,7 @@
         <div id="knowledge-list" class="knowledge-list" aria-live="polite"></div>
         <p class="subtle-note">A lista não altera as letras nem os índices. Ela permanece nas atualizações normais do aplicativo; desinstalar ou limpar os dados pode apagá-la.</p>
       </section>
-      <section class="semantic-settings" aria-label="Preferências de busca semântica">
+      <details class="advanced-settings"><summary>Preferências de busca</summary><section class="semantic-settings" aria-label="Preferências de busca semântica">
         <div class="setting-section-heading"><h3>Busca inteligente offline</h3><span class="local-badge">Sem IA</span></div>
         <label for="search-mode">Prioridade da pesquisa</label>
         <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
@@ -216,6 +225,7 @@
         <label class="setting-check"><input id="bridge-toggle" type="checkbox" checked>Reconhecer contextos com expressões do cotidiano</label>
         <label class="setting-check"><input id="scripture-toggle" type="checkbox" checked>Consultar texto da Bíblia Livre para referências bíblicas (offline)</label>
         <label class="setting-check"><input id="bible-graph-toggle" type="checkbox" checked>Usar assuntos bíblicos e narrativas para recomendar hinos (sem IA)</label>
+        <label class="setting-check"><input id="context-rank-toggle" type="checkbox">Ordem contextual experimental nas buscas bíblicas</label>
         <label class="setting-check"><input id="bible-links-toggle" type="checkbox" checked>Considerar referências cruzadas</label>
         <label for="bible-depth">Abrangência das referências relacionadas</label>
         <select id="bible-depth"><option value="0">Somente passagem informada</option><option value="1" selected>Conservadora (recomendada)</option><option value="2">Ampliada</option></select>
@@ -236,15 +246,15 @@
         <label class="setting-check"><input id="rec-breakdown" type="checkbox" checked>Mostrar porcentagens separadas de letra e contexto</label>
         <p class="subtle-note">Afinidade é uma pontuação heurística. Associações são sugeridas a partir de evidências da letra, não são avaliação teológica oficial.</p>
         <div class="settings-actions"><button id="settings-search-save" class="primary-btn" type="button">Aplicar preferências</button><button id="settings-search-reset" class="secondary-btn" type="button">Restaurar padrões</button></div>
-      </section>
-      <section class="semantic-settings" aria-label="Dicionário de sinônimos pessoal">
+      </section></details>
+      <details class="advanced-settings"><summary>Dicionário pessoal</summary><section class="semantic-settings" aria-label="Dicionário de sinônimos pessoal">
         <h3>Dicionário personalizado</h3>
         <p class="subtle-note">Associe expressões que você costuma pesquisar às narrativas conhecidas. Isso muda a interpretação da consulta, sem alterar a letra dos hinos.</p>
         <label for="alias-term">Expressão ou sinônimo</label><input id="alias-term" type="text" maxlength="90" placeholder="Ex.: reencontro com meu pai">
         <label for="alias-story">Relacionar à narrativa</label><select id="alias-story"></select>
         <div class="settings-actions"><button id="alias-add" class="secondary-btn" type="button">Adicionar associação</button></div>
         <div id="alias-list" class="alias-list" aria-live="polite"></div>
-      </section>
+      </section></details>
       <details class="advanced-settings" data-gguf-ui><summary>IA local experimental (GGUF)</summary><section class="gguf-box" aria-label="Modelo de IA local">
         <h3>IA local (GGUF)</h3>
         <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. O modelo pode sugerir temas, comparar até cinco trechos e solicitar uma busca complementar na coletânea. Use um GGUF pequeno do tipo <em>Instruct</em>, quantizado em Q4.</p>
