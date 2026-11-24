@@ -1,0 +1,62 @@
+name: Harrier - gerar e versionar base vetorial
+on:
+  push:
+    branches: [feat/harrier-embeddings]
+    paths:
+      - 'scripts/build_harrier_index.py'
+      - 'tests/test_harrier_index.py'
+      - '.github/workflows/harrier-index.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: harrier-index-v1
+  cancel-in-progress: false
+jobs:
+  index:
+    if: github.ref == 'refs/heads/feat/harrier-embeddings'
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Instalar runtime validado
+        run: pip install 'numpy==2.2.6' 'onnxruntime==1.31.1' 'huggingface-hub>=0.30,<2' 'tokenizers>=0.21,<0.23' requests
+      - name: Testar normalizacao, segmentacao e quantizacao
+        run: python3 -m unittest discover -s tests -p test_harrier_index.py
+      - name: Gerar base real sem distribuir letras ou pesos
+        run: python3 scripts/build_harrier_index.py --out data/embeddings/harrier-600m-q4f16
+      - name: Auditar dados e manifesto
+        run: python3 scripts/build_harrier_index.py --audit-only --out data/embeddings/harrier-600m-q4f16
+      - uses: actions/upload-artifact@v4
+        with:
+          name: harrier-index-v1
+          path: |
+            data/embeddings/harrier-600m-q4f16/index.json
+            data/embeddings/harrier-600m-q4f16/manifest.json
+          retention-days: 30
+          if-no-files-found: error
+      - name: Versionar base em branch de dados independente
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=data/harrier-600m-v1
+          dir=data/embeddings/harrier-600m-q4f16
+          # Nunca sobrescrever uma versão de dados já publicada.
+          if git ls-remote --exit-code --heads origin "$branch"; then
+            echo "Branch de dados ja existente; use nova versao para publicar outro indice."
+            exit 1
+          else
+            result=$?
+            test "$result" -eq 2
+          fi
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- "$dir/index.json" "$dir/manifest.json"
+          git diff --cached --stat
+          git commit -m 'data: indice Harrier 600M Q4F16 v1 auditado'
+          git push origin "HEAD:refs/heads/$branch"
+          echo "Commit da base: $(git rev-parse HEAD)"
