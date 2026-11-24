@@ -482,3 +482,8 @@ button:focus-visible, summary:focus-visible, a:focus-visible {
 .term-synonym-preview { grid-column: 1 / -1; color: var(--muted); font-size: 11px; }
 .live-filters-actions { display: flex; justify-content: space-between; align-items: center; gap: 7px; padding: 6px 0; }
 .live-filters-actions .secondary-btn { min-height: 37px; padding: 5px 9px; }
+
+/* Evidence of actual lexical filter matches; compact in search, complete in detail. */
+.result-identity .filter-evidence-line{font-size:10px;color:var(--muted);font-weight:500;letter-spacing:0}
+.filter-evidence-detail{font-size:12px;line-height:1.45;color:var(--ink);overflow-wrap:anywhere;margin:0 0 10px}
+.filter-highlight{background:#f9e8a6;color:#2b332a;border-radius:2px;padding:0}

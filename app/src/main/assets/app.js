@@ -43,13 +43,29 @@ function busySearch(value){
   $('search-button').textContent=value?'Buscando…':'Buscar';
   if(!value)$('search-button').innerHTML='Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>';
 }
+function filterEvidenceLabel(evidence){
+  return (evidence||[]).flatMap(item=>item.matches.map(match=>
+    (item.kind==='prefer'?'Preferência: ':'')+item.term+(match.via_synonym?' → '+match.word:'')+
+    ' ('+match.fields.map(field=>field==='title'?'título':'letra').join(' e ')+')')).join(' · ');
+}
+function renderHighlighted(element,value,ranges){
+  const text=String(value??'');let offset=0;
+  element.replaceChildren();
+  for(const [start,end] of ranges||[]){
+    if(!Number.isInteger(start)||!Number.isInteger(end)||start<offset||end<=start||end>text.length)continue;
+    element.append(document.createTextNode(text.slice(offset,start)));
+    const mark=document.createElement('mark');mark.className='filter-highlight';mark.textContent=text.slice(start,end);element.append(mark);offset=end;
+  }
+  element.append(document.createTextNode(text.slice(offset)));
+}
 function resultCard(hymn,{unlearned=false}={}){
   const number=hymn.number?`HINO ${escapeHTML(hymn.number)}`:'HINO SEM NÚMERO';
   const score=Number.isFinite(hymn.relevance_percent)?Math.min(100,Math.max(0,Math.round(hymn.relevance_percent))):0;
+  const filterLabel=filterEvidenceLabel(hymn.filter_evidence);
   return `<article class="result-card ${unlearned?'is-unlearned':''}" data-card-id="${Number(hymn.id)}">
     <button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">
       <span class="result-identity"><span class="hymn-number">${number} · ${escapeHTML(hymn.collection||'Importados')}</span>
-        <span class="result-name">${escapeHTML(hymn.title)}</span></span>
+        <span class="result-name">${escapeHTML(hymn.title)}</span>${filterLabel?`<span class="filter-evidence-line" title="${escapeHTML(filterLabel)}">${escapeHTML(filterLabel)}</span>`:''}</span>
       ${hymn.match_type==='filtro'?'':`<span class="relevance" title="Afinidade estimada"><strong>${score}%</strong><span class="sr-only"> de afinidade</span></span>`}
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
     </button>
@@ -168,7 +184,7 @@ async function renderRecommendations(hymn){
 async function openHymn(id,{fromRelated=false,back=false}={}){
   const sequence=++state.modalSequence;
   try{
-    const hymn=await jsonRequest(`/api/hymns/${Number(id)}`);if(sequence!==state.modalSequence)return;
+    const hymn=await jsonRequest(`/api/hymns/${Number(id)}`,{term_filters:(!fromRelated&&(!back||state.hymnTrail[0]===Number(id)))?state.searchFilters||[]:[]});if(sequence!==state.modalSequence)return;
     if(back){const index=state.hymnTrail.lastIndexOf(hymn.id);if(index>=0)state.hymnTrail=state.hymnTrail.slice(0,index+1);}
     else if(fromRelated){state.hymnTrail.push(hymn.id);if(state.hymnTrail.length>50)state.hymnTrail.shift();}
     else state.hymnTrail=[hymn.id];
@@ -176,8 +192,11 @@ async function openHymn(id,{fromRelated=false,back=false}={}){
     const reason=state.lastResults.find(item=>item.id===hymn.id)?.reason||'';
     $('modal-match-reason').textContent=reason;
     $('modal-match-reason').classList.toggle('hidden',!reason);
-    $('modal-number').textContent=hymn.number?`HINO ${hymn.number}`:'HINO';$('modal-title').textContent=hymn.title;
-    $('modal-lyrics').textContent=hymn.lyrics;$('modal-topics').replaceChildren();
+    $('modal-number').textContent=hymn.number?`HINO ${hymn.number}`:'HINO';renderHighlighted($('modal-title'),hymn.title,hymn.filter_highlights?.title);
+    const filterLabel=filterEvidenceLabel(hymn.filter_evidence);
+    $('modal-filter-evidence').textContent=filterLabel;
+    $('modal-filter-evidence').classList.toggle('hidden',!filterLabel);
+    renderHighlighted($('modal-lyrics'),hymn.lyrics,hymn.filter_highlights?.lyrics);$('modal-topics').replaceChildren();
     if(hymn.topics?.length)hymn.topics.forEach(t=>{const s=document.createElement('span');s.className='small-tag';s.textContent=t;$('modal-topics').appendChild(s);});
     else $('modal-topics').textContent='Ainda não foram identificados temas automaticamente.';
     $('modal-references').textContent=hymn.references?.length?hymn.references.join(' · '):'Nenhuma referência explícita identificada.';

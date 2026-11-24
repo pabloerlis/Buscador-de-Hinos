@@ -643,6 +643,51 @@ const OfflineAPI = (() => {
     return filter.patterns.some(pattern=>(filter.field!=='lyrics'&&pattern.test(title))||
       (filter.field!=='title'&&pattern.test(lyrics)));
   }
+  // Evidence uses exactly the same compiled patterns as the hard filters.
+  function filterEvidence(filters,title,lyrics){
+    return filters.filter(filter=>filter.kind!=='exclude').flatMap(filter=>{
+      const matches=filter.words.flatMap((word,index)=>{
+        const pattern=filter.patterns[index];
+        const fields=[];
+        if(filter.field!=='lyrics'&&pattern.test(title))fields.push('title');
+        if(filter.field!=='title'&&pattern.test(lyrics))fields.push('lyrics');
+        return fields.length?[{word,via_synonym:index!==0,fields}]:[];
+      });
+      return matches.length?[{term:filter.words[0],kind:filter.kind,matches}]:[];
+    });
+  }
+  // Map normalized character positions back to original UTF-16 offsets.
+  // Accents, punctuation and spacing are preserved in the displayed text.
+  function highlightRanges(value,words){
+    const source=String(value??'');
+    let normalized='',starts=[],ends=[],offset=0;
+    for(const char of source){
+      const start=offset;offset+=char.length;
+      const folded=char.normalize('NFKD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+      if(!folded&&ends.length){ends[ends.length-1]=offset;continue;}
+      for(const unit of folded){
+        const next=/[a-z0-9]/.test(unit)?unit:' ';
+        if(next===' '&&(!normalized||normalized.endsWith(' ')))continue;
+        normalized+=next;starts.push(start);ends.push(offset);
+      }
+    }
+    const found=[];
+    for(const word of new Set(words)){
+      const pattern=new RegExp('(?:^| )('+reEscape(word)+')(?=$| )','g');
+      for(const match of normalized.matchAll(pattern)){
+        const start=match.index+match[0].length-match[1].length;
+        found.push([starts[start],ends[start+word.length-1]]);
+      }
+    }
+    found.sort((a,b)=>a[0]-b[0]||b[1]-a[1]);
+    const merged=[];
+    for(const range of found){
+      const last=merged[merged.length-1];
+      if(last&&range[0]<last[1])last[1]=Math.max(last[1],range[1]);
+      else merged.push(range);
+    }
+    return merged;
+  }
   // Conversão VISUAL heurística não calibrada: NÃO é probabilidade nem confiança estatística.
   function percentage(score, exactNumber=false){
     if(exactNumber)return 100;
@@ -863,6 +908,7 @@ const OfflineAPI = (() => {
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
     const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_contextOrder,...hit})=>({...hit,
+      filter_evidence:filters.length?filterEvidence(filters,searchTexts.get(hit.id).title,searchTexts.get(hit.id).lyrics):[],
       snippet:sharedPassage?.text||makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
     const reading=storyIntent?.matches?.map(x=>x.reference?x.label+' ('+x.reference+')':x.label)||[];
     const interpretation=opts.showConcepts?[
@@ -948,10 +994,13 @@ const OfflineAPI = (() => {
     if(!opts.recBreakdown)for(const h of results.results){delete h.query_percent;delete h.similarity_percent;}
     return results;
   }
-  function hymnDetail(id){
+  function hymnDetail(id,payload){
     const song=hymns.find(s=>s.id===id);if(!song)throw Error('Hino não encontrado.');
     const refs=Array.from(new Set(song.lyrics.match(REFERENCE)||[])).slice(0,15);
-    return {...song,topics:[...new Set([...(song.story_profile||[]).map(x=>x.label),...song.topics])].slice(0,12),references:refs};
+    const filters=searchFilters(payload?.term_filters);
+    const evidence=filterEvidence(filters,normalizeLyrics(song.title),normalizeLyrics(song.lyrics));
+    const words=field=>evidence.flatMap(item=>item.matches.filter(match=>match.fields.includes(field)).map(match=>match.word));
+    return {...song,filter_evidence:evidence,filter_highlights:{title:highlightRanges(song.title,words('title')),lyrics:highlightRanges(song.lyrics,words('lyrics'))},topics:[...new Set([...(song.story_profile||[]).map(x=>x.label),...song.topics])].slice(0,12),references:refs};
   }
   async function downloadRemote(){
     if(window.NativeHinos && typeof window.NativeHinos.downloadCollection==='function'){
@@ -998,7 +1047,7 @@ const OfflineAPI = (() => {
     if(url==='/api/search')return search(payload);
     if(url==='/api/recommend')return recommendRelated(payload);
     const match=url.match(/^\/api\/hymns\/(\d+)$/);
-    if(match)return hymnDetail(Number(match[1]));
+    if(match)return hymnDetail(Number(match[1]),payload);
     throw Error('Operação não reconhecida.');
   }
    return {request,normalize,themes,parseTitle,chooseCollection,contextQuery,percentage,semanticLabels,validateHints,searchOptions,filterSynonyms};
