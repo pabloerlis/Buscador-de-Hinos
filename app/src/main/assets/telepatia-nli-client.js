@@ -14,16 +14,26 @@ const TelepatiaUI=(()=>{
   const answerCache=new Map();
   const labels={entailment:'Implicação',neutral:'Neutro',contradiction:'Contradição'};
   const phraseLabel=(s)=>labels[s]||'Não avaliado';
-  const statusMessage=(msg,kind='info')=>{const node=el('nli-status');if(node){node.textContent=msg;node.dataset.kind=kind;}};
+  // Único estado nativo refletido nas três entradas de configuração:
+  // tela inicial, Configurações > Busca e painel de resultados.
+  const statusMessage=(msg,kind='info')=>{
+    for(const id of ['nli-status-home','nli-status-settings','nli-status']){
+      const node=el(id);
+      if(node){node.textContent=msg;node.dataset.kind=kind;}
+    }
+  };
   function status(){
     try{return bridge?JSON.parse(bridge.status()):{available:false,phase:'unavailable'};}
     catch(error){return {available:false,phase:'error',error:error.message};}
   }
   function refresh(){
     const s=status(), ready=Boolean(s.loaded&&s.phase==='ready');
-    const select=el('nli-select'), load=el('nli-load');
-    if(select)select.disabled=!s.available||s.busy;
-    if(load)load.disabled=!s.available||s.busy||!s.installed||ready;
+    for(const select of document.querySelectorAll('[data-nli-select]')){
+      select.disabled=!s.available||s.busy;
+    }
+    for(const load of document.querySelectorAll('[data-nli-load]')){
+      load.disabled=!s.available||s.busy||!s.installed||ready;
+    }
     if(!s.available)statusMessage('O APK não contém a ponte Android do Telepatia. Busca E5 disponível.','warning');
     else if(s.phase==='error')statusMessage('Telepatia: '+(s.error||'erro no modelo externo.'),'error');
     else if(ready)statusMessage('Telepatia NLI carregado: pronto para avaliar hinos.','success');
@@ -150,8 +160,12 @@ const TelepatiaUI=(()=>{
     else refresh();
   }
   function reset(){activeEpoch=++sequenceVersion;currentQuery='';currentCandidates=[];}
-  if(el('nli-select'))el('nli-select').addEventListener('click',()=>{if(bridge?.selectModel)bridge.selectModel();});
-  if(el('nli-load'))el('nli-load').addEventListener('click',()=>{if(bridge?.loadModel)bridge.loadModel();});
+  for(const select of document.querySelectorAll('[data-nli-select]')){
+    select.addEventListener('click',()=>{if(bridge?.selectModel)bridge.selectModel();});
+  }
+  for(const load of document.querySelectorAll('[data-nli-load]')){
+    load.addEventListener('click',()=>{if(bridge?.loadModel)bridge.loadModel();});
+  }
   refresh();
   return {onResults,reset,refresh,combine};
 })();
