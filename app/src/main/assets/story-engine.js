@@ -44,10 +44,11 @@ const StoryEngine = (() => {
       }
       return result;
     }
-    function indexHymn(title,lyrics){
+    function indexHymn(title,lyrics,selected){
       const normTitle=normalize(title),normLyrics=normalize(lyrics),profile=[];
       const windows=lyricWindows(lyrics);
       for(const s of stories){
+        if(selected&&!selected.has(s.id))continue;
         const phraseHits=s.matchPhrases.filter(p=>p.re.test(normTitle)||p.re.test(normLyrics)).map(p=>p.text).slice(0,3);
         const groupHits=s.matchGroups.map(g=>g.filter(c=>c.re.test(normTitle)||c.re.test(normLyrics)).map(c=>c.text).slice(0,3));
         const groups=groupHits.filter(x=>x.length);

@@ -315,6 +315,101 @@ const PersonalDictionary=(()=>{
   let visible=[];
   let editing=null;
   let removed=null;
+  let storyPage=1;
+  let visibleStories=[];
+  let editingStory=null;
+
+  async function loadStories(){
+    const data=await jsonRequest('/api/stories');
+    stories=(data.stories||[]).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
+    $('story-new').disabled=false;
+    if(stories.length)$('settings-stories').textContent=`${stories.length} narrativas locais`;
+    $('alias-new').disabled=!stories.length;
+    render();
+    renderPersonalStories();
+  }
+  function renderPersonalStories(){
+    const personal=stories.filter(story=>story.personal);
+    const pages=Math.max(1,Math.ceil(personal.length/pageSize));
+    storyPage=Math.min(storyPage,pages);
+    visibleStories=personal.slice((storyPage-1)*pageSize,storyPage*pageSize);
+    $('story-state').textContent=personal.length
+      ? `${personal.length} ${personal.length===1?'narrativa cadastrada':'narrativas cadastradas'}`
+      : 'Cadastre uma narrativa para usá-la na busca e nas associações.';
+    $('story-list').innerHTML=visibleStories.map((story,index)=>`
+      <li class="dictionary-row">
+        <div class="dictionary-entry">
+          <strong>${escapeHTML(story.label)}</strong>
+          <span>${escapeHTML(story.reference||story.clues.join(' · '))}</span>
+        </div>
+        <div class="dictionary-row-actions">
+          <button type="button" class="text-action" data-story-search="${index}">Buscar</button>
+          <button type="button" class="text-action" data-story-edit="${index}">Editar</button>
+        </div>
+      </li>`).join('');
+    $('story-pages').hidden=pages===1;
+    $('story-previous').disabled=storyPage===1;
+    $('story-next').disabled=storyPage===pages;
+    $('story-page-status').textContent=`Página ${storyPage} de ${pages}`;
+  }
+  function showStories(show){
+    $('view-aliases').setAttribute('aria-pressed',String(!show));
+    $('view-stories').setAttribute('aria-pressed',String(show));
+    $('dictionary-aliases').hidden=show;
+    $('dictionary-stories').hidden=!show;
+    $('alias-new').hidden=show;
+    $('story-new').hidden=!show;
+  }
+  function editStory(story=null){
+    editingStory=story;
+    $('story-editor-title').textContent=story?'Editar narrativa':'Nova narrativa';
+    $('personal-story-label').value=story?.label||'';
+    $('personal-story-reference').value=story?.reference||'';
+    $('personal-story-clues').value=story?.clues.join('; ')||'';
+    $('personal-story-feedback').hidden=true;
+    openLayer('personal-story');
+  }
+  function searchTerm(term){
+    AppTabs.showSearch();
+    $('search-input').value=term;
+    performSearch(term);
+  }
+  $('view-aliases').onclick=()=>showStories(false);
+  $('view-stories').onclick=()=>showStories(true);
+  $('story-new').onclick=()=>editStory();
+  $('story-previous').onclick=()=>{storyPage--;renderPersonalStories();};
+  $('story-next').onclick=()=>{storyPage++;renderPersonalStories();};
+  $('story-list').onclick=event=>{
+    const button=event.target.closest('[data-story-search],[data-story-edit]');
+    if(!button)return;
+    if(button.hasAttribute('data-story-search'))searchTerm(visibleStories[Number(button.dataset.storySearch)].label);
+    else editStory(visibleStories[Number(button.dataset.storyEdit)]);
+  };
+  $('personal-story-form').onsubmit=async event=>{
+    event.preventDefault();
+    const button=$('personal-story-save');
+    const message=$('personal-story-feedback');
+    message.hidden=true;
+    button.disabled=true;
+    try{
+      const entry=await jsonRequest('/api/stories/save',{
+        id:editingStory?.id,label:$('personal-story-label').value,reference:$('personal-story-reference').value,
+        clues:$('personal-story-clues').value.split(/[;\n]/).map(term=>term.trim()).filter(Boolean)
+      });
+      await loadStories();
+      storyPage=Math.floor(stories.filter(story=>story.personal).findIndex(story=>story.id===entry.id)/pageSize)+1;
+      renderPersonalStories();
+      if(state.activeModal==='personal-story'){
+        closeLayer();
+        $('story-new').focus();
+      }
+      toast('Narrativa salva.');
+      SearchPreferences.refreshSearch();
+    }catch(error){
+      message.textContent=error.message;
+      message.hidden=false;
+    }finally{button.disabled=false;}
+  };
 
   function entries(){
     const byId=new Map(stories.map(story=>[story.id,story]));
@@ -400,9 +495,7 @@ const PersonalDictionary=(()=>{
     if(button.hasAttribute('data-alias-edit'))edit(visible[Number(button.dataset.aliasEdit)]);
     else{
       const {term}=visible[Number(button.dataset.aliasTest)];
-      AppTabs.showSearch();
-      $('search-input').value=term;
-      performSearch(term);
+      searchTerm(term);
     }
   });
   $('alias-form').addEventListener('submit',event=>{
@@ -446,11 +539,7 @@ const PersonalDictionary=(()=>{
     currentPage=1;
     complete('Associação restaurada.');
   });
-  jsonRequest('/api/stories').then(data=>{
-    stories=(data.stories||[]).sort((a,b)=>a.label.localeCompare(b.label,'pt-BR'));
-    $('alias-new').disabled=!stories.length;
-    render();
-  }).catch(()=>render());
+  loadStories().catch(()=>{render();renderPersonalStories();});
 })();
 
 
