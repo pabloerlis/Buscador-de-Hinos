@@ -26,8 +26,8 @@ android {
                 }
             }
         }
-        versionCode 55
-        versionName '2.6.36-qwen3-exp'
+        versionCode 56
+        versionName '2.6.37-qwen3-exp'
         buildConfigField 'boolean', 'ENABLE_LOCAL_MODELS', enableLocalModels.toString()
         buildConfigField 'boolean', 'ENABLE_LOCAL_EMBEDDINGS', enableLocalEmbeddings.toString()
         buildConfigField 'String', 'SOURCE_REVISION', '"' + (sourceRevision ?: 'local') + '"'
