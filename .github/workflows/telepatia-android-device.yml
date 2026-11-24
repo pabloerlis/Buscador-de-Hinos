@@ -1,10 +1,14 @@
 name: Telepatia Android - end-to-end NLI externo offline (sem LFM3)
 on:
   push:
-    branches: [feat/semantic-sliders-live-20261123]
+    branches: [feat/semantic-sliders-live-20261123, feat/telepatia-neutral-ranking]
     paths:
       - app/src/main/assets/index.html
       - app/src/main/assets/style.css
+      - tests/qa-visible-catalog.js
+      - qa/e5-visible-query.json
+      - app/src/main/assets/semantic-tuner-ui.js
+      - app/src/main/assets/semantic-tuner.js
       - app/src/main/assets/telepatia-nli-client.js
       - app/src/main/java/br/com/buscadordehinos/app/MainActivity.java
       - app/src/androidTest/java/br/com/buscadordehinos/app/TelepatiaDeviceSmokeTest.java
@@ -75,6 +79,17 @@ jobs:
           test -s app/src/main/assets/e5-model.onnx
           test -s app/src/main/assets/e5-vocab.bin
           test -s app/src/main/assets/e5-index.json
+      - name: Conferir os resultados exibidos na coletânea de 2018
+        run: |
+          set -euo pipefail
+          catalog="$RUNNER_TEMP/coletanea.json"
+          curl -fsSL --retry 3 'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' -o "$catalog"
+          echo "57d42fb0bcc881a62b210dd1a3972822d2c39856f7a01278e104d407bf1b747a  $catalog" | sha256sum -c
+          npm install --prefix "$RUNNER_TEMP/ui-qa" jsdom@26.1.0 fake-indexeddb@6.2.4
+          export NODE_PATH="$RUNNER_TEMP/ui-qa/node_modules"
+          node tests/qa-visible-catalog.js "$catalog"
+          node tests/qa-visible-catalog.js "$catalog" qa/e5-visible-query.json
+          node tests/qa-metrics.js "$catalog"
       - name: Codigo tokenizer auditado independentemente (sem pesos)
         uses: actions/download-artifact@v4
         with:
@@ -216,7 +231,7 @@ jobs:
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: Buscador-Hinos-v2.6.22-Telepatia-NLI-Android-QA
+          name: Buscador-Hinos-v2.6.35-Telepatia-NLI-Android-QA
           path: app/build/outputs/apk/debug/app-debug.apk
           retention-days: 30
           if-no-files-found: error

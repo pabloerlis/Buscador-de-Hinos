@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#113b35">
+  <meta name="theme-color" content="#211b35">
   <meta name="description" content="Encontre hinos por tema, significado, contexto, número ou trecho da letra.">
   <title>Buscador de Hinos — Encontre pelo significado</title>
   <link rel="manifest" href="manifest.webmanifest">
@@ -45,11 +45,11 @@
       <section class="hero" aria-labelledby="hero-title">
         <div class="hero-inner">
           <h1 id="hero-title">Encontre um hino</h1>
-          <p class="hero-subtitle">Pesquise por tema, passagem bíblica, número ou trecho da letra.</p>
+          <p class="hero-subtitle">Busque por tema, passagem bíblica, número ou trecho da letra.</p>
           <form id="search-form" class="search-box" role="search">
             <svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.8" cy="10.8" r="7"/><path d="m16 16 5 5"/></svg>
             <label class="sr-only" for="search-input">Pesquisar hinos</label>
-            <input id="search-input" type="search" maxlength="500" autocomplete="off" enterkeyhint="search" placeholder="Ex.: João 14 ou consolo" required>
+            <input id="search-input" type="search" maxlength="500" autocomplete="off" enterkeyhint="search" placeholder="Ex.: um hino de consolo" required>
             <button type="submit" id="search-button">Buscar <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></button>
           </form>
           <details class="collection-picker" id="collection-picker">
@@ -87,15 +87,6 @@
         </div>
 
         <div id="welcome-panel" class="welcome-panel">
-          <section id="nli-home-card" class="nli-setup-card" aria-labelledby="nli-home-title">
-            <div class="nli-setup-heading"><h2 id="nli-home-title">Modelo de análise Telepatia</h2><span class="local-badge">Offline</span></div>
-            <p id="nli-status-home" class="nli-setup-status" role="status" aria-live="polite">Verificando modelo local…</p>
-            <div class="nli-control-actions">
-              <button id="nli-select-home" data-nli-select type="button" class="primary-btn">Selecionar ZIP do modelo</button>
-              <button id="nli-load-home" data-nli-load type="button" class="secondary-btn" disabled>Carregar</button>
-            </div>
-            <p class="subtle-note">Selecione o ZIP externo do telepatia-ai/laya-pt-es-nli sem descompactar. O modelo não acompanha o APK.</p>
-          </section>
           <div class="welcome-top"><h2>Experimente buscar</h2><span class="data-count" id="data-count">Aguardando biblioteca</span></div>
           <div class="suggestions">
             <button data-suggestion="Gratidão a Deus" type="button">Gratidão</button>
@@ -110,6 +101,15 @@
             <div class="tuner-history-head"><h3>Pesquisas recentes</h3><button type="button" data-tuner-clear-history class="text-action">Limpar histórico</button></div>
             <div id="tuner-history-home-list" class="tuner-history-list"></div>
           </section>
+          <section id="nli-home-card" class="nli-setup-card" aria-labelledby="nli-home-title">
+            <div class="nli-setup-heading"><h2 id="nli-home-title">Telepatia</h2><span class="local-badge">Offline</span></div>
+            <p id="nli-status-home" class="nli-setup-status" role="status" aria-live="polite">Verificando modelo local…</p>
+            <div class="nli-control-actions">
+              <button id="nli-select-home" data-nli-select type="button" class="primary-btn">Selecionar ZIP</button>
+              <button id="nli-load-home" data-nli-load type="button" class="secondary-btn" disabled>Carregar</button>
+            </div>
+            <p class="subtle-note">Importe o pacote ONNX do Telepatia preparado para o aplicativo.</p>
+          </section>
         </div>
 
         <div id="results-panel" class="results-panel hidden">
@@ -123,7 +123,7 @@
               <section id="tuner-panel" class="semantic-tuner" aria-labelledby="tuner-title">
                 <div class="tuner-title-row"><div><h3 id="tuner-title">Ajuste contextual</h3><p>Reordenação instantânea, offline</p></div><span class="local-badge">Local</span></div>
                 <label class="tuner-switch"><input type="checkbox" id="tuner-enabled" checked><span>Busca direta, sem conversa</span></label>
-                <p class="tuner-info">Os ajustes usam evidências já calculadas. Não executam Laya NLI nem outro modelo a cada alteração.</p>
+                <p class="tuner-info">Equilibrada mantém a ordem da busca. Alterar os pesos reordena os primeiros candidatos.</p>
                 <div class="nli-controls" aria-label="Modelo de inferência textual">
                   <div class="nli-controls-title"><strong>Telepatia Laya PT/ES NLI</strong><span class="local-badge">Modelo externo</span></div>
                   <p id="nli-status" class="tuner-info" role="status" aria-live="polite">Verificando modelo selecionado…</p>

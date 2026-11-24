@@ -1,6 +1,7 @@
 package br.com.buscadordehinos.app;
 
 import android.content.Context;
+import android.util.Base64;
 import android.webkit.WebView;
 import android.view.ViewGroup;
 import androidx.test.core.app.ActivityScenario;
@@ -64,6 +65,40 @@ public final class TelepatiaDeviceSmokeTest {
         }
     }
 
+    private void checkCollectionRanking(WebView web) throws Exception {
+        Context app=InstrumentationRegistry.getInstrumentation().getTargetContext();
+        File corpus=new File(app.getExternalFilesDir(null),"coletanea.json");
+        assertTrue("Coletânea do teste ausente",corpus.isFile());
+        // Cada chamada fica abaixo do limite de transação da WebView.
+        eval(web,"window.qaCatalogBytes=[]");
+        try(FileInputStream in=new FileInputStream(corpus)){
+            byte[] block=new byte[48*1024];
+            int count;
+            while((count=in.read(block))!=-1){
+                String chunk=Base64.encodeToString(block,0,count,Base64.NO_WRAP);
+                eval(web,"qaCatalogBytes.push(atob("+JSONObject.quote(chunk)+"))");
+            }
+        }
+        eval(web,"window.qaRank='pendente';(async()=>{"
+            +"const bytes=Uint8Array.from(qaCatalogBytes.join(''),s=>s.charCodeAt(0));delete window.qaCatalogBytes;"
+            +"const data=JSON.parse(new TextDecoder().decode(bytes));"
+            +"const result=await OfflineAPI.request('/api/import',{data});"
+            +"if(result.count!==1557)throw Error('Coletânea incompleta');"
+            +"await refreshStatus();document.getElementById('tuner-reset').click();"
+            +"if(!await performSearch('filho pródigo'))throw Error('Busca falhou');"
+            +"const titles=Array.from(document.querySelectorAll('#results-list article h3'),el=>el.textContent);"
+            +"window.qaRank=titles.slice(0,4).join('|');"
+            +"})().catch(e=>{window.qaRank='Erro: '+e.message});void 0");
+        String result="";
+        for(int retry=0;retry<120;retry++){
+            result=eval(web,"window.qaRank");
+            if(!JSONObject.quote("pendente").equals(result))break;
+            Thread.sleep(1000);
+        }
+        assertEquals("Ordem dos cartões na coletânea real",
+            JSONObject.quote("UM DIA EU QUIS TE DEIXAR|OH! QUE BELOS HINOS HOJE LÁ NO CÉU|EU QUERO SENTIR|VEM Ó PRÓDIGO"),result);
+    }
+
     @Test public void androidSearchSliderUiUsesNativeNliButNoGguf()throws Exception{
         try(ActivityScenario<MainActivity> activity=ActivityScenario.launch(MainActivity.class)){
             AtomicReference<WebView> view=new AtomicReference<>();
@@ -102,6 +137,11 @@ public final class TelepatiaDeviceSmokeTest {
                 eval(view.get(),"!Boolean(window.NativeGGUF)"));
             assertEquals("NLI bridge status invalid","true",
                 eval(view.get(),"(()=>{const s=JSON.parse(window.NativeNLI.status());return s.available&&s.model==='telepatia-ai/laya-pt-es-nli';})()"));
+            assertEquals("O rótulo neutro alterou a pontuação na WebView","true",eval(view.get(),
+                "(()=>{const sample={relevance_percent:65,tuner_signals:{lexical:12}};"
+                +"const score=x=>SemanticTuner.score(x,SemanticTuner.presets.balanced,{narrative:true,events:false});"
+                +"return score(sample)===21&&score({...sample,nli_label:'neutral'})===score(sample);})()"));
+            checkCollectionRanking(view.get());
             assertEquals("On-device slider did not persist","true",eval(view.get(),
                 "(()=>{const x=document.getElementById('tuner-topic');x.value='30';x.dispatchEvent(new Event('input',{bubbles:true}));"
                  +"const saved=JSON.parse(localStorage.getItem('hinos-semantic-tuner-v1'));"
