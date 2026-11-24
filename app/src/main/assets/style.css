@@ -328,3 +328,22 @@ html.semantic-direct-mode [data-gguf-ui],
 html.semantic-direct-mode #settings-panel-ai,
 html.semantic-direct-mode .gguf-box,
 html.semantic-direct-mode .ai-buttons {display:none!important}
+
+
+/* Telepatia: seleção acessível imediatamente, antes de qualquer busca. */
+.nli-setup-card {margin:0 0 20px;padding:16px 17px;border:1px solid #c6ded1;background:#f4f9f5;border-radius:14px}
+.nli-setup-heading {display:flex;align-items:center;justify-content:space-between;gap:10px}
+.nli-setup-heading h2 {font-size:16px;line-height:1.35;margin:0;color:#164633}
+.nli-setup-status {font-size:12px;line-height:1.55;color:#36574b;overflow-wrap:anywhere;margin:11px 0}
+.nli-setup-status[data-kind="error"] {color:#9d2828}
+.nli-setup-status[data-kind="success"] {color:#16633c}
+.nli-setup-status[data-kind="warning"] {color:#94621c}
+.nli-control-actions {display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.nli-control-actions button, #nli-settings-card .settings-actions button {min-height:42px;font-size:13px}
+.nli-setup-card .subtle-note {font-size:12px;margin:10px 0 0;line-height:1.5}
+#nli-settings-card .nli-setup-status {margin:8px 0 12px}
+#nli-settings-card .setting-section-heading h3 {margin:0}
+@media(max-width:560px){
+  .nli-setup-card {padding:13px 14px}
+  .nli-control-actions button {flex:1 1 auto}
+}
