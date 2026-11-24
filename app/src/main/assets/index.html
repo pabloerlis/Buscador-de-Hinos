@@ -19,6 +19,7 @@
   <script src="bridge-engine.js" defer></script>
   <script src="bible-context.js" defer></script>
   <script src="recommendation-engine.js" defer></script>
+  <script src="harrier-index.js" defer></script>
   <script src="vector-index.js" defer></script>
   <script src="repertoire-store.js" defer></script>
   <script src="context-ranker.js" defer></script>
@@ -366,12 +367,12 @@
         </div>
       </details><section id="harrier-package-panel" class="semantic-settings hidden" aria-labelledby="harrier-package-title">
         <h3 id="harrier-package-title">Modelo vetorial Harrier 600M</h3>
-        <p class="subtle-note">Pacote adicional de 366,60 MB, incluindo índice de 1.562 registros. A busca convencional funciona sem o download. Após instalar, execute o diagnóstico de inferência local. O motor ainda não modifica os resultados de busca nesta versão.</p>
+        <p class="subtle-note">Pacote adicional de 366,60 MB, incluindo índice de 1.562 registros. A busca convencional funciona sem o download. O pacote é validado automaticamente. Quando aprovado, participa das buscas por significado; cada pesquisa informa se houve contribuição vetorial.</p>
         <progress id="harrier-progress" max="366595730" value="0" style="width:100%" aria-label="Progresso do pacote"></progress>
         <p id="harrier-package-status" class="subtle-note" role="status">Verificando pacote…</p>
-        <div class="settings-actions"><button id="harrier-download" type="button" class="primary-btn">Baixar pacote</button><button id="harrier-cancel" type="button" class="secondary-btn hidden">Cancelar</button><button id="harrier-test" type="button" class="secondary-btn hidden">Testar inferência</button><button id="harrier-remove" type="button" class="secondary-btn hidden">Remover</button></div>
+        <div class="settings-actions"><button id="harrier-download" type="button" class="primary-btn">Baixar pacote</button><button id="harrier-cancel" type="button" class="secondary-btn hidden">Cancelar</button><button id="harrier-test" type="button" class="secondary-btn hidden">Revalidar modelo</button><button id="harrier-remove" type="button" class="secondary-btn hidden">Remover</button></div>
         <p id="harrier-diagnostic-result" class="subtle-note" role="status"></p>
-      </section><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores E5 validados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
+      </section><div class="status-grid"><span>Biblioteca</span><strong id="settings-collection">—</strong><span>Por coleção</span><strong id="settings-collection-counts">—</strong><span>Hinos importados</span><strong id="settings-count">—</strong><span>Base semântica offline</span><strong id="settings-vectors">—</strong><span data-vector-ui>Vetores Harrier vinculados</span><strong id="settings-embeddings" data-vector-ui>—</strong><span>Narrativas bíblicas</span><strong id="settings-stories">—</strong><span>Bíblia Livre offline</span><strong id="settings-scripture">—</strong><span>Grafo bíblico</span><strong id="settings-bible-graph">—</strong><span>Expressões ampliadas</span><strong id="settings-bridge">—</strong></div>
       <section class="semantic-settings" aria-label="Coleções e importação">
         <div class="setting-section-heading"><h3>Biblioteca unificada</h3><span class="local-badge">Offline</span></div>
         <p class="subtle-note">Escolha onde pesquisar. Hinos idênticos em várias coleções aparecem uma única vez, preservando suas referências de origem.</p>
@@ -395,7 +396,7 @@
         <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
         <label for="semantic-power">Força das relações semânticas <strong id="semantic-power-value">75%</strong></label>
         <input id="semantic-power" type="range" min="0" max="100" step="5" value="75">
-        <label for="vector-mode" data-vector-ui>Modelo vetorial E5 Small</label>
+        <label for="vector-mode" data-vector-ui>Modelo vetorial Harrier 600M</label>
         <select id="vector-mode" data-vector-ui><option value="off">Desativado</option><option value="balanced">Por palavras e vetores</option><option value="strong">Dar mais peso aos vetores</option></select>
         <p id="vector-state" data-vector-ui class="subtle-note" role="status">Verificando índice vetorial…</p>
         <p class="subtle-note">A lista aparece imediatamente. Com a busca vetorial ativada, o ranking é aprimorado depois que o modelo calcula o significado da consulta. O primeiro uso pode exigir preparar cerca de 120 MB no armazenamento privado.</p>

@@ -5,8 +5,10 @@ const state={ready:false,status:null,originalQuery:'',effectiveQuery:'',exclude:
   searchSettings:OfflineAPI.searchOptions()};
 try{const saved=JSON.parse(localStorage.getItem('hinos-search-preferences-v15')||'{}');state.searchSettings=OfflineAPI.searchOptions(saved);}catch(error){console.warn('Preferências não puderam ser lidas',error.message);}
 delete state.searchSettings.customAliases;
-if(!window.NativeVector)state.searchSettings.vectorMode='off';
-document.documentElement.classList.toggle('with-vector',Boolean(window.NativeVector));
+// Migrate former no-runtime default once, then preserve the user's explicit setting.
+if(window.NativeHarrierPackage&&!localStorage.getItem('hinos-harrier-mode-v1')){state.searchSettings.vectorMode='balanced';localStorage.setItem('hinos-harrier-mode-v1','1');localStorage.setItem('hinos-search-preferences-v15',JSON.stringify(state.searchSettings));}
+if(!window.NativeHarrierPackage)state.searchSettings.vectorMode='off';
+document.documentElement.classList.toggle('with-vector',Boolean(window.NativeHarrierPackage));
 const escapeHTML=value=>String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
 let toastTimer=null;
 function toast(message){const el=$('toast');el.textContent=message;el.classList.remove('hidden');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.add('hidden'),6000);}
@@ -32,7 +34,7 @@ async function refreshStatus(){
   $('settings-stories').textContent=result.story_ready?`${result.story_count} narrativas locais`:'Não carregada';
   $('settings-scripture').textContent=result.scripture_ready?`${result.scripture_books} livros · Bíblia Livre`:'Indisponível';
   $('settings-bible-graph').textContent=result.bible_graph_ready?`${result.bible_graph_stats?.verse_topics||0} versículos com temas · ${result.bible_graph_narratives} narrativas`:'Indisponível';
-  $('settings-embeddings').textContent=result.vector_count?`${result.vector_count} hinos · E5 Small`:'Não disponível para esta coletânea';
+  $('settings-embeddings').textContent=result.vector_count?`${result.vector_count} hinos · Harrier 600M`:'Não disponível para esta coletânea';
   $('settings-bridge').textContent=result.bridge_ready?`${result.bridge_entries} associações`:'Indisponível';
   OfflineComparison.refresh();
   return result;
@@ -65,7 +67,7 @@ function resultCard(hymn,{unlearned=false}={}){
     <button class="view-btn" data-hymn-id="${Number(hymn.id)}" type="button">
       <span class="result-index" aria-label="${hymn.number?'Hino '+number:'Hino sem número'}">${number}</span>
       <span class="result-identity"><span class="hymn-number">${escapeHTML(hymn.collection||'Importados')}</span>
-        <span class="result-name">${escapeHTML(hymn.title)}</span>${filterLabel?`<span class="filter-evidence-line" title="${escapeHTML(filterLabel)}">${escapeHTML(filterLabel)}</span>`:''}</span>
+        <span class="result-name">${escapeHTML(hymn.title)}</span>${filterLabel?`<span class="filter-evidence-line" title="${escapeHTML(filterLabel)}">${escapeHTML(filterLabel)}</span>`:''}${hymn.vector_points>0?`<span class="harrier-evidence" title="Similaridade de cosseno, não probabilidade">Harrier · +${Number(hymn.vector_points).toFixed(1)} pontos</span>`:''}</span>
       ${hymn.match_type==='filtro'?'':`<span class="relevance" title="Afinidade estimada"><strong>${score}%</strong><span class="sr-only"> de afinidade</span></span>`}
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 5 7 7-7 7"/></svg>
     </button>
@@ -90,6 +92,8 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],preserv
   state.searchFilters=termFilters;
   if(!paging){
     state.searchEpoch++;
+    if(state.searchSettings.vectorMode==='off'||state.searchSettings.mode==='literal'||!HarrierRuntime.available()||query!==state.effectiveQuery)state.vectorQuery=null;
+    EmbeddingSearch.show('Busca local · preparando resultados');
     if(!preserveContext){
       state.vectorQuery=null;
       if(!refine)state.searchRootQuery=query;
@@ -101,8 +105,8 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],preserv
   busySearch(true);let succeeded=false;let isBibleSearch=false;
   try {
     let data;
-    if(paging)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
-    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+    if(paging)data=await jsonRequest('/api/search',{query:state.effectiveQuery,page,parsed_query:true,...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,vector_model:'harrier-600m-q4f16',settings:state.searchSettings});
+    else if(preserveContext)data=await jsonRequest('/api/search',{query,parsed_query:true,...searchRestrictions(),semantic_hints:semanticHints,vector_query:state.vectorQuery,vector_model:'harrier-600m-q4f16',settings:state.searchSettings});
     else data=await jsonRequest('/api/search',{query,term_filters:termFilters,refine,previous:refine?state.effectiveQuery:'',...(refine?searchRestrictions():{}),semantic_hints:semanticHints,settings:state.searchSettings});
     if(!paging){
       isBibleSearch=!!(data.bible_reference&&state.searchSettings.bibleGraph);
@@ -131,6 +135,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],preserv
     if(data.results.length)$('results-list').insertAdjacentHTML('beforeend',data.results.map(resultCard).join(''));
     else $('results-list').innerHTML=data.not_learned_total?'<div class="empty-results"><h3>Sem hinos disponíveis para indicação</h3><p>Os hinos relacionados estão na seção «Não aprendidos» abaixo.</p></div>':'<div class="empty-results"><h3>Nenhum hino encontrado</h3><p>Experimente termos mais gerais, outro tema ou uma frase da letra. Não apresentamos sugestões sem evidência mínima.</p></div>';
     if(!paging)RepertoireUI.renderSearch(data);
+    EmbeddingSearch.report(data);
     succeeded=true;
   }catch(error){
     if(!paging&&!preserveContext){
@@ -140,7 +145,7 @@ async function performSearch(query,{page=1,refine=false,semanticHints=[],preserv
     }
     toast(error.message);
   }finally{busySearch(false);}
-  if(succeeded&&query&&allowVector&&!paging&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
+  if(succeeded&&query&&allowVector&&!paging&&!isBibleSearch&&!state.exactNumber&&!state.vectorQuery&&state.searchSettings.vectorMode!=='off'&&state.searchSettings.mode!=='literal')EmbeddingSearch.maybeUpdate(state.effectiveQuery,state.searchEpoch);
   OfflineComparison.refresh();
   return succeeded;
 }
@@ -403,7 +408,7 @@ const SearchPreferences=(()=>{
       const input=$(id);options[key]=input.type==='checkbox'?input.checked:input.type==='range'||key==='pageSize'||key==='bibleDepth'?Number(input.value):input.value;
     }
     options.collections=Object.fromEntries(['principal','avulsos','cia','pessoal'].map(id=>[id,$('collection-'+id).checked]));
-    if(!window.NativeVector)options.vectorMode='off';
+    if(!window.NativeHarrierPackage)options.vectorMode='off';
     return OfflineAPI.searchOptions(options);
   }
   function save(){
@@ -862,7 +867,7 @@ const RepertoireUI=(()=>{
       if(state.ready&&(state.effectiveQuery||state.searchFilters?.length)){
         const epoch=state.searchEpoch;
         const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
-          semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+          semantic_hints:state.semanticHints,vector_query:state.vectorQuery,vector_model:'harrier-600m-q4f16',settings:state.searchSettings});
         if(epoch===state.searchEpoch){
           state.page=1;state.total=response.total;state.hasMore=response.has_more;state.lastResults=response.results.slice();
           
@@ -893,7 +898,7 @@ const RepertoireUI=(()=>{
     operation=true;const next=hiddenPage+1;
     try{
       const response=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,not_learned_page:next,
-        ...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,settings:state.searchSettings});
+        ...searchRestrictions(),semantic_hints:state.semanticHints,vector_query:state.vectorQuery,vector_model:'harrier-600m-q4f16',settings:state.searchSettings});
       hiddenPage=next;
       $('not-learned-list').insertAdjacentHTML('beforeend',response.not_learned_results.map(h=>resultCard(h,{unlearned:true})).join(''));
       $('not-learned-more').classList.toggle('hidden',!response.not_learned_has_more);
@@ -909,56 +914,63 @@ const RepertoireUI=(()=>{
 })();
 
 
-// E5 Small: apenas a consulta passa pela rede neural, no próprio Android.
-// Busca local aparece ANTES do embedding; erros não bloqueiam nenhuma pesquisa.
+// Harrier: inference on device, status based on actual applied ranking.
 const EmbeddingSearch=(()=>{
-  const pending=new Map(),activeQueries=new Map();let sequence=0;
-  function status(message){
+  let running=false,queued=null;
+  function show(message){
     const target=$('vector-results-state');if(target)target.textContent=message;
     const settings=$('vector-state');if(settings)settings.textContent=message;
   }
-  window.VectorNative={
-    progress(event){if(pending.has(String(event.id)))status(event.message||'Calculando embeddings…');},
-    complete(event){const item=pending.get(String(event.id));if(!item)return;
-      pending.delete(String(event.id));clearTimeout(item.timeout);
-      if(event.ok&&Array.isArray(event.vector)&&event.vector.length===384)item.resolve(event);
-      else item.reject(Error(event.error||'Modelo de embeddings indisponível'));
+  function report(data,ms){
+    if(data?.vector_evaluated){
+      const count=data.vector_contributors||0;
+      show(count>0?'Harrier aplicado · '+count+' hinos receberam pontuação vetorial · '+(data.vector_page_contributors||0)+' nesta página'+(Number.isFinite(ms)?' · '+ms+' ms':''):'Harrier consultado · nenhuma pontuação vetorial aplicada'+(Number.isFinite(ms)?' · '+ms+' ms':''));
+    }else{
+      const status=HarrierRuntime.status();
+      let reason=state.searchSettings.vectorMode==='off'?'modelo desativado nas preferências':
+        state.searchSettings.mode==='literal'?'modo literal':data?.exact_number?'número exato':
+        data?.bible_reference?'referência bíblica: motor contextual dedicado':
+        !state.effectiveQuery?'somente filtros':status.preparing?'validando Harrier':
+        status.error?'Harrier indisponível: '+status.error:!status.ready?'Harrier não está pronto':
+        !state.status?.vector_count?'nenhum hino vinculado à base vetorial':'Harrier ainda não utilizado nesta pesquisa';
+      show('Busca local · '+reason);
     }
-  };
-  function request(text){
-    if(activeQueries.has(text))return activeQueries.get(text);
-    const result=new Promise((resolve,reject)=>{
-      const id=String(++sequence);const timeout=setTimeout(()=>{pending.delete(id);reject(Error('Tempo excedido ao calcular embeddings'));},120000);
-      pending.set(id,{resolve,reject,timeout});
-      try{window.NativeVector.embed(id,text);}catch(e){pending.delete(id);clearTimeout(timeout);reject(e);}
-    }).finally(()=>activeQueries.delete(text));
-    activeQueries.set(text,result);
-    return result;
   }
   async function maybeUpdate(query,epoch){
-    if(state.searchSettings.vectorMode==='off'||!state.ready||!state.status?.vector_count)return;
-    if(typeof ScriptureIndex!=='undefined'&&ScriptureIndex.parse(query))return;
-    if(!window.NativeVector||!/^(?!\s*(?:hino\s*)?\d{1,4}\s*$)/i.test(query))return;
-    status('E5 Small: interpretando a consulta no aparelho…');
+    if(!query||state.searchSettings.vectorMode==='off'||state.searchSettings.mode==='literal'||!state.ready||
+       !HarrierRuntime.available()||!state.status?.vector_count||state.exactNumber||
+       (typeof ScriptureIndex!=='undefined'&&ScriptureIndex.parse(query))||/["“”]/.test(query))return;
+    if(running){queued={query,epoch};return;}
+    running=true;show('Harrier calculando embedding no aparelho · busca local já disponível');
     try{
-      const answer=await request(query);
-      if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off')return;
-      state.vectorQuery=answer.vector;
+      const answer=await HarrierRuntime.embed(query);
+      if(epoch!==state.searchEpoch||!state.ready||state.searchSettings.vectorMode==='off'||state.searchSettings.mode==='literal'||
+         !HarrierRuntime.available()||state.page!==1||state.busy)return;
       const result=await jsonRequest('/api/search',{query:state.effectiveQuery,page:1,parsed_query:true,...searchRestrictions(),
-        semantic_hints:state.semanticHints,vector_query:answer.vector,settings:state.searchSettings});
-      if(epoch!==state.searchEpoch)return;
+        semantic_hints:state.semanticHints,vector_query:answer.vector,vector_model:'harrier-600m-q4f16',settings:state.searchSettings});
+      if(epoch!==state.searchEpoch||state.page!==1||state.busy||!HarrierRuntime.available())return;
+      if(result.vector_evaluated)state.vectorQuery=answer.vector;
       state.total=result.total;state.page=1;state.hasMore=result.has_more;state.lastResults=result.results.slice();
-      
       $('results-list').innerHTML=result.results.length?result.results.map(resultCard).join(''):
         result.not_learned_total?'<div class="empty-results"><h3>Somente hinos ainda não aprendidos</h3><p>Veja a seção separada abaixo.</p></div>':'<div class="empty-results"><h3>Nenhum resultado</h3><p>Experimente ampliar o contexto.</p></div>';
-      RepertoireUI.renderSearch(result);
-      updatePages();
-      $('results-subtitle').textContent=`${result.total} resultados · busca híbrida com E5 Small`;
-      status('E5 Small: ranking vetorial atualizado em '+(answer.ms/1000).toFixed(1)+'s. Sem internet.');
-    }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · modelo E5: '+error.message);}
+      RepertoireUI.renderSearch(result);updatePages();OfflineComparison.refresh();
+      $('results-subtitle').textContent=result.total+' resultados · '+(result.vector_evaluated?'busca híbrida':'busca local');
+      report(result,answer.ms);
+    }catch(error){if(epoch===state.searchEpoch)show('Busca local preservada · Harrier: '+error.message);}
+    finally{running=false;const next=queued;queued=null;if(next&&next.epoch===state.searchEpoch)maybeUpdate(next.query,next.epoch);}
   }
-  return {maybeUpdate};
+  return {maybeUpdate,show,report};
 })();
+window.addEventListener('harrier-state',async event=>{
+  state.vectorQuery=null;state.searchEpoch++;
+  try{
+    await refreshStatus();
+    if(!event.detail.ready){EmbeddingSearch.show('Busca local · Harrier desativado ou indisponível');}
+    if(state.ready&&state.effectiveQuery&&!state.busy){
+      await performSearch(state.effectiveQuery,{preserveContext:true,semanticHints:state.semanticHints});
+    }
+  }catch(error){EmbeddingSearch.show('Busca local · '+error.message);}
+});
 
 
 const OfflineComparison=(()=>{

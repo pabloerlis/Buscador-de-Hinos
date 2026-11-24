@@ -483,3 +483,5 @@ button:focus-visible, summary:focus-visible, a:focus-visible {
 
 /* Keep the term filter entry point visible even while its body is collapsed. */
 .live-filters:not([open]){display:block}.live-filters>summary{cursor:pointer}.term-filter-row [data-field="lexical"]{grid-column:1/-1;min-width:0}.term-synonym-preview{overflow-wrap:anywhere;max-height:5.5em;overflow-y:auto}.term-filter-row [data-field="lexical"]:disabled{display:none}
+
+.harrier-evidence{display:block;color:var(--green);font-size:.72rem;font-weight:600;margin-top:3px}.vector-live:empty{display:none}

@@ -39,7 +39,7 @@ final class HarrierPackage {
     private volatile HttpURLConnection active;
     private HarrierPackage(File filesDir){
         root=new File(filesDir,"harrier");installed=new File(root,"v1");
-        if(hasFiles(installed)){phase="installed";message="Arquivos instalados. Execute o diagnóstico para verificar a inferência.";downloaded=TOTAL_BYTES;}
+        if(hasFiles(installed)){phase="installed";message="Arquivos instalados. Validação automática ao abrir o aplicativo.";downloaded=TOTAL_BYTES;}
     }
     static boolean hasFiles(File dir){
         if(!dir.isDirectory())return false;
@@ -126,7 +126,7 @@ final class HarrierPackage {
                 if(!hasFiles(stage))throw new IOException("Pacote inválido");
                 if(installed.exists())delete(installed);
                 if(!stage.renameTo(installed))throw new IOException("Não foi possível finalizar instalação");
-                downloaded=TOTAL_BYTES;message="Arquivos instalados e verificados. Execute o diagnóstico para verificar a inferência.";phase="installed";
+                downloaded=TOTAL_BYTES;message="Arquivos instalados e verificados. Validação automática ao abrir o aplicativo.";phase="installed";
             }
         }catch(Exception e){
             try{delete(stage);}catch(IOException ignored){}
@@ -145,7 +145,7 @@ final class HarrierPackage {
     }
     synchronized File localFile(String name){
         if(!"installed".equals(phase)&&!"testing".equals(phase))return null;
-        if(!"tokenizer.json".equals(name)&&!"tokenizer_config.json".equals(name))return null;
+        if(!"tokenizer.json".equals(name)&&!"tokenizer_config.json".equals(name)&&!"index.json".equals(name)&&!"manifest.json".equals(name))return null;
         File f=new File(installed,name);
         return f.isFile()?f:null;
     }

@@ -34,10 +34,14 @@ public final class MainActivity extends Activity {
     private static final int PICK_FILE = 1205;
     private static final int CREATE_DICTIONARY_BACKUP = 1207;
     private static final int MAX_DICTIONARY_BACKUP_BYTES = 256_000;
-    private final ExecutorService vectorExecutor=Executors.newSingleThreadExecutor();
     private final ExecutorService harrierExecutor=Executors.newSingleThreadExecutor();
-    private volatile String vectorState="Aguardando primeira pesquisa";
-    private E5Engine embeddingEngine;
+    private HarrierEngine harrierEngine;
+    private volatile boolean harrierReady=false,harrierRemoving=false,closing=false;
+    private final java.util.concurrent.atomic.AtomicBoolean inferenceBusy=new java.util.concurrent.atomic.AtomicBoolean(false);
+    private void closeHarrier(){
+        harrierReady=false;
+        if(harrierEngine!=null){try{harrierEngine.close();}catch(Exception ignored){}harrierEngine=null;}
+    }
     private WebView web;
     private ValueCallback<Uri[]> pendingFile;
     private byte[] pendingDictionaryBackup;
@@ -71,7 +75,7 @@ public final class MainActivity extends Activity {
                     try { return new WebResourceResponse("application/json", "UTF-8", new FileInputStream(data)); }
                     catch (IOException ex) { return forbidden(); }
                 }
-                if ("/harrier/tokenizer.json".equals(path)||"/harrier/tokenizer_config.json".equals(path)){
+                if ("/harrier/tokenizer.json".equals(path)||"/harrier/tokenizer_config.json".equals(path)||"/harrier/index.json".equals(path)||"/harrier/manifest.json".equals(path)){
                     File file=HarrierPackage.get(getFilesDir()).localFile(path.substring("/harrier/".length()));
                     if(file==null)return forbidden();
                     try{return new WebResourceResponse("application/json","UTF-8",new FileInputStream(file));}
@@ -95,27 +99,65 @@ public final class MainActivity extends Activity {
         });
         web.addJavascriptInterface(new ImportBridge(), "NativeHinos");
         web.addJavascriptInterface(new HarrierPackageBridge(), "NativeHarrierPackage");
-        if(BuildConfig.ENABLE_EMBEDDINGS){
-            web.addJavascriptInterface(new VectorBridge(), "NativeVector");
-        }
         web.loadUrl(HOST + "/assets/index.html");
     }
     private final class HarrierPackageBridge {
         private final HarrierPackage pack=HarrierPackage.get(getFilesDir());
         @JavascriptInterface public String status(){
-            try{return new JSONObject().put("phase",pack.phase()).put("message",pack.message()).put("downloaded",pack.downloaded()).put("total",HarrierPackage.TOTAL_BYTES).toString();}
+            try{return new JSONObject().put("phase",pack.phase()).put("message",pack.message()).put("downloaded",pack.downloaded()).put("total",HarrierPackage.TOTAL_BYTES).put("ready",harrierReady&&!harrierRemoving&&!closing).put("removing",harrierRemoving).toString();}
             catch(Exception e){return "{}";}
         }
         @JavascriptInterface public void install(){pack.start();}
         @JavascriptInterface public void cancel(){pack.cancel();}
-        @JavascriptInterface public void remove(){pack.remove();}
+        @JavascriptInterface public void remove(){
+            if("testing".equals(pack.phase())||"downloading".equals(pack.phase())||harrierRemoving||closing)return;
+            harrierRemoving=true;harrierReady=false;
+            try{harrierExecutor.execute(()->{try{closeHarrier();pack.remove();}finally{harrierRemoving=false;}});}
+            catch(RuntimeException e){harrierRemoving=false;}
+        }
+        @JavascriptInterface public void embed(String requestId,String encodedIds){
+            if(requestId==null||!requestId.matches("[0-9]{1,16}"))return;
+            if(encodedIds==null||encodedIds.length()>2000||!harrierReady||harrierRemoving||closing){
+                publishVector(requestId,null,0,"Harrier não está pronto.");return;
+            }
+            if(!inferenceBusy.compareAndSet(false,true)){publishVector(requestId,null,0,"Outra inferência está em andamento.");return;}
+            try{harrierExecutor.execute(()->{
+                long start=System.nanoTime();
+                try{
+                    if(!harrierReady||harrierEngine==null||harrierRemoving||closing||!"installed".equals(pack.phase()))throw new IOException("Harrier indisponível");
+                    org.json.JSONArray tokens=new org.json.JSONArray(encodedIds);
+                    if(tokens.length()<1||tokens.length()>192)throw new IOException("Limite de tokens");
+                    long[] ids=new long[tokens.length()];
+                    for(int i=0;i<ids.length;i++){
+                        Object item=tokens.get(i);
+                        if(!(item instanceof Number))throw new IOException("Token inválido");
+                        double d=((Number)item).doubleValue();
+                        if(!Double.isFinite(d)||d!=Math.rint(d)||d<0||d>200000)throw new IOException("Token inválido");
+                        ids[i]=(long)d;
+                    }
+                    float[] vector=harrierEngine.embed(ids);
+                    if(!harrierReady||closing||harrierRemoving)throw new IOException("Harrier desativado");
+                    publishVector(requestId,vector,(System.nanoTime()-start)/1000000,"");
+                }catch(Throwable error){
+                    publishVector(requestId,null,0,error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage()));
+                }finally{inferenceBusy.set(false);}
+            });}catch(RuntimeException e){inferenceBusy.set(false);publishVector(requestId,null,0,"Executor indisponível.");}
+        }
+        private void publishVector(String id,float[] vector,long ms,String error){
+            try{
+                JSONObject event=new JSONObject().put("id",id).put("ok",vector!=null).put("model","harrier-600m-q4f16").put("ms",ms).put("error",error);
+                if(vector!=null){org.json.JSONArray arr=new org.json.JSONArray();for(float value:vector)arr.put(value);event.put("vector",arr);}
+                runOnUiThread(()->{if(web!=null&&!closing)web.evaluateJavascript("window.HarrierRuntime&&window.HarrierRuntime.complete("+event.toString()+")",null);});
+            }catch(Exception ignored){}
+        }
         @JavascriptInterface public void diagnose(String encodedIds){
-            if(encodedIds==null||encodedIds.length()>12000)return;
+            if(encodedIds==null||encodedIds.length()>12000||harrierRemoving||closing){publishDiagnostic(false,null,"Diagnóstico indisponível");return;}
             final File directory;
-            try{directory=pack.beginDiagnostic();}
+            try{directory=pack.beginDiagnostic();harrierReady=false;}
             catch(Exception e){publishDiagnostic(false,null,e.getMessage());return;}
             try{harrierExecutor.execute(()->{
                 try{
+                    closeHarrier();
                     pack.verifyInstalled(directory);
                     java.io.ByteArrayOutputStream content=new java.io.ByteArrayOutputStream();
                     try(InputStream in=getAssets().open("harrier-conformance.json")){
@@ -123,10 +165,15 @@ public final class MainActivity extends Activity {
                         while((n=in.read(buf))!=-1){if(content.size()+n>200000)throw new IOException("Referência muito grande");content.write(buf,0,n);}
                     }
                     JSONObject reference=new JSONObject(new String(content.toByteArray(),StandardCharsets.UTF_8));
-                    JSONObject result=HarrierEngine.verify(directory,reference,new org.json.JSONArray(encodedIds));
-                    pack.finishDiagnostic("Diagnóstico aprovado. Busca vetorial ainda experimental.");
+                    long start=System.nanoTime();
+                    harrierEngine=new HarrierEngine(directory);
+                    JSONObject result=harrierEngine.verify(reference,new org.json.JSONArray(encodedIds),(System.nanoTime()-start)/1000000);
+                    if(closing)throw new IOException("Atividade encerrada");
+                    harrierReady=true;
+                    pack.finishDiagnostic("Harrier validado e carregado.");
                     publishDiagnostic(true,result,"");
                 }catch(Throwable error){
+                    closeHarrier();
                     String message=error.getClass().getSimpleName()+": "+String.valueOf(error.getMessage());
                     pack.finishDiagnostic("Diagnóstico falhou: "+message);
                     publishDiagnostic(false,null,message);
@@ -140,39 +187,6 @@ public final class MainActivity extends Activity {
             }catch(Exception ignored){}
         }
     }
-    private final class VectorBridge {
-        @JavascriptInterface public String status(){
-            try{return new JSONObject().put("available",true).put("state",vectorState).toString();}
-            catch(Exception e){return "{}";}
-        }
-        @JavascriptInterface public void embed(String requestId,String query){
-            if(requestId==null||requestId.length()>64||query==null||query.length()>500)return;
-            vectorExecutor.execute(()->{
-                long start=System.currentTimeMillis();
-                try{
-                    if(embeddingEngine==null)embeddingEngine=new E5Engine(MainActivity.this);
-                    float[] v=embeddingEngine.embed(query,progress->{vectorState=progress;sendProgress(requestId,progress);});
-                    org.json.JSONArray arr=new org.json.JSONArray();
-                    for(float value:v)arr.put(value);
-                    vectorState="Modelo E5 pronto";
-                    sendResult(new JSONObject().put("id",requestId).put("ok",true).put("vector",arr).put("ms",System.currentTimeMillis()-start));
-                }catch(Throwable e){
-                    vectorState="Falha: "+e.getClass().getSimpleName();
-                    try{sendResult(new JSONObject().put("id",requestId).put("ok",false)
-                        .put("error",e.getClass().getSimpleName()+": "+e.getMessage()));}catch(Exception ignored){}
-                }
-            });
-        }
-        private void sendProgress(String id,String message){
-            try{JSONObject data=new JSONObject().put("id",id).put("message",message);
-                runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.VectorNative&&window.VectorNative.progress("+data.toString()+")",null);});
-            }catch(Exception ignored){}
-        }
-        private void sendResult(JSONObject data){
-            runOnUiThread(()->{if(web!=null)web.evaluateJavascript("window.VectorNative&&window.VectorNative.complete("+data.toString()+")",null);});
-        }
-    }
-
     private static WebResourceResponse forbidden(){
         return new WebResourceResponse("text/plain", "UTF-8", new java.io.ByteArrayInputStream(new byte[0]));
     }
@@ -222,7 +236,8 @@ public final class MainActivity extends Activity {
     @Override protected void onDestroy(){
         if(pendingFile!=null)pendingFile.onReceiveValue(null);
         if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeVector");web.removeJavascriptInterface("NativeHarrierPackage");web.destroy();web=null;}
-        vectorExecutor.shutdown();
+        closing=true;harrierReady=false;
+        try{harrierExecutor.execute(this::closeHarrier);}catch(RuntimeException ignored){}
         harrierExecutor.shutdown();
         super.onDestroy();
     }

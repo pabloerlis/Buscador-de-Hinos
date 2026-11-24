@@ -44,16 +44,15 @@ final class HarrierEngine implements AutoCloseable {
             }
         }
     }
-    static JSONObject verify(File directory,JSONObject reference,JSONArray supplied)throws Exception{
+    JSONObject verify(JSONObject reference,JSONArray supplied,long load)throws Exception{
         if(!"dbaf6767003608562dd5b744bc443656a29c45bd".equals(reference.getString("revision"))||
            !"q4f16".equals(reference.getString("variant"))||
            !"1.31.1".equals(reference.getString("runtime")))throw new IOException("Referência incompatível");
         JSONArray cases=reference.getJSONArray("fixtures");
         if(cases.length()!=3||supplied.length()!=3)throw new IOException("Casos de referência inválidos");
-        long start=System.nanoTime();double min=1;
+        double min=1;
         JSONArray measurements=new JSONArray();
-        try(HarrierEngine engine=new HarrierEngine(directory)){
-            long load=(System.nanoTime()-start)/1000000;
+        {
             for(int k=0;k<cases.length();k++){
                 JSONObject fixture=cases.getJSONObject(k);
                 JSONArray expected=fixture.getJSONArray("ids"),actual=supplied.getJSONArray(k),target=fixture.getJSONArray("embedding");
@@ -64,7 +63,7 @@ final class HarrierEngine implements AutoCloseable {
                     if(!(item instanceof Number)||((Number)item).doubleValue()!=expected.getLong(i))throw new IOException("Tokenização não confere");
                     ids[i]=expected.getLong(i);
                 }
-                long before=System.nanoTime();float[] vector=engine.embed(ids);
+                long before=System.nanoTime();float[] vector=embed(ids);
                 double dot=0,refSq=0;
                 for(int i=0;i<DIM;i++){
                     double v=target.getDouble(i);

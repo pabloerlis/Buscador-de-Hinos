@@ -456,7 +456,7 @@ const OfflineAPI = (() => {
         if(i&&i%100===0)await yieldThread();
       }
       await writeCache({hymns,metadata,semantic_revision:semantic?.revision||null,story_revision:narratives?.revision||null});
-    }else if(migrated)await writeCache({hymns,metadata,semantic_revision:semantic?.revision||null,story_revision:narratives?.revision||null});rebuildIndexes();if(window.NativeVector&&typeof VectorIndex!=='undefined')await VectorIndex.configure(hymns);} })().catch(e=>{initialized=null;throw e;});
+    }else if(migrated)await writeCache({hymns,metadata,semantic_revision:semantic?.revision||null,story_revision:narratives?.revision||null});rebuildIndexes();if(window.NativeHarrierPackage&&typeof VectorIndex!=='undefined')await VectorIndex.configure(hymns);} })().catch(e=>{initialized=null;throw e;});
     return initialized;
   }
   async function importJson(data){
@@ -505,7 +505,7 @@ const OfflineAPI = (() => {
       edition:importedTypes.length===1?(next[0]?.edition||'não informada'):'múltiplas coleções',hymn_count:next.length};
     await writeCache({hymns:next,metadata:nextMeta,semantic_revision:semantic?.revision||null,story_revision:narratives?.revision||null});
     hymns=next;metadata=nextMeta;rebuildIndexes();
-    if(window.NativeVector&&typeof VectorIndex!=='undefined')await VectorIndex.configure(hymns);
+    if(window.NativeHarrierPackage&&typeof VectorIndex!=='undefined')await VectorIndex.configure(hymns);
     return {ok:true,collection:metadata.collection,edition:metadata.edition,count:hymns.length,added:Object.values(additions).reduce((a,b)=>a+b,0),
       duplicates,collections:libraryCounts(),processed};
   }
@@ -798,7 +798,7 @@ const OfflineAPI = (() => {
     const usePassages=semanticWeight>0&&!numberMatch&&!quoted.length&&!required.length&&
       !scripture&&!isBiblicalRef&&!storyIntent?.matches.length;
     const passageTopics=new Set(usePassages?intent?.direct.map(topic=>topic.id):[]);
-    const vectorEnabled=opts.vectorMode!=='off' && opts.mode!=='literal' && !numberMatch && typeof VectorIndex!=='undefined' && VectorIndex.status().ready && VectorIndex.checkQuery(payload?.vector_query);
+    const vectorEnabled=opts.vectorMode!=='off' && opts.mode!=='literal' && !numberMatch && !filterOnly && !isBiblicalRef && !quoted.length && typeof VectorIndex!=='undefined' && VectorIndex.status().ready && payload?.vector_model==='harrier-600m-q4f16' && VectorIndex.checkQuery(payload?.vector_query);
     const vectorHits=vectorEnabled?VectorIndex.topForQuery(payload.vector_query,100):[];
     const vectorScores=new Map(vectorHits.map(h=>[h.id,h.similarity]));
     const ranked=[];
@@ -816,7 +816,7 @@ const OfflineAPI = (() => {
       if(excludedCriteria.some(matchesCriterion))continue;
       const namedCollection=numberMatch?.[1]?collectionId(numberMatch[1]):null;
       if(numberMatch&&!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2]) && (!namedCollection||ref.id===namedCollection) && opts.collections[ref.id]!==false))continue;
-      let score=0;const evidence=[],spelling=[];let semanticResult=null,storyResult=null,graphResult=null;
+      let score=0,vectorPoints=0;const evidence=[],spelling=[];let semanticResult=null,storyResult=null,graphResult=null;
       if(numberMatch){
         if(!song.collectionRefs.some(ref=>Number(ref.number)===Number(numberMatch[2])))continue;
         score=100;evidence.push('número exato');
@@ -857,10 +857,10 @@ const OfflineAPI = (() => {
           }
         }
         const v=vectorScores.get(song.id);
-        if(v!==undefined && v>=0.72){
-          const points=Math.min(24,Math.max(0,(v-.70)*110))*(opts.vectorMode==='strong'?1.4:1);
-          score+=points;
-          if(points>=4)evidence.push('significado próximo da consulta (modelo E5)');
+        if(v!==undefined){
+          vectorPoints=VectorIndex.points(v,opts.vectorMode);
+          score+=vectorPoints;
+          if(vectorPoints>0)evidence.push('significado próximo da consulta (Harrier 600M)');
         }
         if(graphCtx){
           graphResult=bibleGraph.evaluate(song,graphCtx);
@@ -874,7 +874,7 @@ const OfflineAPI = (() => {
           if(storyResult.reasons.length)evidence.unshift(...storyResult.reasons);
         }
       }
-      if(score<(semanticResult?.score>0||storyResult?.score>0||graphResult?.score>=7||vectorScores.get(song.id)>0.76||spelling.length?4.7:7))continue;
+      if(score<(semanticResult?.score>0||storyResult?.score>0||graphResult?.score>=7||vectorPoints>=7||spelling.length?4.7:7))continue;
       if(!numberMatch)score+=Math.min(12,preferred.filter(filter=>matchesFilter(filter,title,lyrics)).length*4);
       const sharedPassage=passageTopics.size>=2?findSharedPassage(song,indexedText,passageTopics):null;
       if(sharedPassage){
@@ -897,7 +897,8 @@ const OfflineAPI = (() => {
         relevance_score:Math.round(score*100)/100,relevance_percent:percent,
         _narrativeTier:storyResult?.tier||0,
         vector_similarity:vectorScores.has(song.id)?Math.round(vectorScores.get(song.id)*100):null,
-        match_type:filterOnly?'filtro':numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorScores.get(song.id)>0.74?'vetorial':'contexto',
+        vector_points:Math.round(vectorPoints*100)/100,
+        match_type:filterOnly?'filtro':numberMatch?'numero':exactTitles.has(song.id)?'titulo_exato':graphResult?.score>=8?'referencia_biblica':storyResult?.score>0?'narrativa':vectorPoints>=7?'vetorial':'contexto',
         relevance:score>=17?'Muito relevante':score>=10?'Relevante':'Relacionado'});
     }
     // Consulta composta: preservar o peso dos outros requisitos; o nível
@@ -940,7 +941,7 @@ const OfflineAPI = (() => {
       snippet:sharedPassage?.text||makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
     const reading=storyIntent?.matches?.map(x=>x.reference?x.label+' ('+x.reference+')':x.label)||[];
     const interpretation=opts.showConcepts?[
-      ...(vectorEnabled?['Embeddings E5: '+VectorIndex.status().count+' hinos indexados']:[]),
+      ...(vectorEnabled?['Harrier 600M: '+VectorIndex.status().count+' hinos indexados']:[]),
       ...reading.map(t=>'Narrativa: '+t),
       ...selectedTopics.slice(0,6).map(t=>'Tema: '+t),
       ...(scripture?['Bíblia Livre offline: '+scripture.reference+(scripture.partial?' (amostra do capítulo)':'')]:[]),
@@ -955,6 +956,9 @@ const OfflineAPI = (() => {
       not_learned_total:notLearned.length,not_learned_page:hiddenPage,
       not_learned_results:notLearned.slice(hiddenFrom,hiddenFrom+hiddenSize).map(withSnippet),
       not_learned_has_more:hiddenFrom+hiddenSize<notLearned.length,
+      vector_evaluated:vectorEnabled,vector_model:vectorEnabled?'harrier-600m-q4f16':null,
+      vector_candidates:vectorHits.length,vector_contributors:ranked.filter(x=>x.vector_points>0).length,
+      vector_page_contributors:available.slice(from,from+opts.pageSize).filter(x=>x.vector_points>0).length,
       topics:selectedTopics,story_matches:reading,
       ai_context:{
         reference:graphCtx?.reference||scripture?.reference||null,
@@ -1047,6 +1051,11 @@ const OfflineAPI = (() => {
   }
   async function request(url,payload){
     await init();
+    if(url==='/api/vector/refresh'){
+      if(typeof VectorIndex==='undefined')return {ready:false,count:0};
+      queryRankingCache.clear();return VectorIndex.configure(hymns);
+    }
+    if(url==='/api/vector/clear'){if(typeof VectorIndex!=='undefined')VectorIndex.clear();queryRankingCache.clear();return {ok:true};}
     if(url==='/api/status')return {lexical_ready:!!lexicalPT,lexical_terms:lexicalPT?.terms||0,lexical_groups:lexicalPT?.groups||0,ready:hymns.length>0,hymn_count:hymns.length,vector_count:typeof VectorIndex!=='undefined'?VectorIndex.status().count:0,vector_status:typeof VectorIndex!=='undefined'?VectorIndex.status():null,semantic_ready:!!semantic,semantic_topics:semantic?.topics||0,semantic_revision:semantic?.revision||null,
       story_ready:!!narratives,story_count:(narratives?.stories||0)+personalStories.length,story_revision:narratives?.revision||null,
       scripture_ready:!!scriptureIndex,scripture_books:scriptureIndex?.bookCount||0,
