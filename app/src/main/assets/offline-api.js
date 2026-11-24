@@ -63,7 +63,7 @@ const OfflineAPI = (() => {
   let bibleGraph=null;
   let bridge=null;
   let queryRankingCache=new Map();
-  const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
+  const DEFAULT_SEARCH={collections:{principal:true,avulsos:true,cia:true,pessoal:true},vectorMode:'off',mode:'balanced',strength:75,narratives:true,related:true,minAffinity:0,pageSize:5,showReasons:true,showConcepts:true,scripture:true,bridge:true,bibleGraph:true,bibleLinks:true,bibleDepth:1,contextRerank:false,customAliases:{},recWeight:65,recCount:5,recContext:true,recAvoidVisited:true,recBreakdown:true};
   function searchOptions(raw){
     const p=raw&&typeof raw==='object'?raw:{};
     const clamp=(v,min,max,fallback)=>Number.isFinite(Number(v))?Math.min(max,Math.max(min,Number(v))):fallback;
@@ -79,7 +79,7 @@ const OfflineAPI = (() => {
       strength:clamp(p.strength,0,100,75),narratives:p.narratives!==false,
       related:p.related!==false,minAffinity:clamp(p.minAffinity,0,90,0),
       pageSize:[5,10].includes(Number(p.pageSize))?Number(p.pageSize):5,
-      showReasons:p.showReasons!==false,showConcepts:p.showConcepts!==false,scripture:p.scripture!==false,bridge:p.bridge!==false,bibleGraph:p.bibleGraph!==false,bibleLinks:p.bibleLinks!==false,bibleDepth:[0,1,2].includes(Number(p.bibleDepth))?Number(p.bibleDepth):1,customAliases:aliases,
+      showReasons:p.showReasons!==false,showConcepts:p.showConcepts!==false,scripture:p.scripture!==false,bridge:p.bridge!==false,bibleGraph:p.bibleGraph!==false,bibleLinks:p.bibleLinks!==false,bibleDepth:[0,1,2].includes(Number(p.bibleDepth))?Number(p.bibleDepth):1,contextRerank:p.contextRerank===true,customAliases:aliases,
       recWeight:clamp(p.recWeight,0,100,65),recCount:[5,10].includes(Number(p.recCount))?Number(p.recCount):5,
       recContext:p.recContext!==false,recAvoidVisited:p.recAvoidVisited!==false,recBreakdown:p.recBreakdown!==false};
   }
@@ -599,9 +599,30 @@ const OfflineAPI = (() => {
     // Consulta composta: preservar o peso dos outros requisitos; o nível
     // narrativo só desempata prioritariamente a busca pela história isolada.
     const narrativePrimary=Boolean(storyIntent?.matches?.length)&&qTokens.length===0&&!required.length;
-    ranked.sort((a,b)=>Number(b.match_type==='titulo_exato')-Number(a.match_type==='titulo_exato')||
+    const compareRanking=(a,b)=>Number(b.match_type==='titulo_exato')-Number(a.match_type==='titulo_exato')||
       (narrativePrimary?b._narrativeTier-a._narrativeTier:0)||
-      b.relevance_score-a.relevance_score||Number(a.number||10000)-Number(b.number||10000)||a.id-b.id);
+      b.relevance_score-a.relevance_score||Number(a.number||10000)-Number(b.number||10000)||a.id-b.id;
+    ranked.sort(compareRanking);
+    let contextReranked=false;
+    const canRerank=opts.contextRerank&&semanticWeight>0&&graphCtx&&!numberMatch&&!quoted.length
+      &&typeof ContextRanker!=='undefined';
+    if(canRerank){
+      const source=ContextRanker.profile(graphCtx.sourceText);
+      if(new Set(source.events.map(event=>event.action)).size>=2){
+        const finalists=ranked.slice(0,40).map(hit=>{
+          if(hit.match_type==='titulo_exato')return hit;
+          const signals=ContextRanker.compare(source,ContextRanker.profile(hymns[hit.id-1].lyrics));
+          const weight=Math.min(1,semanticWeight)*(graphCtx.residual?0.5:1);
+          const adjustment=ContextRanker.score(signals)*3*weight;
+          return {...hit,_contextOrder:hit.relevance_score+adjustment};
+        });
+        finalists.sort((a,b)=>Number(b.match_type==='titulo_exato')-Number(a.match_type==='titulo_exato')||
+          (narrativePrimary?b._narrativeTier-a._narrativeTier:0)||
+          (b._contextOrder??b.relevance_score)-(a._contextOrder??a.relevance_score)||compareRanking(a,b));
+        contextReranked=finalists.some((hit,index)=>hit.id!==ranked[index].id);
+        ranked.splice(0,finalists.length,...finalists);
+      }
+    }
     // O hino não aprendido continua no ranking e mantém sua afinidade.
     // Apenas a paginação principal fica reservada aos hinos disponíveis.
     const available=ranked.filter(h=>!RepertoireStore.isNotLearned(hymns[h.id-1]));
@@ -610,7 +631,7 @@ const OfflineAPI = (() => {
     const hiddenSize=5;
     const hiddenFrom=(hiddenPage-1)*hiddenSize;
     const from=(page-1)*opts.pageSize;
-    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,...hit})=>({...hit,
+    const withSnippet=({spelling,sharedPassage,cues,_narrativeTier,_contextOrder,...hit})=>({...hit,
       snippet:sharedPassage?.text||makeSnippet(hymns[hit.id-1],[...qTokens,...spelling],selectedTopics,cues,snippetPhrases)});
     const reading=storyIntent?.matches?.map(x=>x.label+' ('+x.reference+')')||[];
     const interpretation=opts.showConcepts?[
@@ -635,14 +656,14 @@ const OfflineAPI = (() => {
         passage:(graphCtx?.sourceText||scripture?.text||'').slice(0,220),
         topics:[...new Set([...(graphCtx?.concepts||[]).map(topic=>topic.label),...selectedTopics])].slice(0,4)
       },
-      interpretation,...criteria,exact_number:Boolean(numberMatch),used_ai:hints.length>0,applied_hints:hints,
+      interpretation,...criteria,context_reranked:contextReranked,exact_number:Boolean(numberMatch),used_ai:hints.length>0,applied_hints:hints,
       _fullRanked:payload?._forRecommendations===true?ranked:undefined,
       summary:graphCtx?'Busca por contexto bíblico offline: '+graphCtx.reference+'. Resultados baseados nas evidências das letras.':scripture?'Texto da Bíblia Livre consultado offline: '+scripture.reference+'.':bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef&&!storyIntent?.matches.length?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',
       bible_reference:graphCtx?.reference||scripture?.reference||bible?.reference||null,bible_verses:scripture?.verses?.length||0,scripture_source:scripture?.source||null};
   }
   function queryRanking(query,opts){
     if(!query||!query.trim()||/^(?:hino\s*)?\d{1,4}$/i.test(query.trim()))return new Map();
-    const key=JSON.stringify([query,opts.mode,opts.strength,opts.narratives,opts.related,opts.customAliases,opts.collections,opts.vectorMode]);
+    const key=JSON.stringify([query,opts.mode,opts.strength,opts.narratives,opts.related,opts.customAliases,opts.collections,opts.vectorMode,opts.contextRerank]);
     if(queryRankingCache.has(key))return queryRankingCache.get(key);
     const ranked=search({query,page:1,parsed_query:true,settings:{...opts,minAffinity:0},_forRecommendations:true});
     const scores=new Map(ranked._fullRanked.map(x=>[x.id,x.relevance_percent]));

@@ -166,19 +166,12 @@ jobs:
         env:
           BUILD_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: python3 scripts/qa_apk.py apk-candidate/app-debug.apk
-      - name: Identificar a versao do artefato
-        id: meta
-        shell: bash
-        run: |
-          version="$(sed -n "s/.*versionName '\([^']*\)'.*/\1/p" app/build.gradle | head -n 1)"
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Publicar somente APK validado
+      # A chave da linha de distribuição e o teste de atualização precisam existir
+      # antes de expor um APK para instalação. Este fluxo guarda apenas a auditoria.
+      - name: Guardar relatorio de auditoria do candidato
         uses: actions/upload-artifact@v4
         with:
-          name: Buscador-de-Hinos-v${{ steps.meta.outputs.version }}-QA-aprovado
-          path: |
-            apk-candidate/app-debug.apk
-            qa-report/apk-audit.json
-          retention-days: 90
+          name: apk-audit-qa
+          path: qa-report/apk-audit.json
+          retention-days: 30
           if-no-files-found: error

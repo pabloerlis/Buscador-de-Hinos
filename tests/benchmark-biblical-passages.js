@@ -28,7 +28,7 @@ const context=vm.createContext({console,setTimeout,clearTimeout,queueMicrotask,i
   }};}}
 });
 for(const name of ['scripture-index.js','semantic-engine.js','story-engine.js','bridge-engine.js',
-  'bible-context.js','bible-graph-engine.js','recommendation-engine.js','repertoire-store.js','offline-api.js']){
+  'bible-context.js','bible-graph-engine.js','recommendation-engine.js','repertoire-store.js','context-ranker.js','offline-api.js']){
   vm.runInContext(read(name),context,{filename:name});
 }
 const request=vm.runInContext('OfflineAPI.request',context);
@@ -43,23 +43,28 @@ const cases=[
   const groups=JSON.parse(fs.readFileSync(source,'utf8'));
   const imported=await request('/api/import',{data:groups});
   assert.ok(imported.count>=1400,'Catálogo menor do que o esperado: '+imported.count);
-  const outcome=[];
-  for(const item of cases){
-    const result=await request('/api/search',{query:item.query,settings:{pageSize:10},_forRecommendations:true});
-    const ranked=result._fullRanked;
-    const index=(collection,number)=>ranked.findIndex(x=>
-      x.collection===collection&&Number(x.number)===number);
-    const expected=item.positive.map(([collection,number])=>{
-      const i=index(collection,number);return {number,position:i<0?null:i+1};
-    });
-    const falsePositive=(item.negative||[]).map(([collection,number])=>{
-      const i=index(collection,number);return {number,position:i<0?null:i+1};
-    });
-    outcome.push({query:item.query,expected,falsePositive,
-      top10:ranked.slice(0,10).map(x=>({number:x.number,title:x.title,
-        collection:x.collection,score:x.relevance_score,reason:x.reason}))});
+  async function benchmark(contextRerank){
+    const outcome=[];
+    for(const item of cases){
+      const result=await request('/api/search',{query:item.query,settings:{pageSize:10,contextRerank},_forRecommendations:true});
+      const ranked=result._fullRanked;
+      const index=(collection,number)=>ranked.findIndex(x=>
+        x.collection===collection&&Number(x.number)===number);
+      const expected=item.positive.map(([collection,number])=>{
+        const i=index(collection,number);return {number,position:i<0?null:i+1};
+      });
+      const falsePositive=(item.negative||[]).map(([collection,number])=>{
+        const i=index(collection,number);return {number,position:i<0?null:i+1};
+      });
+      outcome.push({query:item.query,expected,falsePositive,
+        top10:ranked.slice(0,10).map(x=>({number:x.number,title:x.title,
+          collection:x.collection,score:x.relevance_score,reason:x.reason}))});
+    }
+    return outcome;
   }
-  console.log('BENCHMARK_BIBLICO '+JSON.stringify({count:imported.count,outcome}));
+  const outcome=await benchmark(false);
+  const experimental=await benchmark(true);
+  console.log('BENCHMARK_BIBLICO '+JSON.stringify({count:imported.count,outcome,experimental}));
   for(const row of outcome){
     assert.ok(row.expected.some(x=>x.position&&x.position<=20),
       'Nenhum hino diretamente relacionado recuperado no top 20: '+row.query);

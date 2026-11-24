@@ -85,6 +85,18 @@ for(const [name,rows] of Object.entries(suites)){
   report.suites[name]={count:rows.length,metrics,thresholds:rules,cases:rows};
   console.log('AGENTE DE RELEVÂNCIA — '+name+': '+JSON.stringify(metrics));
 }
+const experimental = metricRows(bible.experimental, row=>row.expected.map(x=>x.position));
+const summarize = rows => Object.fromEntries(['recall_at_10','recall_at_20','ndcg_at_5'].map(key=>
+  ['macro_'+key, rows.reduce((total,row)=>total+row[key],0)/rows.length]));
+report.experimental_context_rerank = {
+  count:experimental.length,
+  metrics:summarize(experimental),
+  cases:experimental,
+  false_positives:bible.outcome.map((row,index)=>({
+    query:row.query, baseline:row.falsePositive, experimental:bible.experimental[index].falsePositive
+  }))
+};
+console.log('ORDEM CONTEXTUAL EXPERIMENTAL — '+JSON.stringify(report.experimental_context_rerank.metrics));
 const file=path.join(root,'qa-report','metrics.json');
 fs.mkdirSync(path.dirname(file),{recursive:true});
 fs.writeFileSync(file,JSON.stringify(report,null,2)+'\n');
