@@ -324,10 +324,7 @@ html:not(.with-gguf) [data-gguf-ui],html:not(.with-vector) [data-vector-ui]{disp
 /* Arquitetura experimental sem conversa: LFM3/GGUF saiu do fluxo do produto.
  * Este ocultamento NÃO significa que o Telepatia NLI já foi convertido.
  */
-html.semantic-direct-mode [data-gguf-ui],
-html.semantic-direct-mode #settings-panel-ai,
-html.semantic-direct-mode .gguf-box,
-html.semantic-direct-mode .ai-buttons {display:none!important}
+/* O modo de busca direta mantém a curadoria GGUF acessível. */
 
 
 /* Telepatia: seleção acessível imediatamente, antes de qualquer busca. */
