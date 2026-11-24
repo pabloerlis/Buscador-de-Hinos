@@ -1,0 +1,94 @@
+name: Contextual absolute relevance - real 2018 catalog
+on:
+  push:
+    branches: [qa/contextual-absolute-relevance-20261124]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  contextual_gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Recuperar E5 auditado recente (fallback se expirou)
+        id: e5_artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 45294250230
+          name: e5-stanza-assets-qa
+          github-token: ${{ github.token }}
+          path: app/src/main/assets
+      - name: Recuperar indices biblicos auditados recentes (fallback se expirou)
+        id: bible_artifact
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 45294250230
+          name: bible-indexes-qa
+          github-token: ${{ github.token }}
+          path: app/src/main/assets
+      - name: Recriar offline assets de fontes fixadas se artefatos expiraram
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ ! -s app/src/main/assets/scripture-pt.json ] || [ ! -s app/src/main/assets/bible-graph.json ]; then
+            python3 scripts/build_scripture_index.py
+            python3 scripts/build_bible_graph.py
+            python3 scripts/qa_sources.py
+          fi
+          if [ ! -s app/src/main/assets/e5-model.onnx ] || [ ! -s app/src/main/assets/e5-vocab.bin ] || [ ! -s app/src/main/assets/e5-index.json ]; then
+            python3 -m pip install --disable-pip-version-check -q "numpy==1.26.4" "onnxruntime==1.20.1" "tokenizers==0.20.3" "huggingface_hub==0.27.1" requests
+            python3 scripts/build_e5_assets.py
+            python3 scripts/qa_e5_android_tokenizer.py
+            python3 scripts/qa_e5.py
+          fi
+          test -s app/src/main/assets/scripture-pt.json
+          test -s app/src/main/assets/bible-graph.json
+          test -s app/src/main/assets/e5-model.onnx
+          test -s app/src/main/assets/e5-vocab.bin
+          test -s app/src/main/assets/e5-index.json
+      - name: Generate actual E5 query vectors and download pinned catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --disable-pip-version-check -q "numpy==1.26.4" "onnxruntime==1.20.1" "tokenizers==0.20.3" "huggingface_hub==0.27.1" requests
+          curl -fsSL --retry 3 'https://raw.githubusercontent.com/italozaina/projection-html5-icm/da8e75932982123301affce688e45b4152c9e06e/data/data.json' -o "$RUNNER_TEMP/coletanea.json"
+          echo "57d42fb0bcc881a62b210dd1a3972822d2c39856f7a01278e104d407bf1b747a  $RUNNER_TEMP/coletanea.json" | sha256sum -c
+          node tests/qa-contextual-absolute.js --queries > "$RUNNER_TEMP/queries.json"
+          python3 - <<'PY'
+          import sys, os, json, hashlib
+          from pathlib import Path
+          import numpy as np
+          import onnxruntime as ort
+          from tokenizers import Tokenizer
+          from huggingface_hub import hf_hub_download
+          sys.path.insert(0,'scripts')
+          from build_e5_assets import encode,opt,REPO,REVISION,MODEL_SHA256
+          tmp=Path(os.environ['RUNNER_TEMP'])
+          model_path=Path('app/src/main/assets/e5-model.onnx')
+          assert hashlib.sha256(model_path.read_bytes()).hexdigest()==MODEL_SHA256
+          q=json.loads((tmp/'queries.json').read_text())
+          tokenizer=Tokenizer.from_file(hf_hub_download(repo_id=REPO,filename='tokenizer.json',revision=REVISION))
+          model=ort.InferenceSession(str(model_path),sess_options=opt(),providers=['CPUExecutionProvider'])
+          v=encode(model,tokenizer,['query: '+x for x in q],max_tokens=96)
+          assert v.shape==(len(q),384) and np.isfinite(v).all()
+          (tmp/'vectors.json').write_text(json.dumps(dict(zip(q,v.tolist())),ensure_ascii=False))
+          PY
+      - name: Absolute contextual gate - no previous-version comparison
+        run: node tests/qa-contextual-absolute.js "$RUNNER_TEMP/coletanea.json" "$RUNNER_TEMP/vectors.json"
+      - name: Publish diagnostics even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-absolute-report
+          path: qa-report/contextual-absolute.json
+          if-no-files-found: warn
