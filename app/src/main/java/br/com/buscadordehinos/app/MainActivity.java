@@ -87,10 +87,21 @@ public final class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new ImportBridge(), "NativeHinos");
+        web.addJavascriptInterface(new HarrierPackageBridge(), "NativeHarrierPackage");
         if(BuildConfig.ENABLE_EMBEDDINGS){
             web.addJavascriptInterface(new VectorBridge(), "NativeVector");
         }
         web.loadUrl(HOST + "/assets/index.html");
+    }
+    private final class HarrierPackageBridge {
+        private final HarrierPackage pack=HarrierPackage.get(getFilesDir());
+        @JavascriptInterface public String status(){
+            try{return new JSONObject().put("phase",pack.phase()).put("message",pack.message()).put("downloaded",pack.downloaded()).put("total",HarrierPackage.TOTAL_BYTES).toString();}
+            catch(Exception e){return "{}";}
+        }
+        @JavascriptInterface public void install(){pack.start();}
+        @JavascriptInterface public void cancel(){pack.cancel();}
+        @JavascriptInterface public void remove(){pack.remove();}
     }
     private final class VectorBridge {
         @JavascriptInterface public String status(){
@@ -173,7 +184,7 @@ public final class MainActivity extends Activity {
     }
     @Override protected void onDestroy(){
         if(pendingFile!=null)pendingFile.onReceiveValue(null);
-        if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeVector");web.destroy();web=null;}
+        if(web!=null){web.removeJavascriptInterface("NativeHinos");web.removeJavascriptInterface("NativeVector");web.removeJavascriptInterface("NativeHarrierPackage");web.destroy();web=null;}
         vectorExecutor.shutdown();
         super.onDestroy();
     }
