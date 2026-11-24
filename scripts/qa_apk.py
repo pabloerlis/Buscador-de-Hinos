@@ -12,6 +12,7 @@ import re
 import subprocess
 import sys
 import zipfile
+from signature_policy import inspect_signature
 
 ROOT = Path(__file__).resolve().parents[1]
 APK = Path(sys.argv[1]) if len(sys.argv)>1 else ROOT/"app/build/outputs/apk/debug/app-debug.apk"
@@ -76,16 +77,22 @@ if aapt.is_file():
     check("name='br.com.buscadordehinos.app'" in manifest,"applicationId inesperado")
     check("versionCode='"+version_code+"'" in manifest,"versionCode incompatível")
     check("versionName='"+version_name+"'" in manifest,"versionName incompatível")
+signature = inspect_signature('', 1)
 if apksigner.is_file():
-    result=subprocess.run([str(apksigner),"verify","--verbose",str(APK)],
+    result=subprocess.run([str(apksigner),"verify","--verbose","--print-certs",str(APK)],
                           text=True,stdout=subprocess.PIPE,stderr=subprocess.PIPE,check=False)
-    check(result.returncode==0,"Assinatura Android inválida: "+result.stderr.strip())
+    signature = inspect_signature(result.stdout, result.returncode)
+    check(signature["verified"],"Assinatura Android inválida ou certificado ambíguo: "+result.stderr.strip())
+    check(signature["update_certificate_matches"],"Certificado incompatível com a linha original 2.6.1-agentes-QA; publicação bloqueada")
 
 sha=hashlib.sha256(APK.read_bytes()).hexdigest()
 report={"apk":APK.name,"version_name":version_name,"version_code":int(version_code),
         "source_sha":expected_sha,"sha256":sha,"bytes":APK.stat().st_size,
-        "signed":apksigner.is_file() and not any("Assinatura" in e for e in errors),
-        "passed":not errors}
+        "signed":signature["verified"],
+        "signature":signature,
+        "update_install_tested":False,
+        "distribution_approved":False,
+        "passed":not errors,"errors":errors}
 output=ROOT/"qa-report/apk-audit.json"
 output.parent.mkdir(exist_ok=True)
 output.write_text(json.dumps(report,indent=2)+"\n",encoding="utf-8")

@@ -50,6 +50,8 @@ jobs:
           while IFS= read -r -d '' file; do node --check "$file"; done < <(find app/src/main/assets tests -type f -name '*.js' -print0)
       - name: Auditar interface, versao, licencas e bloqueio da compilacao
         run: python3 scripts/qa_static.py
+      - name: Testar politica de certificado de atualizacao
+        run: python3 -m unittest discover -s scripts -p test_signature_policy.py
 
   regressions:
     name: "Agente 3 | Testes funcionais de regressao"
@@ -169,6 +171,7 @@ jobs:
       # A chave da linha de distribuição e o teste de atualização precisam existir
       # antes de expor um APK para instalação. Este fluxo guarda apenas a auditoria.
       - name: Guardar relatorio de auditoria do candidato
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: apk-audit-qa
