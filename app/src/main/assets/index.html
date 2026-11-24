@@ -26,8 +26,6 @@
   <script src="semantic-tuner.js" defer></script>
   <script src="semantic-tuner-ui.js" defer></script>
   <script src="app.js" defer></script>
-  <script src="telepatia-nli-sequence.js" defer></script>
-  <script src="telepatia-nli-client.js" defer></script>
 </head>
 <body>
   <div class="app-shell">
@@ -101,14 +99,11 @@
             <div class="tuner-history-head"><h3>Pesquisas recentes</h3><button type="button" data-tuner-clear-history class="text-action">Limpar histórico</button></div>
             <div id="tuner-history-home-list" class="tuner-history-list"></div>
           </section>
-          <section id="nli-home-card" class="nli-setup-card" aria-labelledby="nli-home-title">
-            <div class="nli-setup-heading"><h2 id="nli-home-title">Telepatia</h2><span class="local-badge">Offline</span></div>
-            <p id="nli-status-home" class="nli-setup-status" role="status" aria-live="polite">Verificando modelo local…</p>
-            <div class="nli-control-actions">
-              <button id="nli-select-home" data-nli-select type="button" class="primary-btn">Selecionar ZIP</button>
-              <button id="nli-load-home" data-nli-load type="button" class="secondary-btn" disabled>Carregar</button>
-            </div>
-            <p class="subtle-note">Importe o pacote ONNX do Telepatia preparado para o aplicativo.</p>
+          <section id="gguf-home-card" class="nli-setup-card" aria-labelledby="gguf-home-title" data-gguf-ui>
+            <div class="nli-setup-heading"><h2 id="gguf-home-title">Qwen3 — IA local</h2><span class="local-badge">GGUF · Offline</span></div>
+            <p id="gguf-home-status" class="nli-setup-status" role="status">Verificando motor local…</p>
+            <div class="nli-control-actions"><button id="gguf-select-home" type="button" class="primary-btn">Selecionar arquivo .gguf</button><button id="gguf-load-home" type="button" class="secondary-btn">Carregar modelo</button></div>
+            <p class="subtle-note">Use Qwen3-4B-Instruct-2507 Q4_K_M. Depois de carregar, pesquise e toque em Selecionar hinos com Qwen3.</p>
           </section>
         </div>
 
@@ -124,15 +119,6 @@
                 <div class="tuner-title-row"><div><h3 id="tuner-title">Ajuste contextual</h3><p>Reordenação instantânea, offline</p></div><span class="local-badge">Local</span></div>
                 <label class="tuner-switch"><input type="checkbox" id="tuner-enabled" checked><span>Busca direta, sem conversa</span></label>
                 <p class="tuner-info">Equilibrada mantém a ordem da busca. Alterar os pesos reordena os primeiros candidatos.</p>
-                <div class="nli-controls" aria-label="Modelo de inferência textual">
-                  <div class="nli-controls-title"><strong>Telepatia Laya PT/ES NLI</strong><span class="local-badge">Modelo externo</span></div>
-                  <p id="nli-status" class="tuner-info" role="status" aria-live="polite">Verificando modelo selecionado…</p>
-                  <div class="nli-control-actions">
-                    <button type="button" id="nli-select" data-nli-select class="secondary-btn">Escolher ZIP do modelo</button>
-                    <button type="button" id="nli-load" data-nli-load class="secondary-btn" disabled>Carregar</button>
-                  </div>
-                  <p class="tuner-info">Analisa a mensagem central dos primeiros candidatos quando o modelo é carregado. Implicação, neutro e contradição não são probabilidades.</p>
-                </div>
                 <div class="tuner-presets" role="group" aria-label="Perfis de classificação">
                   <button type="button" data-tuner-preset="narrative">Narrativa</button>
                   <button type="button" data-tuner-preset="balanced">Equilibrada</button>
@@ -229,7 +215,7 @@
       <div class="settings-tabs" role="tablist" aria-label="Seções das configurações">
         <button id="settings-tab-library" role="tab" type="button" aria-selected="true" aria-controls="settings-panel-library">Biblioteca</button>
         <button id="settings-tab-search" role="tab" type="button" aria-selected="false" aria-controls="settings-panel-search" tabindex="-1">Busca</button>
-        <button id="settings-tab-ai" role="tab" type="button" aria-selected="false" aria-controls="settings-panel-ai" tabindex="-1" data-gguf-ui>IA local</button>
+        <button id="settings-tab-ai" role="tab" type="button" aria-selected="false" aria-controls="settings-panel-ai" tabindex="-1" data-gguf-ui>Qwen3 / GGUF</button>
         <button id="settings-tab-about" role="tab" type="button" aria-selected="false" aria-controls="settings-panel-about" tabindex="-1">Sobre</button>
       </div>
       <div class="settings-content" id="settings-scroll">
@@ -274,17 +260,8 @@
       </section>
       </div>
       <div id="settings-panel-search" role="tabpanel" aria-labelledby="settings-tab-search" tabindex="0" hidden>
-      <section id="nli-settings-card" class="semantic-settings" aria-labelledby="nli-settings-title">
-        <div class="setting-section-heading"><h3 id="nli-settings-title">Modelo Telepatia NLI</h3><span class="local-badge">Modelo externo</span></div>
-        <p id="nli-status-settings" class="nli-setup-status" role="status" aria-live="polite">Verificando modelo local…</p>
-        <div class="settings-actions">
-          <button id="nli-select-settings" data-nli-select type="button" class="primary-btn">Selecionar ZIP do modelo</button>
-          <button id="nli-load-settings" data-nli-load type="button" class="secondary-btn" disabled>Carregar</button>
-        </div>
-        <p class="subtle-note">Baixe o pacote ONNX externo do Telepatia e selecione o ZIP original. Sem LFM3/GGUF e sem necessidade de descompactar.</p>
-      </section>
       <section class="semantic-settings" aria-label="Preferências de busca semântica">
-        <div class="setting-section-heading"><h3>Busca contextual offline</h3><span class="local-badge">E5 + NLI</span></div>
+        <div class="setting-section-heading"><h3>Busca contextual offline</h3><span class="local-badge">E5 + Qwen3</span></div>
         <label for="search-mode">Prioridade da pesquisa</label>
         <select id="search-mode"><option value="balanced">Equilibrada (recomendada)</option><option value="context">Contextual: priorizar significado</option><option value="literal">Literal: priorizar palavras exatas</option></select>
         <label for="semantic-power">Força das relações semânticas <strong id="semantic-power-value">75%</strong></label>
@@ -337,12 +314,12 @@
         <p>Escolha e carregue um arquivo <code>.gguf</code> do telefone. Use Qwen3-4B-Instruct-2507 Q4_K_M. Depois de carregar, faça uma busca e toque em Selecionar hinos com Qwen3. A avaliação integral de até 18 candidatos é experimental e pode ser lenta.</p>
         <p id="gguf-status" class="gguf-status" role="status">Verificando motor local…</p>
         <p id="gguf-phase" class="gguf-phase">Estado: verificando</p><p id="gguf-model-meta" class="subtle-note">Nenhum modelo foi carregado na memória.</p>
-        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Usar IA automaticamente para sugerir palavras-chave (desativado por padrão). A busca offline sempre aparece primeiro.</span></label>
+        <label class="ai-switch"><input type="checkbox" id="gguf-auto"><span>Executar curadoria Qwen3 automaticamente após a busca (pode ser lento).</span></label>
         <p id="gguf-last" class="gguf-phase" aria-live="polite">Última execução: nenhuma</p>
         <div class="settings-actions"><button id="gguf-select" class="secondary-btn" type="button">Escolher arquivo .gguf</button><button id="gguf-load" class="primary-btn" type="button">Carregar modelo</button></div>
         <div class="settings-actions"><button id="gguf-test" class="secondary-btn" type="button" disabled>Testar modelo</button><button id="gguf-cancel" class="secondary-btn" type="button" disabled>Interromper IA</button></div>
         <p id="gguf-test-result" class="subtle-note" role="status" aria-live="polite">Carregue o GGUF para testar a geração no aparelho.</p>
-        <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. Modelos como Gemma 4 E2B podem precisar de vários GB adicionais. Funciona em Android ARM64.</p>
+        <p class="setting-warning">O arquivo deve permanecer acessível no telefone. O aplicativo usa mapeamento de memória e lotes menores, mas o Android pode limitar cada processo mesmo com RAM livre. Erros de formato GGUF, quantização ou acesso ao arquivo serão exibidos separadamente. O Qwen3 4B pode exigir vários GB adicionais de RAM. Funciona em Android ARM64.</p>
       </section>
       </div>
       </div>
