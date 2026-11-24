@@ -1,8 +1,8 @@
 name: Android APK - verificacao por agentes
+# Pipeline legada LFM3/GGUF: somente main. A variante Telepatia utiliza
+# telepatia-android-device.yml e nao pode publicar um APK legado por engano.
 on:
   push:
-    branches: ['**']
-  pull_request:
     branches: [main]
   workflow_dispatch:
 permissions:
