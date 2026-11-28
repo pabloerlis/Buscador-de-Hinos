@@ -733,6 +733,61 @@ const OfflineAPI = (() => {
       summary:graphCtx?'Busca por contexto bíblico offline: '+graphCtx.reference+'. Resultados baseados nas evidências das letras.':scripture?'Texto da Bíblia Livre consultado offline: '+scripture.reference+'.':bible?'Referência '+bible.reference+': '+bible.theme+'.':isBiblicalRef&&!storyIntent?.matches.length?'Referência bíblica não mapeada localmente; cole o texto do versículo para buscar por seu significado.':'',
       bible_reference:graphCtx?.reference||scripture?.reference||bible?.reference||null,bible_verses:scripture?.verses?.length||0,scripture_source:scripture?.source||null};
   }
+  // P2: pool recuperado do catálogo integral, independente de page/lastResults.
+  // Não reclassifica ranking nem afirma julgamento semântico.
+  function contextualCandidates(payload){
+    if(typeof ContextualRetrieval==='undefined'||!ContextualRetrieval.buildPool)
+      throw Error('Recuperação contextual indisponível nesta versão.');
+    const query=String(payload?.query||'').trim();
+    if(!query||query.length>500)throw Error('Consulta contextual inválida.');
+    const opts=searchOptions(payload?.settings);
+    const exactNumber=/^(?:(?:coletanea|principal|avulsos?|cia|criancas|infantil)\s+)?(?:hino\s*|louvor\s*)?\d{1,4}$/i.test(normalize(query));
+    const exactTitle=titleIndex.has(normalizeLyrics(query));
+    const strategies=[['baseline',opts.mode,opts.fusionMode]];
+    if(!exactNumber&&!exactTitle)strategies.push(
+      ['context','context','rrf'],['literal','literal','rrf'],['legacy','balanced','legacy']);
+    const poolVariants={},metadata=new Map();
+    for(const [name,mode,fusionMode] of strategies){
+      const result=search({
+        ...payload,query,parsed_query:true,page:1,_forRecommendations:true,
+        settings:{...opts,mode,fusionMode,pageSize:10}
+      });
+      const eligible=(result._fullRanked||[]).filter(row=>{
+        const hymn=hymns[row.id-1];
+        return hymn&&hymn.id===row.id&&
+          !RepertoireStore.isNotLearned(hymn)&&collectionEnabled(hymn,opts);
+      });
+      poolVariants[name]=eligible;
+      for(const hit of eligible)if(!metadata.has(hit.id))metadata.set(hit.id,hit);
+    }
+    const requested=Math.floor(Number(payload?.limit)||50);
+    const limit=Math.max(10,Math.min(60,requested));
+    const pool=ContextualRetrieval.buildPool(poolVariants,{
+      limit,pageSize:opts.pageSize
+    });
+    return {
+      schema_version:1,query,retrieval_mode:'full_catalog_multi_strategy',
+      semantic_judgment:'NOT_VERIFIED',default_ranking_changed:false,
+      vector_query_included:opts.vectorMode!=='off'&&
+        typeof VectorIndex!=='undefined'&&VectorIndex.status().ready&&
+        VectorIndex.checkQuery(payload?.vector_query),
+      strategies:strategies.map(x=>x[0]),limit,
+      count:pool.returned_count,
+      candidate_count_outside_visible_page:pool.beyond_visible_page,
+      candidate_count_novel_to_baseline:pool.novel_vs_baseline_full,
+      protected_top10:pool.protected_top10,
+      candidates:pool.candidates.map(item=>{
+        const hit=metadata.get(item.hymn_id);
+        if(!hit)throw Error('Candidato sem fonte verificável.');
+        return {hymn_id:item.hymn_id,number:hit.number,title:hit.title,
+          collection:hit.collection,baseline_position:item.baseline_position,
+          source_positions:item.source_positions,
+          outside_baseline_top10:item.outside_baseline_top10,
+          novel_vs_baseline_full:item.novel_vs_baseline_full,
+          source_status:'unjudged_not_verified'};
+      })
+    };
+  }
   function queryRanking(query,opts){
     if(!query||!query.trim()||/^(?:hino\s*)?\d{1,4}$/i.test(query.trim()))return new Map();
     const key=JSON.stringify([query,opts.mode,opts.strength,opts.narratives,opts.related,opts.customAliases,opts.collections,opts.vectorMode,opts.fusionMode,opts.eventEvidence]);
@@ -830,6 +885,16 @@ const OfflineAPI = (() => {
     if(url==='/api/import')return importJson(payload.data);
     if(url==='/api/import-remote')return downloadRemote();
     if(url==='/api/search')return search(payload);
+    if(url==='/api/contextual/candidates')return contextualCandidates(payload);
+    if(url==='/api/bible/context'){
+      const reference=String(payload?.reference||'');
+      if(reference.length>140||!scriptureIndex)return null;
+      const count=Math.max(1,Math.min(12,Number(payload?.limit)||8));
+      const entry=scriptureIndex.lookup(reference,count);
+      if(!entry)return null;
+      return {reference:entry.reference,source:entry.source,partial:entry.partial,
+        verses:entry.verses.slice(0,count).map(v=>({number:v.number,text:v.text}))};
+    }
     if(url==='/api/recommend')return recommendRelated(payload);
     const match=url.match(/^\/api\/hymns\/(\d+)$/);
     if(match)return hymnDetail(Number(match[1]));

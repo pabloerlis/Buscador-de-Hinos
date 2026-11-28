@@ -40,7 +40,7 @@ function makeRuntime(){
     }};
   vm.createContext(ctx);
   for(const name of ['semantic-engine.js','story-engine.js','bridge-engine.js','bible-context.js','scripture-index.js',
-    'bible-graph-engine.js','recommendation-engine.js','repertoire-store.js','offline-api.js']){
+    'bible-graph-engine.js','recommendation-engine.js','repertoire-store.js','contextual-retrieval.js','offline-api.js']){
     vm.runInContext(fs.readFileSync(path.join(root,name),'utf8'),ctx,{filename:name});
   }
   return vm.runInContext('OfflineAPI',ctx);

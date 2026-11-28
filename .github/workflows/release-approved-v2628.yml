@@ -1,0 +1,71 @@
+name: Publicar APK v2.6.28 ja aprovado
+
+on:
+  push:
+    branches: [codex/contextual-p0-p1-profile-schema]
+    paths: ['.github/workflows/release-approved-v2628.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  deliver_existing_qa:
+    name: Entregar APK v2.6.28 ja validado
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 67b21b3e64d02707a093535afadf4476814840aa
+      - uses: actions/download-artifact@v4
+        with:
+          name: Buscador-de-Hinos-v2.6.28-QA-aprovado
+          run-id: 45091717703
+          github-token: ${{ github.token }}
+          repository: pabloerlis/Buscador-de-Hinos
+          path: qa-approved
+      - name: Conferir pacote, SHA-256, versao, pareceres e rastreabilidade
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,hashlib,re
+          from pathlib import Path
+          root=Path('qa-approved')
+          def one(name):
+            matches=list(root.rglob(name))
+            assert len(matches)==1,(name,[str(x) for x in matches])
+            return matches[0]
+          apk=one('app-debug.apk')
+          audit=json.loads(one('apk-audit.json').read_text())
+          review=json.loads(one('independent-review.json').read_text())
+          cross=json.loads(one('semantic-crossversion-agent.json').read_text())
+          digest=hashlib.sha256(apk.read_bytes()).hexdigest()
+          assert digest==audit['sha256']==review['apk']['sha256'], 'SHA-256 divergente'
+          assert audit['passed'] is True and review['decision']=='approved' and not review['errors']
+          assert audit['local_e5_embedded'] is True and audit['local_gguf_engine_embedded'] is True
+          assert cross['decision']=='approved' and not cross['errors']
+          assert re.search(r'versionCode\s+47\b',Path('app/build.gradle').read_text())
+          assert re.search(r"versionName\s+'2\.6\.28'",Path('app/build.gradle').read_text())
+          release=Path('qa-release')
+          release.mkdir(exist_ok=True)
+          output=release/'Buscador-de-Hinos-v2.6.28-QA.apk'
+          output.write_bytes(apk.read_bytes())
+          (release/'SHA256SUMS.txt').write_text(digest+'  '+output.name+'\n')
+          print('APK validado: '+digest)
+          PY
+      - name: Criar prerelease com APK diretamente acessivel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create v2.6.28-qa-pr59 \
+            qa-release/Buscador-de-Hinos-v2.6.28-QA.apk \
+            qa-release/SHA256SUMS.txt \
+            --target 67b21b3e64d02707a093535afadf4476814840aa \
+            --title 'Buscador de Hinos 2.6.28 - APK QA experimental' \
+            --prerelease \
+            --notes 'Build 47. Codigo 67b21b3e. APK proveniente da execucao 45091717703, aprovado por todos os agentes incluindo Android, E5, GGUF e revisao independente. Opcao Explorar alem da pagina compara trechos de cinco hinos dentre ate trinta candidatos. O GGUF deve ser selecionado pelo usuario. Preview nao mesclada na main.'

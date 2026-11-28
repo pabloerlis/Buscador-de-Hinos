@@ -3,7 +3,9 @@
 const LocalHymnAI = (() => {
   const MAX_CANDIDATES = 5;
   const MAX_PICKS = 2;
-  const COMPARISON_TIMEOUT_MS = 20000;
+  // Medição em Android x86_64: 20s pode expirar antes do primeiro resultado GBNF.
+  // Limite explícito de 35s, não ocultar demora nem assumir latência ARM64.
+  const COMPARISON_TIMEOUT_MS = 35000;
   const MAX_THEME_OPTIONS = 8;
   const LOOKUP_CHARACTERS = 'A-Za-zÀ-ÖØ-öø-ÿ ';
   const invalidLookupCharacter = new RegExp(`[^${LOOKUP_CHARACTERS}]`);
@@ -16,11 +18,30 @@ const LocalHymnAI = (() => {
     timeoutMs: 20000
   };
 
+  // Só o texto original local é fonte de evidência, nunca um resumo inventado.
+  // Esta amostra NÃO substitui verificação integral; apenas distribui as
+  // partes de início, meio e fim dentro do orçamento atual de 1280 tokens.
+  function excerptFromWholeLyrics(lyrics){
+    const source=String(lyrics||'').trim();
+    if(!source)return '';
+    let parts=source.split(/\n\s*\n/).map(x=>x.split(/\n/).map(l=>l.trim()).filter(Boolean))
+      .filter(x=>x.length);
+    if(parts.length===1&&parts[0].length>=3){
+      const lines=parts[0];
+      parts=lines.map(line=>[line]);
+    }
+    const one=p=>clip(p?.[0]||'',30);
+    const first=one(parts[0]);
+    const middle=one(parts[Math.floor((parts.length-1)/2)]);
+    const last=one(parts[parts.length-1]);
+    if(parts.length===1)return 'Letra: '+clip(first,110);
+    return 'Início: '+first+' | Meio: '+middle+' | Fim: '+last;
+  }
   function prepareComparison(query, exclusions, hymns, context, lookup = null) {
     const candidates = new Map();
     for (const hymn of hymns) {
       const { id } = hymn;
-      const excerpt = clip(hymn.snippet, 72);
+      const excerpt = clip(hymn.snippet, 130);
       if (!Number.isSafeInteger(id) || id < 1 || candidates.has(id) || !excerpt || excerpt === 'Nenhum trecho disponível') continue;
       candidates.set(id, {
         id,
@@ -52,7 +73,7 @@ const LocalHymnAI = (() => {
       context?.reference && 'Ref.: '+promptText(context.reference, 30),
       context?.reference && context?.passage && promptText(context.passage, 54),
       candidates.size && 'ID | trecho',
-      ...[...candidates.values()].map(hymn=>hymn.id+' | '+promptText(hymn.excerpt, 72))
+      ...[...candidates.values()].map(hymn=>hymn.id+' | '+promptText(hymn.excerpt, 130))
     ].filter(Boolean).join('\n');
     const grammar = [
       'root ::= '+(lookupRequired?'lookup':canLookup?'picks | lookup':'picks'),
@@ -99,6 +120,27 @@ const LocalHymnAI = (() => {
     return { added: extra.length, hymns: [...original.slice(0,MAX_CANDIDATES-extra.length),...extra] };
   }
 
+  // Five short excerpts from as many as 30 current search hits, no reranking.
+  function selectExpandedCandidates(pages) {
+    if (!Array.isArray(pages) || pages.length<1 || pages.length>3 ||
+      pages.some(page => !Array.isArray(page) || page.length>10))
+      throw Error('Páginas de candidatos inválidas.');
+    const selected=[],seen=new Set();
+    function add(h){
+      const id=Number(h?.id);
+      if(!Number.isSafeInteger(id)||id<1||seen.has(id)||
+        !String(h.snippet||'').trim()||selected.length>=MAX_CANDIDATES)return;
+      seen.add(id);selected.push(h);
+    }
+    pages[0].slice(0,3).forEach(add);
+    for(const page of pages.slice(1)){
+      const item=page.find(h=>Number.isSafeInteger(h?.id)&&!seen.has(h.id)&&String(h.snippet||'').trim());
+      if(item)add(item);
+    }
+    for(const page of pages)for(const h of page)add(h);
+    return selected;
+  }
+
   function prepareThemes(query, exclusions, labels, timeoutMs, preferred = []) {
     const normalize = text => text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
     const canonical = new Map(labels.map(label=>[normalize(label),label]));
@@ -125,5 +167,5 @@ const LocalHymnAI = (() => {
     };
   }
 
-  return { diagnostic, prepareComparison, readComparison, mergeCandidates, prepareThemes };
+  return { diagnostic, prepareComparison, readComparison, mergeCandidates, selectExpandedCandidates, excerptFromWholeLyrics, prepareThemes };
 })();

@@ -20,3 +20,26 @@ fs.writeFileSync(out,JSON.stringify({
   prompt:request.prompt, grammar:request.grammar, maxTokens:request.maxTokens,
   timeoutMs:request.timeoutMs, expected:3
 })+'\n');
+
+
+// P4: chamar no Android a MESMA gramática e prompt do chat instalado no APK.
+const chatSource=fs.readFileSync('app/src/main/assets/local-hymn-chat.js','utf8');
+const chat=vm.runInNewContext(chatSource+'\nHymnChatTools');
+const chatRequest=chat.planPrompt('Procure hinos sobre o retorno arrependido do filho pródigo.',{
+  topic:'Retorno do filho pródigo',preferences:[],turns:[],candidates:[]
+});
+const chatTarget='app/src/androidTest/assets/lfm3-chat-decision.json';
+fs.writeFileSync(chatTarget,JSON.stringify({
+  prompt:chatRequest.prompt,grammar:chatRequest.grammar,
+  maxTokens:chatRequest.maxTokens,timeoutMs:chatRequest.timeoutMs,
+  expected:'BUSCAR'
+})+'\n');
+
+
+const answerRequest=chat.answerPrompt('Quais hinos se relacionam ao arrependimento?',{
+  topic:'Arrependimento e retorno',preferences:[],turns:[],candidates:[]
+},{tool:'search_hymns',modelContext:'ID 8 — Hino 008 — Retorno e perdão'});
+fs.writeFileSync('app/src/androidTest/assets/lfm3-chat-answer.json',JSON.stringify({
+  prompt:answerRequest.prompt,grammar:answerRequest.grammar,
+  maxTokens:24,timeoutMs:60000
+})+'\n');

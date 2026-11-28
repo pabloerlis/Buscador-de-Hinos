@@ -12,7 +12,7 @@ const cpp=read('app/src/main/cpp/hinos_jni.cpp');
 const cmake=read('app/src/main/cpp/CMakeLists.txt');
 const build=read('app/build.gradle');
 const workflow=read('.github/workflows/android-apk.yml');
-for(const id of ['gguf-cancel','ai-cancel','gguf-select','gguf-load','gguf-improve','gguf-compare','gguf-compare-model','gguf-test','gguf-test-result','gguf-comparison','gguf-status','gguf-banner','gguf-auto','ai-workspace','ai-indicator','modal-ai-ask','settings-ai','gguf-phase','gguf-model-meta'])assert.match(html,new RegExp('id="'+id+'"'),id);
+for(const id of ['gguf-compare-expanded','gguf-cancel','ai-cancel','gguf-select','gguf-load','gguf-improve','gguf-compare','gguf-compare-model','gguf-test','gguf-test-result','gguf-comparison','gguf-status','gguf-banner','gguf-auto','ai-workspace','ai-indicator','modal-ai-ask','settings-ai','gguf-phase','gguf-model-meta'])assert.match(html,new RegExp('id="'+id+'"'),id);
 for(const fn of ['selectModel','loadModel','generate','cancel','status'])assert.match(java,new RegExp('public (?:synchronized )?'+(fn==='status'?'String':'void')+' '+fn+'\\('),'Java bridge: '+fn);
 assert.match(js,/window\.NativeGGUF/);
 assert.match(js,/\.generate\(prompt/);
@@ -137,7 +137,22 @@ const merged=ai.mergeCandidates(hymns.slice(0,5),[hymns[0],hymns[5],hymns[5]]);
 assert.equal(merged.added,1);
 assert.equal(merged.hymns.at(-1).id,6);
 
-const ggufSource=js.slice(js.indexOf('const GGUF='),js.lastIndexOf('refreshStatus().catch'));
+const pagesInput=[
+  hymns.slice(0,5),
+  [{id:21,title:'Hino fora da página',number:'021',snippet:'O amor de Deus alcança a todos.'}],
+  [{id:31,title:'Outro resultado fora da página',number:'031',snippet:'O Senhor ampara na dificuldade.'}]
+];
+const selected=ai.selectExpandedCandidates(pagesInput);
+assert.deepEqual([...selected.map(h=>h.id)],[1,2,3,21,31]);
+assert.equal(ai.prepareComparison('Consolo',[],selected,null).candidates.size,5);
+assert.deepEqual([...ai.selectExpandedCandidates([hymns.slice(0,2)]).map(h=>h.id)],[1,2]);
+assert.throws(()=>ai.selectExpandedCandidates([hymns,hymns,hymns,hymns]),/inválidas/);
+const evidence=ai.excerptFromWholeLyrics('Começo do relato e da oração\n\nA luta cresce na caminhada\n\nAo final vem a consolação e a paz');
+assert.match(evidence,/Início: Começo.*Meio: A luta.*Fim: Ao final/);
+assert.ok(evidence.length<=130);
+assert.equal(ai.excerptFromWholeLyrics(''), '');
+const retrieval=require('../app/src/main/assets/contextual-retrieval.js');
+const ggufSource=js.slice(js.indexOf('const GGUF='),js.indexOf('const HymnChatUI='));
 const searchSource=js.slice(js.indexOf('async function performSearch('),js.indexOf('function appendConversation'));
 function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false,nativeModel=true}={}){
   const calls=[],cancelled=[],elements=new Map(),requests=[],embeddings=[],opened=[],messages=[];
@@ -158,9 +173,21 @@ function setup({ready=true,initialResults=hymns,additionalSearch=null,auto=false
   const {gguf,search}=vm.runInNewContext(aiSource+searchSource+ggufSource+'\n({gguf:GGUF,search:performSearch})',{window,$,state,performance:{now:()=>now},localStorage:{getItem:()=>auto?'1':null},setInterval(){},toast(){},appendConversation:(kind,text)=>messages.push(text),showResults(){},
     document:{createElement(){return {addEventListener(name,handler){this.click=handler;}};}},openHymn:id=>opened.push(id),
     OfflineAPI:{normalize:value=>value.toLowerCase(),semanticLabels:()=>['Arrependimento'],validateHints:hints=>hints},
+    ContextualRetrieval:retrieval,
     jsonRequest:async(url,payload)=>{
       requests.push(payload);
-      if(additionalSearch&&payload.settings.pageSize===10)return additionalSearch();
+      if(url==='/api/contextual/candidates')return {
+        semantic_judgment:'NOT_VERIFIED',default_ranking_changed:false,count:6,
+        candidates:[{hymn_id:1},{hymn_id:2},{hymn_id:6,novel_vs_baseline_full:true},
+          {hymn_id:3,outside_baseline_top10:true,source_positions:{context:3}},
+          {hymn_id:4,outside_baseline_top10:true,source_positions:{legacy:4}},
+          {hymn_id:5}]
+      };
+      if(/^\/api\/hymns\/\d+$/.test(url)){
+        const h=hymns[Number(url.split('/').pop())-1];
+        return {...h,lyrics:'Primeira estrofe do hino\n\nMensagem do meio\n\nConclusão da letra'};
+      }
+      if(additionalSearch&&payload?.settings?.pageSize===10)return additionalSearch();
       return {results:hymns,effective_query:payload.query,excluded:payload.exclude,deprioritized:nativeModel?payload.deprioritize:['tristeza'],ai_context:context,total:hymns.length,page:payload.page||1};
     },
     busySearch:value=>{state.busy=value;},resultCard:()=>'',RepertoireUI:{renderSearch(){}},EmbeddingSearch:{maybeUpdate:(...args)=>embeddings.push(args)}});
@@ -179,6 +206,17 @@ async function checkBridge(){
   diagnostic.complete(id,'OK',true,{setupMs:10,prefillMs:5,firstTokenMs:15,tokens:1});
   assert.match(diagnostic.$('gguf-test-result').textContent,/Teste passou.*Primeiro token: 15 ms/);
 
+  const expanded=setup({additionalSearch:async()=>({results:hymns.slice(0,5),has_more:false})});
+  expanded.$('gguf-compare-expanded').click();
+  await tick();
+  assert.equal(expanded.requests[0].limit,50);
+  assert.equal(expanded.requests[0].settings.mode,'balanced');
+  assert.equal(expanded.requests[0].vector_query,expanded.vector);
+  assert.equal(expanded.calls.length,1);
+  assert.match(expanded.$('gguf-comparison-text').textContent,/Recuperação em toda a coletânea/);
+  assert.match(expanded.calls[0][0],/Início:.*Meio:.*Fim:/);
+  expanded.complete(expanded.calls[0][1],'[2]');
+  assert.match(expanded.$('gguf-comparison-text').textContent,/Sugestões da IA/);
   const comparison=setup();
   comparison.$('gguf-compare-model').click();
   const comparisonId=comparison.calls[0][1];
@@ -208,7 +246,7 @@ async function checkBridge(){
   assert.equal(extra.state.effectiveQuery,'Voltar para Deus');
   assert.equal(extra.state.lastResults,hymns);
   assert.equal(extra.calls.length,2);
-  assert.equal(extra.calls[1][4],18000);
+  assert.equal(extra.calls[1][4],extra.calls[0][4]-2000);
   assert.notEqual(extra.calls[1][1],extra.calls[0][1]);
   assert.doesNotMatch(extra.calls[1][2],/\bbuscar_hinos\b/);
   extra.complete(extra.calls[1][1],'[6]');
@@ -238,7 +276,7 @@ async function checkBridge(){
 
   const expired=setup({additionalSearch:async()=>({results:[hymns[5]]})});
   expired.$('gguf-compare-model').click();
-  expired.setTime(20500);
+  expired.setTime(expired.calls[0][4]+500);
   expired.complete(expired.calls[0][1],toolCall);
   await tick();
   assert.equal(expired.calls.length,1);

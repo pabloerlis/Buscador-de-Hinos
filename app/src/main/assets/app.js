@@ -561,13 +561,13 @@ const EmbeddingSearch=(()=>{
       status('E5 Small: ranking vetorial atualizado em '+(answer.ms/1000).toFixed(1)+'s. Sem internet.');
     }catch(error){if(epoch===state.searchEpoch)status('Busca local preservada · modelo E5: '+error.message);}
   }
-  return {maybeUpdate};
+  return {maybeUpdate,encode:request};
 })();
 
 const GGUF=(()=>{
   const native=()=>window.NativeGGUF||null;
   const selectedState={ready:false,busy:false,task:null};
-  let nextRequest=0,queuedAuto=null;
+  let nextRequest=0,queuedAuto=null,expandedPending=false;
   const aiCache=new Map();
   const MAX_AI_MS=12000;
   const canUseTopics=()=>!state.exactNumber&&state.searchSettings.mode!=='literal';
@@ -604,6 +604,7 @@ const GGUF=(()=>{
     $('gguf-improve').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||!canUseTopics();
     $('gguf-compare').disabled=!state.lastResults.length;
     $('gguf-compare-model').disabled=!selectedState.ready||selectedState.busy||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
+    $('gguf-compare-expanded').disabled=!selectedState.ready||selectedState.busy||expandedPending||state.busy||state.repertoirePending||!state.effectiveQuery||state.exactNumber;
     $('gguf-compare-model').textContent=state.lastResults.length<2?'Buscar hinos com IA':'Comparar com IA';
     $('gguf-test').disabled=!selectedState.ready||selectedState.busy;
     $('gguf-cancel').disabled=!selectedState.task; if($('ai-cancel'))$('ai-cancel').classList.toggle('hidden',!selectedState.task);
@@ -715,6 +716,53 @@ const GGUF=(()=>{
       showTask('Buscando hinos com IA',`Trechos disponíveis para o modelo: ${request.candidates.size}.`);
     }
   }
+  async function compareExpanded(){
+    if(expandedPending||state.busy||selectedState.busy||state.repertoirePending||
+      !state.ready||!state.effectiveQuery||state.exactNumber)return;
+    const epoch=state.searchEpoch,query=state.effectiveQuery;
+    const search={query,exclusions:state.exclude.slice(),
+      deprioritized:state.deprioritize?.slice(),context:state.aiContext,settings:state.searchSettings};
+    expandedPending=true;
+    $('gguf-compare-expanded').disabled=true;
+    showTask('Recuperação contextual','Consultando o catálogo completo por estratégias independentes da página…');
+    try{
+      const response=await jsonRequest('/api/contextual/candidates',{
+        query,parsed_query:true,...searchRestrictions(),
+        semantic_hints:state.semanticHints,vector_query:state.vectorQuery,
+        settings:search.settings,limit:50
+      });
+      if(epoch!==state.searchEpoch||selectedState.task)return;
+      if(response.semantic_judgment!=='NOT_VERIFIED'||response.default_ranking_changed!==false||
+        !Array.isArray(response.candidates))throw Error('Resposta de recuperação incompatível.');
+      const selected=ContextualRetrieval.selectForInspection(response.candidates);
+      const candidates=[];
+      for(const item of selected){
+        if(epoch!==state.searchEpoch||selectedState.task)return;
+        if(!Number.isSafeInteger(item.hymn_id)||item.hymn_id<1)continue;
+        const hymn=await jsonRequest('/api/hymns/'+item.hymn_id);
+        if(epoch!==state.searchEpoch||selectedState.task)return;
+        if(hymn.id!==item.hymn_id)throw Error('O hino consultado não corresponde ao candidato.');
+        const snippet=LocalHymnAI.excerptFromWholeLyrics(hymn.lyrics);
+        if(snippet)candidates.push({
+          id:hymn.id,number:hymn.number,title:hymn.title,
+          collection:hymn.collection,snippet
+        });
+      }
+      const request=LocalHymnAI.prepareComparison(query,search.exclusions,candidates,search.context);
+      if(!request.candidates.size){toast('Não há candidatos disponíveis para comparação.');return;}
+      if(startTask('compare',request,{
+        search,deadline:performance.now()+request.timeoutMs,
+        expanded:true,expandedPoolCount:response.count
+      })){
+        $('gguf-comparison-text').textContent='Recuperação em toda a coletânea: '+response.count+' candidatos. A IA recebe apenas amostras do início, meio e fim de até cinco letras; a mensagem integral ainda NÃO foi verificada pelo modelo.';
+        $('gguf-comparison-actions').replaceChildren();
+        $('gguf-comparison').classList.remove('hidden');
+        showTask('Comparação contextual experimental',
+          request.candidates.size+' letras consultadas localmente; só três partes de cada uma foram enviadas à IA. Nenhuma mudança no ranking padrão.');
+      }
+    }catch(error){if(epoch===state.searchEpoch)toast('Recuperação contextual falhou: '+error.message);}
+    finally{expandedPending=false;info();}
+  }
   async function completeLookup(task,term){
     if(task.deadline-performance.now()<1000){resetTask('A comparação atingiu o limite de tempo antes da busca complementar.',true);return;}
     task.id=null;
@@ -740,13 +788,14 @@ const GGUF=(()=>{
     if(remaining<1000){resetTask('A comparação atingiu o limite de tempo após a busca complementar.',true);return;}
     sendTask(task,{...request,timeoutMs:remaining});
   }
-  function displayComparison(picks,lookup){
+  function displayComparison(picks,lookup,task=null){
     const format = hymn => [
       (hymn.number?'Hino '+hymn.number+' — ':'')+hymn.title,
       'Trecho da coletânea: “'+hymn.excerpt+'”'
     ].join('\n');
     const parts = [];
-    if(state.lastResults.length)parts.push(indexComparison());
+    if(task?.expanded)parts.push('Amostra do início, meio e fim de letras recuperadas de toda a coletânea. A IA NÃO verificou a letra integral.');
+    else if(state.lastResults.length)parts.push(indexComparison());
     if(lookup)parts.push('Busca complementar por “'+lookup.term+'” · '+lookup.added+' novo(s) candidato(s)');
     parts.push(picks.length?'Sugestões da IA\n\n'+picks.map(format).join('\n\n'):
       'A IA não destacou nenhum trecho.');
@@ -789,6 +838,7 @@ const GGUF=(()=>{
       toast(ok?'GGUF carregado.':'Falha ao carregar GGUF: '+value);info();return;
     }
     if(event!=='generate')return;
+    if(window.__hymnChatNativeEvent?.(ok,value,requestId,metrics))return;
     const task=selectedState.task;
     if(!task||task.id!==requestId)return;
     if(task.cancelled){
@@ -809,7 +859,7 @@ const GGUF=(()=>{
       try{
         const result=LocalHymnAI.readComparison(answer,task);
         if(result.lookup){completeLookup(task,result.lookup);return;}
-        displayComparison(result.picks,task.lookup);
+        displayComparison(result.picks,task.lookup,task);
       }
       catch(error){resetTask('A IA respondeu em um formato inválido. Tente comparar novamente.',true);return;}
       resetTask('Comparação concluída.');return;
@@ -827,6 +877,7 @@ const GGUF=(()=>{
   $('gguf-improve').addEventListener('click',()=>interpret(state.effectiveQuery||state.originalQuery));
   $('gguf-cancel').addEventListener('click',cancelIfBusy);if($('ai-cancel'))$('ai-cancel').addEventListener('click',cancelIfBusy);
   $('gguf-compare-model').addEventListener('click',compareWithModel);
+  $('gguf-compare-expanded').addEventListener('click',compareExpanded);
   $('gguf-compare').addEventListener('click',compare);$('modal-ai-ask').addEventListener('click',detail);
   // Em atualizações antigas a IA estava ligada automaticamente. Na 1.4 fica desligada inicialmente.
   const savedAuto=localStorage.getItem('hinos-gguf-auto-v15');$('gguf-auto').checked=savedAuto==='1';
@@ -834,4 +885,236 @@ const GGUF=(()=>{
   if(native())setInterval(info,1250);
   info();return {info,maybeAuto,cancelSearchTask};
 })();
+
+// v2.6.30 — chat local em aba isolada, com orquestrador de ferramentas allowlisted.
+// A IA seleciona a ferramenta; o aplicativo valida os argumentos e executa
+// apenas endpoints offline. Nenhuma alteração no ranking padrão de busca.
+const HymnChatUI=(()=>{
+  const session={topic:'',preferences:[],turns:[],candidates:[],bibleReference:null};
+  const native=()=>window.NativeGGUF||null;
+  let active=false,sequence=0,callSequence=0,pending=null,currentStatusLine=null;
+  // O Android ModelBridge.generate aceita exclusivamente IDs numéricos de 1–12 dígitos.
+  // A faixa 8xxxxxxxxxx evita colisão com os IDs curtos dos fluxos legados.
+  const chatRequestId=()=> '8'+String(++callSequence).padStart(10,'0');
+  const generationStages=['Aguardando o motor','Preparando contexto','Processando entrada','Gerando resposta'];
+  const messages=$('chat-messages'),sources=$('chat-sources'),events=$('chat-events');
+  const initialMessage='Descreva o assunto, uma anotação espiritual ou a passagem bíblica. Vou conversar e consultar a biblioteca quando necessário.';
+  function trace(text){
+    const item=document.createElement('li');
+    item.textContent=String(text).slice(0,230);
+    events.appendChild(item);
+    while(events.children.length>14)events.firstElementChild.remove();
+  }
+  function bubble(role,content){
+    const el=document.createElement('div');
+    el.className='chat-bubble '+(role==='user'?'user':'assistant');
+    el.textContent=String(content);
+    messages.appendChild(el);
+    messages.scrollTop=messages.scrollHeight;
+    return el;
+  }
+  function setBusy(busy){
+    active=busy;$('chat-send').disabled=busy;
+    $('chat-stop').disabled=!busy;
+    $('chat-reset').disabled=false;
+    $('chat-input').disabled=busy;
+  }
+  function modelStatus(){
+    try{return JSON.parse(native()?.status?.()||'{}');}catch{return {};}
+  }
+  function updateModelLabel(){
+    const status=modelStatus();
+    const text=status.loaded?'GGUF carregado no aparelho · '+(status.name||'modelo local'):
+      'GGUF não carregado. Escolha e carregue o modelo em Configurações → IA.';
+    $('chat-engine-state').textContent=text;
+  }
+  function setTab(name){
+    const chat=name==='chat';
+    $('main-tab-chat').classList.toggle('active',chat);
+    $('main-tab-search').classList.toggle('active',!chat);
+    $('main-tab-chat').setAttribute('aria-selected',String(chat));
+    $('main-tab-search').setAttribute('aria-selected',String(!chat));
+    $('chat-screen').classList.toggle('hidden',!chat);
+    $('search-screen').classList.toggle('hidden',chat);
+    if(chat){updateModelLabel();$('chat-input').focus({preventScroll:true});}
+  }
+  function cancelGeneration(){
+    sequence++;
+    if(currentStatusLine){
+      currentStatusLine.textContent='Processamento interrompido.';
+      currentStatusLine=null;
+    }
+    if(pending){
+      const old=pending;
+      pending=null;
+      clearTimeout(old.watchdog);
+      try{native()?.cancel?.(old.id);}catch{}
+      old.reject(Error('Geração interrompida.'));
+    }
+  }
+  function generate(request,stage){
+    return new Promise((resolve,reject)=>{
+      if(pending)return reject(Error('A IA ainda está processando outra mensagem.'));
+      if(!native()?.generate)return reject(Error('Motor GGUF indisponível.'));
+      const id=chatRequestId();
+      const budget=Math.min(120000,Math.max(1000,Number(request.timeoutMs)||25000));
+      // Defesa independente do JNI: uma solicitação perdida não deixa o chat bloqueado.
+      const watchdog=setTimeout(()=>{
+        if(pending?.id!==id)return;
+        pending=null;
+        try{native()?.cancel?.(id);}catch{}
+        reject(Error('O motor não retornou em '+Math.ceil((budget+6000)/1000)+
+          ' s. Verifique a atividade da IA ou recarregue o modelo.'));
+      },budget+6000);
+      pending={id,resolve,reject,watchdog,stage};
+      try{native().generate(request.prompt,id,request.grammar,
+        request.maxTokens,request.timeoutMs);}
+      catch(e){clearTimeout(watchdog);pending=null;reject(e);}
+    });
+  }
+  // Roteia somente o ID exato da requisição pendente do chat.
+  // Todos os demais eventos continuam no fluxo GGUF convencional.
+  window.__hymnChatNativeEvent=(ok,value,requestId,metrics)=>{
+    if(!pending||pending.id!==String(requestId))return false;
+    const task=pending;pending=null;
+    clearTimeout(task.watchdog);
+    if(ok)task.resolve({text:String(value),metrics:metrics||{}});
+    else task.reject(Error(String(value).slice(0,240)));
+    return true;
+  };
+  function showCandidates(rows){
+    sources.replaceChildren();
+    for(const item of rows.slice(0,5)){
+      if(!Number.isSafeInteger(item.hymn_id))continue;
+      const btn=document.createElement('button');
+      btn.type='button';btn.className='chat-source';
+      btn.textContent='Ver hino '+(item.number||'—')+' · '+String(item.title||'').slice(0,50);
+      btn.addEventListener('click',()=>openHymn(item.hymn_id));
+      sources.appendChild(btn);
+    }
+  }
+  async function submit(message){
+    if(active)return;
+    const userText=String(message||'').trim().slice(0,480);
+    if(!userText)return;
+    bubble('user',userText);
+    $('chat-input').value='';
+    if(!state.ready){
+      bubble('assistant','Importe a coletânea antes de consultar hinos. A pesquisa e a Bíblia funcionam localmente após a importação.');
+      return;
+    }
+    const status=modelStatus();
+    if(!status.loaded){
+      bubble('assistant','O modelo GGUF ainda não está carregado. Abra Configurações → IA, escolha o arquivo e toque em Carregar modelo.');
+      return;
+    }
+    if(status.busy){
+      bubble('assistant','O modelo está ocupado com outra geração. Interrompa a tarefa anterior ou tente novamente.');
+      return;
+    }
+    const epoch=++sequence,start=performance.now();
+    setBusy(true);
+    const statusLine=bubble('assistant','Interpretando o pedido…');
+    currentStatusLine=statusLine;
+    let lastStage='';
+    // O dispositivo expõe progresso real do GGUF (prefill / geração).
+    const progressTimer=setInterval(()=>{
+      if(epoch!==sequence||!pending||!active)return;
+      const info=modelStatus();
+      const label=generationStages[info.generationStage]||generationStages[0];
+      const seconds=Math.max(0,Math.floor(Number(info.elapsedMs)||0)/1000);
+      const step=pending.stage==='routing'?'Interpretando pedido':'Elaborando resposta';
+      statusLine.textContent=step+' · '+label+' · '+seconds+' s';
+      const signature=pending.stage+':'+label;
+      if(signature!==lastStage){
+        trace(step+': '+label+(Number.isFinite(info.promptTokens)?' · entrada '+info.promptTokens+' tokens':''));
+        lastStage=signature;
+      }
+    },1200);
+    try{
+      let plan=HymnChatTools.quickPlan(userText);
+      if(plan){
+        trace('Pedido explícito: '+plan+' · roteador local, sem geração desnecessária.');
+      }else{
+        const routing=HymnChatTools.planPrompt(userText,session);
+        const decision=await generate(routing,'routing');
+        if(epoch!==sequence)return;
+        plan=HymnChatTools.readPlan(decision.text,routing.allowed);
+        trace('Decisão LFM3: '+plan+' · '+Math.round(performance.now()-start)+' ms');
+      }
+      statusLine.textContent=plan==='CONVERSAR'?'Preparando resposta…':
+        'Executando consulta '+{BUSCAR:'ao catálogo',LER:'à letra original',BIBLIA:'à Bíblia local'}[plan]+'…';
+      const toolStart=performance.now();
+      let vector=null;
+      if(plan==='BUSCAR'&&window.NativeVector&&state.status?.vector_count&&
+        state.searchSettings.vectorMode!=='off'){
+        try{
+          const query=HymnChatTools.queryFor(session,userText);
+          const encoded=await Promise.race([
+            EmbeddingSearch.encode(query),
+            new Promise((_,reject)=>setTimeout(()=>reject(Error('Prazo de codificação E5 excedido')),12000))
+          ]);
+          if(epoch!==sequence)return;
+          vector=encoded.vector;
+          trace('E5 local: vetor 384D gerado · '+Math.round(performance.now()-toolStart)+' ms.');
+        }catch(e){trace('E5 indisponível, mantendo busca textual local: '+String(e.message).slice(0,95));}
+      }
+      if(epoch!==sequence)return;
+      const result=await HymnChatTools.execute(plan,userText,session,jsonRequest,state.searchSettings,{vector});
+      if(epoch!==sequence)return;
+      trace('Ferramenta: '+result.tool+' · '+Math.round(performance.now()-toolStart)+' ms · '+result.display);
+      if(result.tool==='search_hymns')showCandidates(result.candidates||[]);
+      statusLine.textContent='Consulta concluída: '+result.display+' Elaborando resposta…';
+      const draft=HymnChatTools.answerPrompt(userText,session,result);
+      const generated=await generate(draft,'answer');
+      if(epoch!==sequence)return;
+      const reply=HymnChatTools.sanitizeAnswer(generated.text);
+      statusLine.textContent=reply;
+      HymnChatTools.remember(session,userText);
+      session.turns.push({role:'user',text:userText},{role:'assistant',text:reply});
+      session.turns=session.turns.slice(-HymnChatTools.MAX_TURNS);
+      trace('Resposta: '+(generated.metrics.tokens||0)+' tokens · '+Math.round(performance.now()-start)+' ms (duas etapas)');
+    }catch(error){
+      if(epoch===sequence){
+        statusLine.textContent='Não consegui concluir esta mensagem: '+error.message+
+          '. A conversa foi preservada; você pode tentar novamente.';
+        trace('Falha: '+String(error.message).slice(0,130));
+      }
+    }finally{
+      clearInterval(progressTimer);
+      if(currentStatusLine===statusLine)currentStatusLine=null;
+      if(epoch===sequence){setBusy(false);updateModelLabel();}
+    }
+  }
+  $('main-tab-search').addEventListener('click',()=>setTab('search'));
+  $('main-tab-chat').addEventListener('click',()=>setTab('chat'));
+  $('chat-configure').addEventListener('click',()=>{
+    selectSettingsTab($('settings-tab-ai'));openLayer('settings');
+  });
+  $('chat-form').addEventListener('submit',e=>{
+    e.preventDefault();submit($('chat-input').value);
+  });
+  $('chat-input').addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit($('chat-input').value);}
+  });
+  $('chat-stop').addEventListener('click',()=>{
+    cancelGeneration();
+    bubble('assistant','Execução interrompida. O histórico anterior foi mantido.');
+    trace('Geração cancelada pelo usuário.');
+    setBusy(false);
+  });
+  $('chat-reset').addEventListener('click',()=>{
+    cancelGeneration();
+    session.topic='';session.preferences=[];session.turns=[];session.candidates=[];session.bibleReference=null;
+    messages.replaceChildren();sources.replaceChildren();events.replaceChildren();
+    bubble('assistant',initialMessage);
+    setBusy(false);
+    $('chat-input').value='';
+    $('chat-input').focus();
+  });
+  setBusy(false);
+  updateModelLabel();
+  return {setTab,submit};
+})();
+
 refreshStatus().catch(e=>toast('Não foi possível acessar a base local: '+e.message));
